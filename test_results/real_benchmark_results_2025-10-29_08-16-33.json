@@ -1,0 +1,62 @@
+﻿{
+    "success_rate":  100,
+    "results":  [
+                    {
+                        "Test":  "Two Sum",
+                        "Category":  "Easy",
+                        "Success":  true,
+                        "Duration":  56.49,
+                        "ExitCode":  0,
+                        "HasFunction":  true,
+                        "Language":  "Python",
+                        "CodePreview":  "```py\r\ndef two_sum(nums: list[int], target: int) -\u003e list[int]:\r\n    \"\"\"\r\n    Given a list of integers and a target integer, return indices of two numbers that sum to target.\r\n    Use hash table for O(n) time.\r"
+                    },
+                    {
+                        "Test":  "Valid Parentheses",
+                        "Category":  "Easy",
+                        "Success":  true,
+                        "Duration":  37.96,
+                        "ExitCode":  0,
+                        "HasFunction":  true,
+                        "Language":  "Python",
+                        "CodePreview":  "```py\r\ndef is_valid(s: str) -\u003e bool:\r\n    \"\"\"\r\n    Check if a string of parentheses is valid using a stack.\r\n    \"\"\"\r"
+                    },
+                    {
+                        "Test":  "Binary Search",
+                        "Category":  "Easy",
+                        "Success":  true,
+                        "Duration":  43.54,
+                        "ExitCode":  0,
+                        "HasFunction":  true,
+                        "Language":  "Python",
+                        "CodePreview":  "```py\r\ndef binary_search(arr: list, target: int) -\u003e int:\r\n    \"\"\"Performs binary search on a sorted array.\r\n\r\n    Args:\r"
+                    },
+                    {
+                        "Test":  "3Sum",
+                        "Category":  "Medium",
+                        "Success":  true,
+                        "Duration":  43.42,
+                        "ExitCode":  0,
+                        "HasFunction":  true,
+                        "Language":  "Python",
+                        "CodePreview":  "```py\r\ndef three_sum(arr):\r\n    arr.sort()\r\n    triplets = []\r\n    for i in range(len(arr) - 2):\r"
+                    },
+                    {
+                        "Test":  "Longest Substring",
+                        "Category":  "Medium",
+                        "Success":  true,
+                        "Duration":  40.25,
+                        "ExitCode":  0,
+                        "HasFunction":  true,
+                        "Language":  "Python",
+                        "CodePreview":  "```py\r\ndef length_of_longest_substring(s: str) -\u003e int:\r\n    \"\"\"\r\n    Finds length of longest substring without repeating characters.\r\n    :param s: input string\r"
+                    }
+                ],
+    "note":  "These are REAL test results, not expectations",
+    "total_time":  221.6562582,
+    "passed":  5,
+    "total_tests":  5,
+    "timestamp":  "2025-10-29 08:16:33",
+    "average_time":  44.33,
+    "failed":  0
+}

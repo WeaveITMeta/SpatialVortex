@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Markdown Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <h1>Markdown Rendering Test</h1>
+    
+    <h2>Raw Input:</h2>
+    <pre id="raw"></pre>
+    
+    <h2>Rendered Output:</h2>
+    <div id="output" style="border: 1px solid #ccc; padding: 20px; background: #1a1a1a; color: #e4e4e7;"></div>
+    
+    <script>
+        const testMarkdown = `# Consciousness: A Complex Phenomenon
+
+Consciousness is a multifaceted and debated topic among philosophers, neuroscientists, and psychologists.
+
+## Theories of Consciousness
+
+Several theories attempt to explain the nature of consciousness:
+
+* **Integrated Information Theory (IIT)**: Proposed by Giulio Tononi
+* **Global Workspace Theory (GWT)**: By Bernard Baars  
+* **Panpsychism**: Consciousness is fundamental
+
+## The Neural Correlates
+
+Research has identified several brain regions:
+
+* Thalamus
+* Cortex
+* Brainstem`;
+
+        document.getElementById('raw').textContent = testMarkdown;
+        
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+        
+        const html = marked.parse(testMarkdown);
+        document.getElementById('output').innerHTML = html;
+    </script>
+</body>
+</html>

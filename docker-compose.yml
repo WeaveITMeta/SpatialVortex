@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: spatial_vortex
+      POSTGRES_USER: spatial_user
+      POSTGRES_PASSWORD: spatial_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spatial_user -d spatial_vortex"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  spatial-vortex:
+    build: .
+    ports:
+      - "7000:7000"
+    environment:
+      DATABASE_URL: postgresql://spatial_user:spatial_pass@postgres:5432/spatial_vortex
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info,spatial_vortex=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

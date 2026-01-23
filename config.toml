@@ -1,0 +1,57 @@
+# SpatialVortex Production Configuration
+# Copy this file to config.toml and customize for your environment
+
+[server]
+host = "127.0.0.1"
+port = 7000
+workers = 4
+enable_cors = true
+
+[database]
+# PostgreSQL connection - URI format required for Rust async drivers
+# Format: postgresql://[user[:password]@][host][:port][/database]
+url = "postgresql://postgres@localhost:5432/spatialvortex"
+pool_size = 10
+connection_timeout_seconds = 30
+
+[cache]
+# Redis connection (optional - in-memory cache used if not available)
+url = "redis://127.0.0.1:6379/"
+ttl_hours = 24
+pool_size = 10
+
+[onnx]
+# ONNX model paths
+model_path = "./models/model.onnx"
+tokenizer_path = "./models/tokenizer.json"
+batch_size = 32
+
+[confidence_lake]
+# Encrypted storage configuration
+path = "./data/confidence_lake.mmap"
+size_mb = 1024
+encryption_enabled = true
+# Generate key with: openssl rand -hex 32
+encryption_key = "c53bd079db35d107cea3448ade64325a75c9c6ceb4794446eec39cfd01c51a4c"
+signal_threshold = 0.6
+
+[voice]
+# Voice pipeline configuration
+sample_rate = 44100
+buffer_size = 1024
+channels = 1
+
+[ai]
+# External AI service (optional)
+api_key = ""
+endpoint = ""
+
+[logging]
+level = "info"  # trace, debug, info, warn, error
+format = "json"  # json or pretty
+
+[features]
+# Feature flags
+onnx_enabled = true
+lake_enabled = true
+voice_enabled = true

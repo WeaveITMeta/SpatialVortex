@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "description": "Semantic knowledge graph of SpatialVortex documentation",
+  "nodes": {
+    "flux-matrix": {
+      "path": "architecture/inference-layer/flux-matrix.md",
+      "type": "component",
+      "layer": "inference",
+      "related": ["asi-orchestrator", "vcp", "elp-channels", "compression"],
+      "prerequisite": ["tensors", "vortex-mathematics"],
+      "concepts": ["inferential-index", "weighted-alternatives", "beam-search"]
+    },
+    "reference-byte": {
+      "path": "architecture/data-layer/reference-byte.md",
+      "type": "component",
+      "layer": "data",
+      "related": ["compression", "tensors", "storage"],
+      "prerequisite": ["vortex-mathematics"],
+      "concepts": ["property-schemas", "16-byte-format", "orm"]
+    },
+    "vcp": {
+      "path": "architecture/inference-layer/vcp.md",
+      "type": "component",
+      "layer": "inference",
+      "related": ["dynamic-context", "hallucination-detection", "sacred-geometry"],
+      "prerequisite": ["vortex-mathematics", "tensors"],
+      "concepts": ["context-preservation", "40-percent-improvement"]
+    },
+    "elp-channels": {
+      "path": "concepts/elp-channels.md",
+      "type": "concept",
+      "layer": "cross-cutting",
+      "related": ["tensors", "beam-visualization", "sacred-positions"],
+      "prerequisite": [],
+      "concepts": ["ethos-logos-pathos", "three-dimensional-semantics"]
+    },
+    "sacred-geometry": {
+      "path": "foundations/vortex-mathematics/sacred-geometry.md",
+      "type": "foundation",
+      "layer": "mathematical",
+      "related": ["doubling-sequence", "vcp", "signal-strength"],
+      "prerequisite": [],
+      "concepts": ["3-6-9", "sacred-positions", "attractors"]
+    },
+    "compression": {
+      "path": "foundations/information-theory/compression.md",
+      "type": "foundation",
+      "layer": "mathematical",
+      "related": ["reference-byte", "flux-matrix", "tensors"],
+      "prerequisite": [],
+      "concepts": ["16-byte-hash", "625-to-1-ratio", "semantic-compression"]
+    },
+    "ai-router": {
+      "path": "architecture/processing-layer/ai-router.md",
+      "type": "component",
+      "layer": "processing",
+      "related": ["meta-orchestrator", "asi-orchestrator"],
+      "prerequisite": [],
+      "concepts": ["priority-routing", "request-management"]
+    },
+    "tensors": {
+      "path": "architecture/data-layer/tensors.md",
+      "type": "component",
+      "layer": "data",
+      "related": ["elp-channels", "compression", "beam-visualization"],
+      "prerequisite": [],
+      "concepts": ["beam-tensor", "elp-tensor", "data-structures"]
+    }
+  },
+  "concepts": {
+    "inferential-index": "Weighted alternatives tracking for optimal path selection",
+    "16-byte-format": "12 bytes core + 4 bytes schema reference",
+    "context-preservation": "40% better than linear transformers via vortex cycles",
+    "3-6-9": "Sacred positions excluded from doubling sequence, act as attractors",
+    "elp": "Ethos-Logos-Pathos three-dimensional semantic analysis"
+  },
+  "layers": {
+    "mathematical": "Theoretical foundation and formal proofs",
+    "data": "Storage, representation, compression",
+    "inference": "Meaning generation and context",
+    "processing": "Orchestration and routing",
+    "intelligence": "Learning and self-optimization"
+  }
+}

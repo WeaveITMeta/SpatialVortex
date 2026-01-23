@@ -1,0 +1,78 @@
+# Rust build artifacts - match at any level
+target/
+**/target/
+/target-build/
+*.rlib
+*.pdb
+*.exe
+*.dll
+*.d
+*.rmeta
+
+# Benchmark build artifacts (large .rlib files >100MB)
+benchmarks/target/
+benches/target/
+
+# Subdirectory target folders (ensure they're never tracked)
+viewer/target/
+backend-rs/target/
+
+# Benchmark data (large datasets - download separately)
+benchmarks/data/
+benches/data/
+
+# Benchmark datasets (download separately - structure/code tracked, data ignored)
+# benchmarks/  # Code is tracked, just not data files
+/.archive
+
+# ML Models (download separately, ~90MB)
+models/
+
+# IDE and code analysis tools
+.vscode/
+.idea/
+.VSCodeCounter/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+.logs/
+
+# Build artifacts and coverage
+build_rs_cov.profraw
+*.profraw
+
+# Debug tools
+tools/debug/*.log
+tools/debug/*.txt
+
+# Temporary files
+tree.txt
+commit_message.txt
+test_output.png
+benchmark_results_*.json
+cascade
+
+# Web build artifacts
+web/.svelte-kit/
+web/node_modules/
+web/build/
+web/dist/
+web/.svelte-kit/generated/
+
+# WASM build outputs (large binary files)
+web/src/lib/wasm/
+web/static/bevy/
+*.wasm
+
+# Training checkpoints (large binary files)
+checkpoints/

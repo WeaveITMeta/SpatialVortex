@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+target/
+*.o
+*.so
+*.exe
+
+# Config files (mount at runtime)
+config.toml
+.env
+
+# Data directories (mount at runtime)
+data/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CI/CD
+.github/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

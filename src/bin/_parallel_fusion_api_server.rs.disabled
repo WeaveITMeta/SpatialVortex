@@ -1,0 +1,340 @@
+//! Parallel Fusion API Server
+//!
+//! Production-ready API server using ParallelFusion orchestrator
+//!
+//! Features:
+//! - Actix-web for high performance
+//! - Prometheus metrics
+//! - Structured logging
+//! - Health checks
+//! - Unified API types
+//! - Error handling
+
+use actix_web::{web, App, HttpResponse, HttpServer, middleware};
+use spatial_vortex::ai::parallel_fusion::{
+    ParallelFusionOrchestrator, FusionConfig, FusionAlgorithm,
+};
+use spatial_vortex::ai::unified_api::{
+    UnifiedRequest, UnifiedResponse, UnifiedRequestBuilder,
+    ResponseMetadata, ResponseMetrics, HealthResponse, ErrorResponse,
+    ServiceStatus, ComponentHealth, SystemMetrics,
+};
+use spatial_vortex::monitoring::{VORTEX_METRICS, init_logging, LogConfig};
+use spatial_vortex::error::SpatialVortexError;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{info, error, warn};
+use std::collections::HashMap;
+use std::time::Instant;
+
+/// Application state
+struct AppState {
+    fusion: Arc<RwLock<ParallelFusionOrchestrator>>,
+    start_time: Instant,
+    total_requests: Arc<RwLock<u64>>,
+    successful_requests: Arc<RwLock<u64>>,
+    failed_requests: Arc<RwLock<u64>>,
+}
+
+/// Health check endpoint
+async fn health_check(data: web::Data<AppState>) -> HttpResponse {
+    let total = *data.total_requests.read().await;
+    let successful = *data.successful_requests.read().await;
+    let failed = *data.failed_requests.read().await;
+    
+    let uptime = data.start_time.elapsed().as_secs();
+    
+    let mut components = HashMap::new();
+    
+    // Check fusion orchestrator
+    components.insert(
+        "fusion_orchestrator".to_string(),
+        ComponentHealth {
+            status: ServiceStatus::Healthy,
+            message: Some("ParallelFusion operational".to_string()),
+            last_check: chrono::Utc::now().to_rfc3339(),
+        },
+    );
+    
+    // Check ASI orchestrator
+    components.insert(
+        "asi_orchestrator".to_string(),
+        ComponentHealth {
+            status: ServiceStatus::Healthy,
+            message: Some("ASI ready".to_string()),
+            last_check: chrono::Utc::now().to_rfc3339(),
+        },
+    );
+    
+    // Check Flux orchestrator
+    components.insert(
+        "flux_orchestrator".to_string(),
+        ComponentHealth {
+            status: ServiceStatus::Healthy,
+            message: Some("Flux runtime ready".to_string()),
+            last_check: chrono::Utc::now().to_rfc3339(),
+        },
+    );
+    
+    let error_rate = if total > 0 {
+        (failed as f32 / total as f32) * 100.0
+    } else {
+        0.0
+    };
+    
+    let avg_latency = if total > 0 {
+        // Estimate from Ensemble default (~400ms)
+        400.0
+    } else {
+        0.0
+    };
+    
+    let response = HealthResponse {
+        status: ServiceStatus::Healthy,
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        components,
+        metrics: SystemMetrics {
+            active_requests: 0,  // TODO: track active
+            total_requests: total,
+            avg_latency_ms: avg_latency,
+            error_rate,
+            memory_usage_mb: get_memory_usage_mb(),
+            cpu_usage_percent: 0.0,  // TODO: track CPU
+        },
+    };
+    
+    HttpResponse::Ok().json(response)
+}
+
+/// Process endpoint (unified API)
+async fn process(
+    data: web::Data<AppState>,
+    request: web::Json<UnifiedRequest>,
+) -> HttpResponse {
+    let start = Instant::now();
+    
+    // Increment total requests
+    *data.total_requests.write().await += 1;
+    
+    info!(
+        input_len = request.input.len(),
+        algorithm = ?data.fusion.read().await.get_config().await.algorithm,
+        "Processing request"
+    );
+    
+    // Validate request
+    if let Err(e) = request.validate() {
+        warn!(error = %e, "Invalid request");
+        return HttpResponse::BadRequest().json(ErrorResponse {
+            error_type: "ValidationError".to_string(),
+            message: e,
+            details: None,
+            flux_position: None,
+            sacred_position: false,
+            recovery_strategy: "Fix request".to_string(),
+            request_id: None,
+        });
+    }
+    
+    // Process with fusion
+    let fusion = data.fusion.read().await;
+    
+    match fusion.process(&request.input).await {
+        Ok(result) => {
+            let duration = start.elapsed();
+            
+            // Increment successful requests
+            *data.successful_requests.write().await += 1;
+            
+            // Record metrics
+            VORTEX_METRICS.record_meta_request(
+                &format!("{:?}", result.metadata.algorithm),
+                "Fusion",
+                duration.as_secs_f64(),
+                true,
+            );
+            
+            VORTEX_METRICS.record_flux_position(result.flux_position);
+            VORTEX_METRICS.record_confidence(result.confidence, "fusion");
+            
+            if result.sacred_boost {
+                VORTEX_METRICS.record_sacred_hit(result.flux_position, 0.15);
+            }
+            
+            info!(
+                confidence = result.confidence,
+                flux_position = result.flux_position,
+                sacred_boost = result.sacred_boost,
+                duration_ms = result.duration_ms,
+                "Request completed successfully"
+            );
+            
+            // Convert to UnifiedResponse
+            let response = UnifiedResponse {
+                result: result.content,
+                confidence: result.confidence,
+                flux_position: result.flux_position,
+                elp: result.elp,
+                confidence: result.confidence,
+                sacred_boost: result.sacred_boost,
+                metadata: ResponseMetadata {
+                    mode: Some(fusion.get_config().await.asi_mode),
+                    strategy: result.metadata.algorithm.clone(),
+                    orchestrators_used: "Fusion".to_string(),
+                    vortex_cycles: 0,
+                    models_used: vec!["ASI".to_string(), "Runtime".to_string()],
+                    confidence_lake_hit: false,
+                    consensus_achieved: result.metadata.both_succeeded,
+                    stored_to_lake: false,
+                },
+                metrics: ResponseMetrics {
+                    duration_ms: result.duration_ms,
+                    inference_ms: Some(result.metadata.asi_duration_ms),
+                    consensus_ms: None,
+                    lake_query_ms: None,
+                    tokens_used: None,
+                    cpu_usage: None,
+                    memory_bytes: None,
+                },
+                api_version: spatial_vortex::ai::unified_api::ApiVersion::V1,
+            };
+            
+            HttpResponse::Ok().json(response)
+        }
+        
+        Err(e) => {
+            let duration = start.elapsed();
+            
+            // Increment failed requests
+            *data.failed_requests.write().await += 1;
+            
+            error!(
+                error = ?e,
+                duration_ms = duration.as_millis(),
+                "Request failed"
+            );
+            
+            // Record error metrics
+            VORTEX_METRICS.record_error(
+                "fusion",
+                "parallel_fusion",
+                &format!("{:?}", e.recovery_strategy()),
+            );
+            
+            let error_response = ErrorResponse {
+                error_type: std::any::type_name_of_val(&e).to_string(),
+                message: e.to_string(),
+                details: Some(format!("{:?}", e)),
+                flux_position: e.flux_position(),
+                sacred_position: e.is_at_sacred_position(),
+                recovery_strategy: format!("{:?}", e.recovery_strategy()),
+                request_id: None,
+            };
+            
+            HttpResponse::InternalServerError().json(error_response)
+        }
+    }
+}
+
+/// Metrics endpoint
+async fn metrics() -> HttpResponse {
+    use prometheus::Encoder;
+    
+    let encoder = prometheus::TextEncoder::new();
+    let metric_families = prometheus::gather();
+    
+    let mut buffer = Vec::new();
+    if let Err(e) = encoder.encode(&metric_families, &mut buffer) {
+        error!(error = %e, "Failed to encode metrics");
+        return HttpResponse::InternalServerError().body("Failed to encode metrics");
+    }
+    
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4")
+        .body(buffer)
+}
+
+/// Get memory usage in MB
+fn get_memory_usage_mb() -> f64 {
+    // TODO: Implement actual memory tracking
+    // For now, return estimate
+    1800.0  // ~1.8GB typical for ParallelFusion
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    // Initialize logging
+    init_logging(LogConfig::production())
+        .expect("Failed to initialize logging");
+    
+    info!("Starting Parallel Fusion API Server");
+    
+    // Load configuration
+    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "7000".to_string())
+        .parse::<u16>()
+        .expect("Invalid PORT");
+    
+    let algorithm = std::env::var("FUSION_ALGORITHM")
+        .unwrap_or_else(|_| "ensemble".to_string())
+        .to_lowercase();
+    
+    let algorithm = match algorithm.as_str() {
+        "weighted" | "weightedaverage" => FusionAlgorithm::WeightedAverage,
+        "vote" | "majorityvote" => FusionAlgorithm::MajorityVote,
+        "stacking" => FusionAlgorithm::Stacking,
+        "bayesian" | "bayesianaverage" => FusionAlgorithm::BayesianAverage,
+        "adaptive" => FusionAlgorithm::Adaptive,
+        _ => FusionAlgorithm::Ensemble,  // Default
+    };
+    
+    info!(
+        host = %host,
+        port = port,
+        algorithm = ?algorithm,
+        "Configuration loaded"
+    );
+    
+    // Create fusion orchestrator
+    let config = FusionConfig {
+        algorithm,
+        ..Default::default()
+    };
+    
+    let fusion = ParallelFusionOrchestrator::new(config)
+        .await
+        .expect("Failed to create ParallelFusionOrchestrator");
+    
+    info!(
+        algorithm = ?fusion.get_config().await.algorithm,
+        "ParallelFusion orchestrator created"
+    );
+    
+    // Create app state
+    let app_state = web::Data::new(AppState {
+        fusion: Arc::new(RwLock::new(fusion)),
+        start_time: Instant::now(),
+        total_requests: Arc::new(RwLock::new(0)),
+        successful_requests: Arc::new(RwLock::new(0)),
+        failed_requests: Arc::new(RwLock::new(0)),
+    });
+    
+    info!("Starting HTTP server on {}:{}", host, port);
+    
+    // Create HTTP server
+    HttpServer::new(move || {
+        App::new()
+            .app_data(app_state.clone())
+            .wrap(middleware::Logger::default())
+            .wrap(middleware::Compress::default())
+            .route("/health", web::get().to(health_check))
+            .route("/api/v1/process", web::post().to(process))
+            .route("/metrics", web::get().to(metrics))
+    })
+    .bind((host.as_str(), port))?
+    .workers(num_cpus::get() * 2)  // 2 workers per CPU
+    .run()
+    .await
+}

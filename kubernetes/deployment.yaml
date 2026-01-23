@@ -1,0 +1,197 @@
+# SpatialVortex ASI System - Kubernetes Deployment
+# Production-ready deployment with all features enabled
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spatialvortex
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spatialvortex-config
+  namespace: spatialvortex
+data:
+  RUST_LOG: "info,spatial_vortex=debug"
+  ASI_PORT: "8080"
+  VOICE_ENABLED: "true"
+  LAKE_ENABLED: "true"
+  ML_ENABLED: "true"
+  CONFIDENCE_THRESHOLD: "0.6"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: spatialvortex-secrets
+  namespace: spatialvortex
+type: Opaque
+stringData:
+  LAKE_ENCRYPTION_KEY: "REPLACE_WITH_BASE64_ENCODED_32_BYTE_KEY"
+  DATABASE_URL: "sqlite:///data/confidence_lake.db"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spatialvortex-data
+  namespace: spatialvortex
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spatialvortex-models
+  namespace: spatialvortex
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spatialvortex-asi
+  namespace: spatialvortex
+  labels:
+    app: spatialvortex
+    component: asi-orchestrator
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spatialvortex
+      component: asi-orchestrator
+  template:
+    metadata:
+      labels:
+        app: spatialvortex
+        component: asi-orchestrator
+    spec:
+      containers:
+      - name: asi-orchestrator
+        image: weavesolutions/spatialvortex:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        envFrom:
+        - configMapRef:
+            name: spatialvortex-config
+        - secretRef:
+            name: spatialvortex-secrets
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: models
+          mountPath: /models
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health/liveness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health/readiness
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: spatialvortex-data
+      - name: models
+        persistentVolumeClaim:
+          claimName: spatialvortex-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spatialvortex-service
+  namespace: spatialvortex
+  labels:
+    app: spatialvortex
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: spatialvortex
+    component: asi-orchestrator
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: spatialvortex-hpa
+  namespace: spatialvortex
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: spatialvortex-asi
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Optional: Ingress for HTTPS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: spatialvortex-ingress
+  namespace: spatialvortex
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/websocket-services: "spatialvortex-service"
+spec:
+  tls:
+  - hosts:
+    - api.spatialvortex.ai
+    secretName: spatialvortex-tls
+  rules:
+  - host: api.spatialvortex.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: spatialvortex-service
+            port:
+              number: 80

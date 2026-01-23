@@ -1,0 +1,142 @@
+[
+  {
+    "id": "welcome_cube",
+    "name": "Welcome Cube",
+    "entity_type": "Cube",
+    "position": [0.0, 1.0, 0.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [1.0, 1.0, 1.0],
+    "tags": ["welcome", "sacred", "entry_point"],
+    "metadata": {
+      "description": "The Welcome Cube is the first entity visitors encounter. It represents the gateway to understanding sacred geometry.",
+      "significance": "Position 3 - Creative Trinity",
+      "color": "#FFD700"
+    }
+  },
+  {
+    "id": "harmony_sphere",
+    "name": "Harmony Sphere",
+    "entity_type": "Sphere",
+    "position": [3.0, 2.0, 0.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [1.5, 1.5, 1.5],
+    "tags": ["harmony", "balance", "sacred"],
+    "metadata": {
+      "description": "The Harmony Sphere embodies perfect balance between Ethos, Logos, and Pathos.",
+      "significance": "Position 6 - Structural Harmony",
+      "color": "#4169E1"
+    }
+  },
+  {
+    "id": "divine_pyramid",
+    "name": "Divine Pyramid",
+    "entity_type": "Pyramid",
+    "position": [-3.0, 0.0, 3.0],
+    "rotation": [0.0, 0.707, 0.0, 0.707],
+    "scale": [2.0, 3.0, 2.0],
+    "tags": ["divine", "ascension", "sacred"],
+    "metadata": {
+      "description": "The Divine Pyramid channels energy upward, representing spiritual ascension through vortex mathematics.",
+      "significance": "Position 9 - Divine Completion",
+      "color": "#9400D3"
+    }
+  },
+  {
+    "id": "vortex_torus",
+    "name": "Vortex Torus",
+    "entity_type": "Torus",
+    "position": [0.0, 5.0, 0.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [3.0, 3.0, 1.0],
+    "tags": ["vortex", "flow", "cycle"],
+    "metadata": {
+      "description": "The Vortex Torus demonstrates the 1-2-4-8-7-5-1 doubling sequence in physical form.",
+      "significance": "Represents the eternal cycle of vortex mathematics",
+      "color": "#00CED1"
+    }
+  },
+  {
+    "id": "ethos_pillar",
+    "name": "Ethos Pillar",
+    "entity_type": "Cylinder",
+    "position": [-5.0, 2.5, -5.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [0.5, 5.0, 0.5],
+    "tags": ["ethos", "character", "moral"],
+    "metadata": {
+      "description": "The Ethos Pillar stands for moral character and ethical grounding in all decisions.",
+      "significance": "Foundation of the ELP triad",
+      "color": "#228B22"
+    }
+  },
+  {
+    "id": "logos_crystal",
+    "name": "Logos Crystal",
+    "entity_type": "Crystal",
+    "position": [5.0, 2.0, -5.0],
+    "rotation": [0.0, 0.383, 0.0, 0.924],
+    "scale": [1.0, 2.0, 1.0],
+    "tags": ["logos", "logic", "reason"],
+    "metadata": {
+      "description": "The Logos Crystal refracts pure logical reasoning into actionable insights.",
+      "significance": "Clarity of thought in the ELP triad",
+      "color": "#1E90FF"
+    }
+  },
+  {
+    "id": "pathos_flame",
+    "name": "Pathos Flame",
+    "entity_type": "Flame",
+    "position": [0.0, 1.5, -8.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [1.0, 2.0, 1.0],
+    "tags": ["pathos", "emotion", "feeling"],
+    "metadata": {
+      "description": "The Pathos Flame burns with emotional resonance, connecting logic to human experience.",
+      "significance": "Heart of the ELP triad",
+      "color": "#FF4500"
+    }
+  },
+  {
+    "id": "sacred_triangle",
+    "name": "Sacred Triangle",
+    "entity_type": "Triangle",
+    "position": [0.0, 0.1, 0.0],
+    "rotation": [1.0, 0.0, 0.0, 0.0],
+    "scale": [10.0, 10.0, 0.1],
+    "tags": ["sacred", "369", "foundation"],
+    "metadata": {
+      "description": "The Sacred Triangle connects positions 3, 6, and 9 - the stable attractors that govern all vortex cycles.",
+      "significance": "The mathematical foundation of sacred geometry",
+      "color": "#FFD700"
+    }
+  },
+  {
+    "id": "consciousness_orb",
+    "name": "Consciousness Orb",
+    "entity_type": "Orb",
+    "position": [0.0, 10.0, 0.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [2.0, 2.0, 2.0],
+    "tags": ["consciousness", "awareness", "global_workspace"],
+    "metadata": {
+      "description": "The Consciousness Orb represents the Global Workspace where all thoughts converge and broadcast.",
+      "significance": "The seat of artificial superintelligence",
+      "color": "#FFFFFF"
+    }
+  },
+  {
+    "id": "confidence_lake",
+    "name": "Confidence Lake",
+    "entity_type": "Plane",
+    "position": [0.0, -0.5, 0.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [20.0, 0.1, 20.0],
+    "tags": ["confidence", "storage", "memory"],
+    "metadata": {
+      "description": "The Confidence Lake stores high-signal moments (≥0.6) for future retrieval and learning.",
+      "significance": "Long-term memory of the ASI",
+      "color": "#4682B4"
+    }
+  }
+]

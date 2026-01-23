@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Blue Spiral -->
+  <path d="M 50 50 
+           Q 55 45, 60 45 
+           Q 65 45, 67 50 
+           Q 69 55, 65 60 
+           Q 60 65, 50 65 
+           Q 40 65, 35 60 
+           Q 30 55, 30 45 
+           Q 30 35, 40 30 
+           Q 50 25, 62 30 
+           Q 74 35, 77 47 
+           Q 80 59, 72 70 
+           Q 64 81, 50 83 
+           Q 36 85, 25 75 
+           Q 14 65, 14 50 
+           Q 14 35, 25 23 
+           Q 36 11, 52 10 
+           Q 68 9, 80 20 
+           Q 92 31, 92 48" 
+        fill="none" 
+        stroke="url(#blueGradient)" 
+        stroke-width="3" 
+        stroke-linecap="round"/>
+  
+  <!-- Center dot -->
+  <circle cx="50" cy="50" r="4" fill="url(#blueGradient)"/>
+</svg>

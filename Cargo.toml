@@ -1,0 +1,380 @@
+[package]
+name = "spatial-vortex"
+version = "1.6.0"
+edition = "2021"
+resolver = "2"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--document-private-items"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lib]
+name = "spatial_vortex"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[features]
+default = ["tract", "color_ml", "rag", "agents"]  # Pure Rust - works on Windows!
+voice = ["cpal", "tokio/sync", "rustfft", "tokio-stream", "whisper-rs"]
+voice-cuda = ["voice", "whisper-rs/cuda"]  # NVIDIA GPU acceleration for Whisper
+lake = ["aes-gcm-siv", "memmap2", "sqlx"]
+postgres = ["sqlx/postgres", "sqlx/runtime-tokio-rustls"]  # PostgreSQL with pgvector
+color_ml = []  # Aspect Color ML integration
+rag = []  # RAG dependencies now always available
+agents = ["reqwest"]  # Multi-language coding agents with LLM
+persistence = []  # State persistence (Memory Palace)
+bevy_support = ["bevy"]
+onnx = ["ort", "tokenizers"]  # C++ dependencies - Windows CRT issues
+tract = ["tract-onnx", "tokenizers"]  # Pure Rust ONNX - recommended
+burn-backend = ["burn", "burn-ndarray", "burn-autodiff"]
+burn-wgpu-backend = ["burn", "burn-wgpu", "burn-autodiff"]
+burn-cuda-backend = ["burn", "burn-cuda", "burn-autodiff"]
+burn-train = ["burn", "burn-ndarray", "burn-autodiff", "burn-train-dep"]  # Distributed training
+candle-backend = ["candle-core", "candle-nn"]
+candle = ["candle-core", "candle-nn"]  # Alias for candle-backend
+candle-cuda = ["candle-core", "candle-nn"]  # CUDA support for Candle
+formal-verification = ["z3"]
+transport = ["wtransport", "quinn", "rustls"]  # WebTransport (QUIC) server
+benchmarks = []
+
+[dependencies]
+# Voice Pipeline (optional)
+cpal = { version = "0.15", optional = true }
+rustfft = { version = "6.1", optional = true }
+tokio-stream = { version = "0.1", features = ["sync"], optional = true }
+whisper-rs = { version = "0.12", optional = true }
+
+# Confidence Lake (optional)
+aes-gcm-siv = { version = "0.11", optional = true }
+memmap2 = { version = "0.9", optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid", "json"], optional = true }
+
+# WebTransport (QUIC) Server (optional)
+wtransport = { version = "0.2", optional = true }
+quinn = { version = "0.11", optional = true }
+rustls = { version = "0.23", optional = true }
+
+# ONNX Runtime for ML inference (optional - C++ deps, Windows CRT issues)
+ort = { version = "2.0.0-rc.10", optional = true }
+
+# tract - Pure Rust ONNX inference (recommended for Windows)
+tract-onnx = { version = "0.21", optional = true }
+
+# Tokenizers - shared by both onnx and tract (configured for pure Rust with tract)
+tokenizers = { version = "0.20", optional = true, default-features = false, features = ["onig"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Utilities  
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde", "wasmbind"], default-features = false }
+anyhow = "1.0"
+thiserror = "1.0"
+static_assertions = "1.1"  # Force version for Bevy main branch compatibility
+getrandom = { version = "0.2", features = ["js"] }  # Force js feature for WASM compatibility
+once_cell = "1.19"  # Lazy static initialization for ONNX model
+prometheus = "0.13"
+
+# CLI and configuration (for binaries)
+clap = { version = "4.5", features = ["derive", "env"] }
+dotenv = "0.15"
+
+# Performance benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.6"         # Property-based testing
+
+# Optimization dependencies
+md5 = "0.7"              # For cache key hashing
+rayon = "1.10"           # Parallel processing
+sysinfo = "0.30"         # System resource detection
+
+# Lock-free data structures for maximum Hz performance
+crossbeam-queue = "0.3"  # Lock-free SegQueue
+dashmap = "5.5"          # Concurrent HashMap
+parking_lot = "0.12"     # Fast RwLock
+arc-swap = "1.6"         # Atomic pointer swapping
+num_cpus = "1.16"        # CPU detection for runtime sizing
+
+# Vector search and indexing
+ndarray = "0.16"         # N-dimensional arrays for vectors (updated for tract compatibility)
+rand = "0.8"             # Random vector generation for testing
+itertools = "0.13"       # Permutation generation for exhaustive pathway search
+ordered-float = "4.2"    # Ordered floats for sorting by score
+nalgebra = { version = "0.33", features = ["serde-serialize"] }  # Linear algebra for dynamic ELP vectors
+bincode = "1.3"          # Serialization for Confidence Lake storage
+
+# Database and storage  
+bb8 = "0.8"              # Connection pooling
+
+# Async runtime for transformer architecture
+tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "macros", "sync"] }
+futures = "0.3"          # Async utilities
+async-trait = "0.1"      # Async traits
+
+# RAG (Retrieval-Augmented Generation) dependencies
+regex = "1.10"  # Pattern matching for safety and document ingestion
+lazy_static = "1.4"  # For static regex compilation
+base64 = "0.22"  # Base64 encoding/decoding for audio data
+pulldown-cmark = "0.12"  # Markdown to HTML parser
+
+# Document parsing for RAG
+pdf-extract = "0.7"    # PDF parsing
+docx-rs = "0.4"        # Word document parsing
+calamine = "0.25"      # Excel file parsing
+zip = "0.6"            # ZIP extraction for DOCX files
+mime_guess = "2.0"     # MIME type detection
+
+# Coding Agents - LLM integration
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "blocking"], optional = true }  # HTTP client for LLM APIs
+urlencoding = "2.1"  # URL encoding for multi-source web search queries
+
+# Burn - Pure Rust ML framework (PRIMARY)
+burn = { version = "0.16", optional = true, features = ["ndarray"] }
+burn-ndarray = { version = "0.16", optional = true }
+burn-autodiff = { version = "0.16", optional = true }
+burn-wgpu = { version = "0.16", optional = true }
+burn-cuda = { version = "0.16", optional = true }
+burn-train-dep = { package = "burn-train", version = "0.16", optional = true }  # Training utilities
+
+# Candle - Hugging Face ML framework (FALLBACK)
+candle-core = { version = "0.8", optional = true }
+candle-nn = { version = "0.8", optional = true }
+
+# Z3 SMT Solver for formal verification
+z3 = { version = "0.12", features = ["static-link-z3"], optional = true }
+
+# Visualization (Rust equivalent of matplotlib)
+plotters = "0.3"         # Native Rust plotting library
+
+# Logging - reduced features
+tracing = { version = "0.1", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
+
+# Bevy 0.16.0 - stable release with WASM support
+# Pinned to avoid API breaking changes from 0.17-dev
+bevy = { version = "0.16.0", optional = true, default-features = false, features = [
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_asset",
+    "bevy_winit",
+    "bevy_pbr",
+    "bevy_sprite",
+    "bevy_ui",
+    "bevy_text",
+    "webgl2"
+] }
+embedvec = { version = "0.5.1", features = ["simd"] }
+# Optional physics - DISABLED for now due to Bevy version conflicts
+# bevy_rapier3d = { version = "0.17", optional = true, features = ["dim3"] }
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"
+criterion = "0.5"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+serde_json = "1.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Web framework - reduced features to minimize dependencies
+actix-web = "4.11"
+actix-cors = "0.7"
+actix-rt = "2.11"
+actix = "0.13"          # Actor system for self-optimization agents
+actix-multipart = "0.7" # File upload support
+actix-web-actors = "4.3"  # WebSocket support for real-time updates
+env_logger = "0.11"
+actix-service = "2"
+
+# OpenAPI/Swagger documentation
+utoipa = { version = "4.2", features = ["actix_extras", "uuid"] }
+utoipa-swagger-ui = { version = "6.0", features = ["actix-web"] }
+
+# Async runtime - only essential features instead of "full"
+tokio = { version = "1.48", features = ["full"] }
+
+# HTTP client - minimal features
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Database - lighter alternative to sqlx (native only)
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+postgres-types = { version = "0.2", features = ["derive", "with-serde_json-1", "with-chrono-0_4", "with-uuid-1"] }
+deadpool-postgres = "0.14"
+
+# Redis - keep existing (native only)
+redis = { version = "0.24", default-features = false, features = ["tokio-comp", "connection-manager"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = ["console"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+uuid = { version = "1.13", features = ["v4", "serde", "js"] }
+getrandom = { version = "0.2", features = ["js"] }
+
+# Config
+config = { version = "0.14", default-features = false, features = ["toml"] }
+dotenv = "0.15"
+clap = { version = "4.5", features = ["derive", "env"] }
+
+[[bin]]
+name = "subject_cli"
+path = "src/bin/subject_cli.rs"
+
+[[bin]]
+name = "coding_agent_cli"
+path = "src/bin/coding_agent_cli.rs"
+required-features = ["agents"]
+
+[[bin]]
+name = "vortex_view"
+path = "src/bin/vortex_view.rs"
+required-features = ["bevy_support"]
+
+[[bin]]
+name = "flux_matrix"
+path = "src/bin/flux_matrix.rs"
+required-features = ["bevy_support"]
+
+[[bin]]
+name = "flux_matrix_vortex"
+path = "src/bin/flux_matrix_vortex.rs"
+required-features = ["bevy_support"]
+
+# Gate camera binary behind bevy_support to avoid building in default test runs
+[[bin]]
+name = "camera"
+path = "src/bin/camera.rs"
+required-features = ["bevy_support"]
+
+# WASM binary - only builds with wasm-pack, not in regular cargo build
+# This prevents build errors when not targeting WASM
+[[bin]]
+name = "epic_flux_3d_wasm"
+path = "src/bin/epic_flux_3d_wasm.rs"
+required-features = ["bevy_support"]
+
+# Benchmarks
+[[bin]]
+name = "geometric_reasoning_benchmark"
+path = "benchmarks/custom/geometric_reasoning_benchmark.rs"
+
+[[bench]]
+name = "academic_benchmark"
+path = "benches/academic_benchmark.rs"
+harness = false
+
+[[bench]]
+name = "e8_benchmark"
+path = "benches/e8_benchmark.rs"
+harness = false
+
+[[bin]]
+name = "webtransport_server"
+path = "src/bin/webtransport_server.rs"
+required-features = ["transport"]
+
+[[bin]]
+name = "consciousness_streaming_server"
+path = "src/bin/consciousness_streaming_server.rs"
+required-features = ["transport", "agents"]
+
+[[bin]]
+name = "consciousness_api_server"
+path = "src/bin/consciousness_api_server.rs"
+required-features = ["agents"]
+
+[[example]]
+name = "train_on_google_scholar"
+path = "examples/train_on_google_scholar.rs"
+required-features = ["rag"]
+
+[[example]]
+name = "train_on_grokipedia"
+path = "examples/train_on_grokipedia.rs"
+required-features = ["rag"]
+
+[[example]]
+name = "rag_continuous_learning"
+path = "examples/rag_continuous_learning.rs"
+required-features = ["rag"]
+
+[[example]]
+name = "actual_benchmarks"
+path = "examples/actual_benchmarks.rs"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "quick_benchmarks"
+path = "examples/quick_benchmarks.rs"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "core_benchmarks"
+path = "examples/core_benchmarks.rs"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "real_benchmarks"
+path = "examples/real_benchmarks.rs"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "optimization_benchmark"
+path = "examples/optimization_benchmark.rs"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "dynamic_config_benchmark"
+path = "examples/dynamic_config_benchmark.rs"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "dynamic_elp_rl_demo"
+path = "examples/dynamic_elp_rl_demo.rs"
+required-features = ["benchmarks", "lake"]
+
+[[example]]
+name = "consciousness_streaming_demo"
+path = "examples/consciousness_streaming_demo.rs"
+required-features = ["agents"]
+
+[[example]]
+name = "background_learning_full_demo"
+path = "examples/background_learning_full_demo.rs"
+required-features = ["agents"]
+
+[[example]]
+name = "memory_palace_demo"
+path = "examples/memory_palace_demo.rs"
+required-features = ["agents", "persistence"]
+
+[[example]]
+name = "high_performance_inference_demo"
+path = "examples/ml_ai/high_performance_inference_demo.rs"
+
+[[example]]
+name = "autoregressive_demo"
+path = "examples/ml_ai/autoregressive_demo.rs"
+
+[[example]]
+name = "optimized_ops_benchmark"
+path = "examples/ml_ai/optimized_ops_benchmark.rs"
+
+[[example]]
+name = "integrated_engine_benchmark"
+path = "examples/ml_ai/integrated_engine_benchmark.rs"
+
+[[example]]
+name = "production_engine_demo"
+path = "examples/ml_ai/production_engine_demo.rs"
+
+[[example]]
+name = "distributed_training_demo"
+path = "examples/ml_ai/distributed_training_demo.rs"
+

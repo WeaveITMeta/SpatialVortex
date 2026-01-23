@@ -1,0 +1,616 @@
+openapi: 3.0.3
+info:
+  title: SpatialVortex API
+  description: Revolutionary Flux Matrix computational engine
+  version: 0.7.0
+  contact:
+    name: SpatialVortex Development Team
+    url: https://SpatialVortex.dev
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.SpatialVortex.dev/v1
+    description: Production SpatialVortex API
+  - url: http://localhost:7000/api/v1
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Check system health and status
+      tags:
+        - System
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /chat/text:
+    post:
+      summary: Chat with AI
+      description: |
+        Process natural language chat with SpatialVortex AI using:
+        - ONNX sentence-transformers embeddings
+        - Sacred geometry (3-6-9) transformation
+        - ELP (Ethos-Logos-Pathos) channel analysis
+        - Flux position calculation
+        - AI response generation with sacred geometry routing
+      tags:
+        - Chat & Conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              simple:
+                value:
+                  message: "What is consciousness?"
+                  user_id: "user123"
+              with_context:
+                value:
+                  message: "Can you explain more?"
+                  user_id: "user123"
+                  context:
+                    - "What is consciousness?"
+                    - "It's the state of being aware..."
+      responses:
+        '200':
+          description: Chat response generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                high_confidence:
+                  value:
+                    response: "Consciousness is a fundamental aspect of existence..."
+                    elp_values:
+                      ethos: 7.2
+                      logos: 8.5
+                      pathos: 6.3
+                    flux_position: 6
+                    confidence: 0.92
+                    processing_time_ms: 145
+                    subject: "Philosophy"
+        '400':
+          description: Bad request - invalid message format
+        '500':
+          description: Internal server error
+
+  /flux/matrix/generate:
+    post:
+      summary: Generate Flux Matrix Pattern
+      description: Create flux matrix sequence with sacred geometry integration
+      tags:
+        - Flux Matrix
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FluxGenerationRequest'
+      responses:
+        '200':
+          description: Flux matrix pattern generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FluxMatrixResponse'
+
+  /flux/nodes/{nodeId}/calculate:
+    get:
+      summary: Calculate Flux Node Properties
+      description: Retrieve flux index, spatial coordinates, and sacred geometry data
+      tags:
+        - Flux Nodes
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique flux node identifier
+      responses:
+        '200':
+          description: Node calculation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FluxNodeResponse'
+
+  /sacred/geometry/intersections:
+    get:
+      summary: Calculate Sacred Intersections
+      description: Find 3,6,9 divine intersection points in flux space
+      tags:
+        - Sacred Geometry
+      parameters:
+        - name: dimension
+          in: query
+          schema:
+            type: integer
+            minimum: 2
+            maximum: 10
+            default: 3
+          description: Dimensional space for intersection calculation
+        - name: subject
+          in: query
+          schema:
+            type: string
+          description: Optional subject filter
+      responses:
+        '200':
+          description: Sacred intersections calculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SacredIntersectionResponse'
+
+  /inference/semantic/flux:
+    post:
+      summary: Semantic Flux Inference
+      description: Process natural language using flux matrix semantic scoring
+      tags:
+        - AI Inference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SemanticInferenceRequest'
+      responses:
+        '200':
+          description: Semantic processing completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticInferenceResponse'
+
+  /inference/process:
+    post:
+      summary: Process Seed Numbers
+      description: Process seed numbers for bidirectional inference
+      tags:
+        - AI Inference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceRequest'
+      responses:
+        '200':
+          description: Inference completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceResponse'
+
+  /inference/tokenize:
+    post:
+      summary: Reverse Tokenization
+      description: Find seed numbers for target meanings
+      tags:
+        - AI Inference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenizeRequest'
+      responses:
+        '200':
+          description: Seeds found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenizeResponse'
+
+  /universes/generate:
+    post:
+      summary: Generate Flux Universe
+      description: Create procedural universe using flux matrix patterns
+      tags:
+        - Universe Generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniverseGenerationRequest'
+      responses:
+        '200':
+          description: Universe generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UniverseResponse'
+
+  /subjects:
+    get:
+      summary: List All Subjects
+      description: Get all available subject matrices
+      tags:
+        - Matrix Management
+      responses:
+        '200':
+          description: List of subjects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /matrix/{subject}:
+    get:
+      summary: Get Matrix by Subject
+      description: Retrieve specific flux matrix by subject name
+      tags:
+        - Matrix Management
+      parameters:
+        - name: subject
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matrix found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FluxMatrixResponse'
+        '404':
+          description: Matrix not found
+
+  /cache/clear:
+    post:
+      summary: Clear Cache
+      description: Clear all cached inference results
+      tags:
+        - System
+      responses:
+        '200':
+          description: Cache cleared
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        version:
+          type: string
+        inference_engine_stats:
+          type: object
+        database_status:
+          type: string
+        cache_status:
+          type: string
+
+    FluxGenerationRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+          description: Subject matter for flux matrix
+        iterations:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          description: Number of flux matrix iterations
+        sacredGuides:
+          type: array
+          items:
+            type: integer
+          default: [3, 6, 9]
+        centerIndex:
+          type: string
+          default: "1245780"
+        use_ai_generation:
+          type: boolean
+          default: false
+
+    FluxMatrixResponse:
+      type: object
+      properties:
+        matrix_id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/FluxNodeResponse'
+        sacred_guides:
+          type: array
+          items:
+            $ref: '#/components/schemas/SacredGuideResponse'
+        generation_source:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    FluxNodeResponse:
+      type: object
+      properties:
+        position:
+          type: integer
+        base_value:
+          type: integer
+        primary_meaning:
+          type: string
+        positive_associations:
+          type: array
+          items:
+            type: string
+        negative_associations:
+          type: array
+          items:
+            type: string
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeConnectionResponse'
+
+    NodeConnectionResponse:
+      type: object
+      properties:
+        target_position:
+          type: integer
+        connection_type:
+          type: string
+        weight:
+          type: number
+
+    SacredGuideResponse:
+      type: object
+      properties:
+        position:
+          type: integer
+        divine_properties:
+          type: array
+          items:
+            type: string
+        geometric_significance:
+          type: string
+
+    SacredIntersectionResponse:
+      type: object
+      properties:
+        intersections:
+          type: array
+          items:
+            type: object
+            properties:
+              guides:
+                type: array
+                items:
+                  type: integer
+              coordinates:
+                type: array
+                items:
+                  type: number
+              divine_score:
+                type: number
+
+    SemanticInferenceRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        flux_context:
+          type: object
+        moral_dimension:
+          type: boolean
+          default: true
+
+    SemanticInferenceResponse:
+      type: object
+      properties:
+        flux_tokens:
+          type: array
+          items:
+            type: object
+        semantic_score:
+          type: number
+        thought_constellation:
+          type: object
+        moral_alignment:
+          type: string
+          enum: [heaven, hell, neutral]
+
+    InferenceRequest:
+      type: object
+      properties:
+        seed_numbers:
+          type: array
+          items:
+            type: integer
+        subject_filter:
+          type: string
+        include_synonyms:
+          type: boolean
+        include_antonyms:
+          type: boolean
+        confidence_threshold:
+          type: number
+        use_sacred_guides:
+          type: boolean
+
+    InferenceResponse:
+      type: object
+      properties:
+        inference_id:
+          type: string
+          format: uuid
+        inferred_meanings:
+          type: array
+          items:
+            type: object
+        confidence_score:
+          type: number
+        processing_time_ms:
+          type: integer
+        moral_alignment_summary:
+          type: string
+
+    TokenizeRequest:
+      type: object
+      properties:
+        target_meanings:
+          type: array
+          items:
+            type: string
+        subject_filter:
+          type: string
+        max_results:
+          type: integer
+
+    TokenizeResponse:
+      type: object
+      properties:
+        candidate_seeds:
+          type: array
+          items:
+            type: integer
+        explanation:
+          type: string
+
+    UniverseGenerationRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+        dimensions:
+          type: integer
+          minimum: 2
+          maximum: 10
+        seed:
+          type: integer
+
+    UniverseResponse:
+      type: object
+      properties:
+        universe_id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        flux_pattern:
+          type: array
+          items:
+            type: integer
+        metadata:
+          type: object
+
+    ChatRequest:
+      type: object
+      required:
+        - message
+        - user_id
+      properties:
+        message:
+          type: string
+          description: User message to process
+          example: "What is consciousness?"
+        user_id:
+          type: string
+          description: Unique user identifier
+          example: "user123"
+        context:
+          type: array
+          items:
+            type: string
+          description: Optional conversation history for context
+          example:
+            - "Previous question"
+            - "Previous response"
+
+    ChatResponse:
+      type: object
+      properties:
+        response:
+          type: string
+          description: AI generated response
+          example: "Consciousness is a fundamental aspect..."
+        elp_values:
+          type: object
+          description: ELP (Ethos-Logos-Pathos) channel values
+          properties:
+            ethos:
+              type: number
+              format: float
+              description: Character/moral dimension (0-13 range)
+              minimum: 0
+              maximum: 13
+              example: 7.2
+            logos:
+              type: number
+              format: float
+              description: Logic/reason dimension (0-13 range)
+              minimum: 0
+              maximum: 13
+              example: 8.5
+            pathos:
+              type: number
+              format: float
+              description: Emotion/feeling dimension (0-13 range)
+              minimum: 0
+              maximum: 13
+              example: 6.3
+        flux_position:
+          type: integer
+          description: |
+            Position in flux matrix (0-9):
+            - Vortex sequence: 1→2→4→8→7→5→1
+            - Sacred positions: 3, 6, 9 (enhanced processing)
+          minimum: 0
+          maximum: 9
+          example: 6
+        confidence:
+          type: number
+          format: double
+          description: |
+            Confidence score (0.0-1.0) indicates response trustworthiness:
+            - 0.7-1.0: Very high confidence, highly trustworthy ⭐
+            - 0.5-0.7: High confidence, generally trustworthy ✅
+            - 0.3-0.5: Moderate confidence, use caution ⚡
+            - 0.0-0.3: Low confidence, high risk ⚠️
+          minimum: 0
+          maximum: 1
+          example: 0.92
+        processing_time_ms:
+          type: integer
+          description: Time taken to process request in milliseconds
+          example: 145
+        subject:
+          type: string
+          description: Determined subject/domain for the conversation
+          example: "Philosophy"
+
+  securitySchemes:
+    FluxApiKey:
+      type: apiKey
+      in: header
+      name: X-Flux-API-Key
+    FluxBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - FluxApiKey: []
+  - FluxBearer: []

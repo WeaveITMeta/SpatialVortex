@@ -1,0 +1,26 @@
+[build]
+# Single-threaded build to reduce file contention
+jobs = 1
+# Incremental compilation can cause locking issues
+incremental = false
+
+[profile.dev]
+# Split debuginfo to reduce file locks
+split-debuginfo = "unpacked"
+
+[profile.test]
+# Optimize test builds slightly
+opt-level = 1
+
+[net]
+git-fetch-with-cli = true
+
+[target.x86_64-pc-windows-msvc]
+# Use lld linker which handles file locks better
+linker = "rust-lld.exe"
+# Use dynamic CRT for compatibility with ONNX Runtime (all dependencies)
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.wasm32-unknown-unknown]
+runner = 'wasm-bindgen-test-runner'
+rustflags = ['--cfg=getrandom_backend="wasm_js"']
