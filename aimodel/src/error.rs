@@ -1,7 +1,9 @@
+//! Error types for AIModel
+
 use thiserror::Error;
 use std::fmt;
 
-pub type Result<T> = std::result::Result<T, SpatialVortexError>;
+pub type Result<T> = std::result::Result<T, AIModelError>;
 
 /// Error context for better debugging and recovery
 #[derive(Debug, Clone)]
@@ -79,7 +81,7 @@ impl fmt::Display for ErrorContext {
 }
 
 #[derive(Error, Debug)]
-pub enum SpatialVortexError {
+pub enum AIModelError {
     #[error("Database error: {0}")]
     Database(String),
 
@@ -91,8 +93,7 @@ pub enum SpatialVortexError {
     Serialization(#[from] serde_json::Error),
 
     #[error("HTTP client error: {0}")]
-    #[cfg(not(target_arch = "wasm32"))]
-    HttpClient(#[from] reqwest::Error),
+    HttpClient(String),
 
     #[error("Invalid flux matrix configuration: {0}")]
     InvalidFluxMatrix(String),

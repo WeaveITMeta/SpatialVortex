@@ -1,51 +1,19 @@
-//! ML Training Module
+//! ML Training Module (2026 Distilled)
 //!
-//! Contains training infrastructure:
-//! - Trainers and optimizers
-//! - Loss functions
-//! - Sacred gradient descent
-//! - Vortex SGD
+//! Minimal, non-redundant training stack:
+//! - **Burn** - Primary ML framework with tch-rs backend
+//! - **SSO** - Spectral Sphere Optimizer (to be implemented)
+//! - **Distributed** - Multi-GPU training with ZeRO
+//! - **Pretraining** - MLM/CLM infrastructure
 
-pub mod trainer;
-pub mod vortex_sgd;
-pub mod sacred_gradients;
 pub mod loss_functions;
-pub mod color_loss;
-pub mod aspect_color_trainer;
-pub mod two_stage_rl;
-pub mod distributed;  // Distributed training with data parallelism
-pub mod burn_model;   // Burn-based model definitions for training
-// REMOVED: pub mod eustress_adapter;  // EustressEngine → DistributedTrainer adapter - will be reimplemented via MCP server
-pub mod pretraining;  // Pre-training infrastructure (MLM, CLM)
-pub mod gradient_checkpointing;  // Memory-efficient training
-// REMOVED: pub mod background_trainer;  // Eustress-dependent - will be reimplemented via MCP server
+pub mod distributed;
+pub mod burn_model;
+pub mod pretraining;
+pub mod gradient_checkpointing;
 
-// Re-export training types
-pub use trainer::{
-    Trainer,
-    TrainingConfig,
-    TrainingMetrics,
-    LossFunction,
-    Optimizer,
-    OptimizerType,
-    Trainable,
-};
-
-pub use vortex_sgd::VortexSGD;
-pub use sacred_gradients::SacredGradientField;
+// Loss functions
 pub use loss_functions::*;
-pub use color_loss::{ColorLossFunction, ColorLossCombination};
-pub use aspect_color_trainer::{
-    ColorDatasetGenerator,
-    ColorDatasetConfig,
-    AspectColorModelTrainer,
-};
-pub use two_stage_rl::{
-    TwoStageRLTrainer,
-    TrainingStage,
-    TwoStageConfig,
-    TrainingStats as TwoStageStats,
-};
 
 // Distributed training exports
 pub use distributed::{
@@ -79,15 +47,6 @@ pub use burn_model::{
     SpatialVortexModel,
 };
 
-// REMOVED: EustressEngine training adapter exports - will be reimplemented via MCP server
-// pub use eustress_adapter::{
-//     EustressTrainingAdapter,
-//     EustressTrainingConfig,
-//     EustressTrainingStats,
-//     TokenizedBatch,
-//     SimpleTokenizer,
-// };
-
 // Pre-training exports
 pub use pretraining::{
     PretrainingObjective,
@@ -116,12 +75,3 @@ pub use gradient_checkpointing::{
     PrecisionMode,
     GradScaler,
 };
-
-// REMOVED: Background training exports - Eustress-dependent, will be reimplemented via MCP server
-// pub use background_trainer::{
-//     BackgroundTrainingCoordinator,
-//     BackgroundTrainingConfig,
-//     TrainingTrigger,
-//     ModelVersion,
-//     TrainingStats as BackgroundTrainingStats,
-// };

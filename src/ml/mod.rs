@@ -1,77 +1,32 @@
-//! Machine Learning Module
+//! Machine Learning Module (2026 Distilled)
 //!
-//! Contains all ML and AI functionality:
-//! - Inference engines
-//! - Training infrastructure
-//! - Backend selection (Burn/Candle)
+//! Minimal, non-redundant ML stack:
+//! - **ProductionEngine** - Primary inference with CALM
+//! - **Burn** - Training framework with tch-rs backend
+//! - **VortexModel** - Unified transformer with sacred geometry
+//! - **VCP** - Vortex Context Preserver (hallucination detection)
+//! - **EBRM** - Energy-Based Reasoning Model
 
 pub mod inference;
-pub mod backend;
-pub mod enhancement;
 pub mod hallucinations;
 pub mod training;
-pub mod rl_gradient_optimizer;
-pub mod meta_learning;
-pub mod vortex_model;  // Unified Vortex Model - the crown jewel
-pub mod ebrm;  // Energy-Based Reasoning Model (inspired by Logical Intelligence)
-pub mod exhaustive_pathway;  // Exhaustive n! pathway enumeration with stacked federated inference
+pub mod vortex_model;
+pub mod ebrm;
 
 // Re-export inference
 pub use inference::{
-    InferenceEngine,
-    OnnxInferenceEngine,
     TokenizerWrapper,
     TokenizedInput,
-    ASIIntegrationEngine,
-    PositionalEncoding,
-    SelfAttention,
-    MultiHeadAttention,
-    FeedForwardNetwork,
-    TransformerBlock,
-    ActivationFunction,
-    DynamicPositionalEncoding,
-    ConfidenceContextManager,
-    ContextStats,
+    ProductionEngine,
+    ProductionConfig,
+    ProductionStats,
 };
 
-// Re-export training
-pub use training::{
-    Trainer,
-    TrainingConfig,
-    TrainingMetrics,
-    LossFunction,
-    Optimizer,
-    OptimizerType,
-    Trainable,
-};
-
-// Re-export backend
-pub use backend::{
-    BackendSelector,
-    BackendType,
-    BackendError,
-    BackendInfo,
-};
-
-// Re-export hallucinations
+// Re-export hallucinations (VCP - sacred core)
 pub use hallucinations::{
     SignalSubspace,
     HallucinationDetector,
     VortexContextPreserver,
-};
-
-// Re-export enhancement
-pub use enhancement::*;
-
-// Re-export exhaustive pathway optimizer
-pub use exhaustive_pathway::{
-    ExhaustivePathwayOptimizer,
-    PathwayConfig,
-    ScoredPath,
-    StackedResult,
-    StackStats,
-    EBRMSentenceRefiner,
-    CompoundingModel,
 };
 
 // Re-export EBRM (Energy-Based Reasoning Model)

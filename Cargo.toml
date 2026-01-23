@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [features]
-default = ["tract", "color_ml", "rag", "agents"]  # Pure Rust - works on Windows!
+default = ["onnx", "color_ml", "rag", "agents", "burn-cpu"]  # 2026 distilled stack: ort + Burn (CPU)
 voice = ["cpal", "tokio/sync", "rustfft", "tokio-stream", "whisper-rs"]
 voice-cuda = ["voice", "whisper-rs/cuda"]  # NVIDIA GPU acceleration for Whisper
 lake = ["aes-gcm-siv", "memmap2", "sqlx"]
@@ -27,15 +27,17 @@ rag = []  # RAG dependencies now always available
 agents = ["reqwest"]  # Multi-language coding agents with LLM
 persistence = []  # State persistence (Memory Palace)
 bevy_support = ["bevy"]
-onnx = ["ort", "tokenizers"]  # C++ dependencies - Windows CRT issues
-tract = ["tract-onnx", "tokenizers"]  # Pure Rust ONNX - recommended
-burn-backend = ["burn", "burn-ndarray", "burn-autodiff"]
+onnx = ["ort", "tokenizers"]  # PRIMARY: ONNX Runtime (fastest CPU/GPU inference)
+tract = ["tract-onnx", "tokenizers"]  # WASM/edge fallback only
+burn-cpu = ["burn", "burn-ndarray", "burn-autodiff"]  # Burn with CPU backend (no libtorch)
+burn-backend = ["burn", "burn-ndarray", "burn-autodiff", "burn-tch"]  # Burn with tch-rs for GPU (requires libtorch)
 burn-wgpu-backend = ["burn", "burn-wgpu", "burn-autodiff"]
 burn-cuda-backend = ["burn", "burn-cuda", "burn-autodiff"]
 burn-train = ["burn", "burn-ndarray", "burn-autodiff", "burn-train-dep"]  # Distributed training
-candle-backend = ["candle-core", "candle-nn"]
-candle = ["candle-core", "candle-nn"]  # Alias for candle-backend
-candle-cuda = ["candle-core", "candle-nn"]  # CUDA support for Candle
+# REMOVED: Candle superseded by Burn
+# candle-backend = ["candle-core", "candle-nn"]
+# candle = ["candle-core", "candle-nn"]
+# candle-cuda = ["candle-core", "candle-nn"]
 formal-verification = ["z3"]
 transport = ["wtransport", "quinn", "rustls"]  # WebTransport (QUIC) server
 benchmarks = []
@@ -142,9 +144,15 @@ burn-wgpu = { version = "0.16", optional = true }
 burn-cuda = { version = "0.16", optional = true }
 burn-train-dep = { package = "burn-train", version = "0.16", optional = true }  # Training utilities
 
-# Candle - Hugging Face ML framework (FALLBACK)
-candle-core = { version = "0.8", optional = true }
-candle-nn = { version = "0.8", optional = true }
+# REMOVED: Candle superseded by Burn
+# candle-core = { version = "0.8", optional = true }
+# candle-nn = { version = "0.8", optional = true }
+
+# tch-rs - PyTorch bindings for Burn GPU acceleration
+burn-tch = { version = "0.16", optional = true }
+
+# RocksDB - Hot path storage (supersedes Redis)
+rocksdb = { version = "0.22", optional = true }
 
 # Z3 SMT Solver for formal verification
 z3 = { version = "0.12", features = ["static-link-z3"], optional = true }
@@ -206,8 +214,8 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_j
 postgres-types = { version = "0.2", features = ["derive", "with-serde_json-1", "with-chrono-0_4", "with-uuid-1"] }
 deadpool-postgres = "0.14"
 
-# Redis - keep existing (native only)
-redis = { version = "0.24", default-features = false, features = ["tokio-comp", "connection-manager"] }
+# REMOVED: Redis superseded by RocksDB
+# redis = { version = "0.24", default-features = false, features = ["tokio-comp", "connection-manager"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }

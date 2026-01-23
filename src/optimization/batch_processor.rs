@@ -171,20 +171,22 @@ impl BatchHandler<Vec<f32>, String> for VoiceBatchProcessor {
     }
 }
 
-/// Batch processor for database operations
+// Database batch processor requires sqlx feature
+#[cfg(feature = "lake")]
 pub struct DbBatchProcessor {
     pool: Arc<sqlx::SqlitePool>,
 }
 
+#[cfg(feature = "lake")]
 impl DbBatchProcessor {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self { pool }
     }
 }
 
+#[cfg(feature = "lake")]
 impl BatchHandler<DbOperation, DbResult> for DbBatchProcessor {
     fn process_batch(&self, batch: Vec<DbOperation>) -> Vec<Result<DbResult, String>> {
-        // Group operations by type for efficiency
         let mut inserts = Vec::new();
         let mut selects = Vec::new();
         let mut updates = Vec::new();
@@ -199,24 +201,20 @@ impl BatchHandler<DbOperation, DbResult> for DbBatchProcessor {
         
         let mut results = Vec::new();
         
-        // Process batches by type
         if !inserts.is_empty() {
-            // Batch insert
-            for data in inserts {
+            for _data in inserts {
                 results.push(Ok(DbResult::Inserted(1)));
             }
         }
         
         if !selects.is_empty() {
-            // Batch select
-            for query in selects {
+            for _query in selects {
                 results.push(Ok(DbResult::Selected(vec![serde_json::json!({})])));
             }
         }
         
         if !updates.is_empty() {
-            // Batch update
-            for data in updates {
+            for _data in updates {
                 results.push(Ok(DbResult::Updated(1)));
             }
         }
@@ -225,6 +223,7 @@ impl BatchHandler<DbOperation, DbResult> for DbBatchProcessor {
     }
 }
 
+#[cfg(feature = "lake")]
 #[derive(Clone)]
 pub enum DbOperation {
     Insert(serde_json::Value),
@@ -232,6 +231,7 @@ pub enum DbOperation {
     Update(serde_json::Value),
 }
 
+#[cfg(feature = "lake")]
 #[derive(Debug)]
 pub enum DbResult {
     Inserted(u64),

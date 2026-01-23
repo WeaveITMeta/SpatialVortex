@@ -1,15 +1,8 @@
-//! Performance Optimization Module
+//! Performance Optimization Module (2026 Distilled)
 //!
-//! Addresses identified bottlenecks in API, voice pipeline, inference, and database layers
-//! to improve throughput from 200-500 req/sec to target 1000+ req/sec.
+//! Minimal optimization - most handled by ProductionEngine and Actix directly.
 
-pub mod api_optimizer;
-pub mod voice_optimizer;
-pub mod inference_optimizer;
-pub mod db_optimizer;
 pub mod batch_processor;
-pub mod cache_layer;
-pub mod config_optimizer;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -87,7 +80,6 @@ pub struct OptimizationConfig {
     pub query_timeout_ms: u64,
     
     // Cache Configuration
-    pub enable_redis_cache: bool,
     pub cache_ttl_secs: u64,
     pub max_cache_size_mb: usize,
 }
@@ -121,8 +113,7 @@ impl Default for OptimizationConfig {
             batch_insert_size: 1000,
             query_timeout_ms: 5000,
             
-            // Cache: In-memory caching
-            enable_redis_cache: false,
+            // Cache: In-memory caching (RocksDB)
             cache_ttl_secs: 300,
             max_cache_size_mb: 512,
         }

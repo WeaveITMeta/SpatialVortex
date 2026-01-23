@@ -1,4 +1,4 @@
-// Core modules
+// Core modules (2026 Distilled)
 pub mod error;
 pub mod config;
 pub mod core;
@@ -7,11 +7,9 @@ pub mod ml;
 pub mod processing;
 pub mod storage;
 pub mod visualization;
-pub mod text_formatting;  // Text formatting utilities for better paragraph breaks
-pub mod pipeline;  // Universal 5-layer data flow pipeline
+pub mod text_formatting;
 pub mod embodiment;
-pub mod training;
-// pub mod optimization;  // Requires optional deps: ort, sqlx, cpal - enable with features
+pub mod optimization;
 
 // AI & API integration
 pub mod ai;
@@ -19,33 +17,27 @@ pub mod metrics;
 pub mod monitoring;
 pub mod auth;
 
-// WebTransport server for QUIC-based real-time communication
+// WebTransport server
 #[cfg(feature = "transport")]
 pub mod transport;
 
 // Multi-language coding agents
 pub mod agents;
 
-// Consciousness simulation (Global Workspace Theory)
+// Consciousness simulation
 pub mod consciousness;
 
-// Content generators
-pub mod generators;
+// RAG
 #[cfg(feature = "rag")]
 pub mod rag;
 
 // Benchmark suite
 pub mod benchmarks;
 
-// Evaluation harness for ASI Orchestrator
-pub mod evaluation;
-
-// ASI Core - Autonomous Superintelligent System
+// ASI Core
 #[cfg(not(target_arch = "wasm32"))]
 pub mod asi;
-// Backward compatibility - cache is now in storage
-#[cfg(not(target_arch = "wasm32"))]
-pub use storage::cache;
+
 // Backward compatibility - compression is now in data
 pub use data::compression;
 // Backward compatibility - these are now in core::sacred_geometry
@@ -70,21 +62,9 @@ pub use ai::integration as ai_integration;
 pub use ai::api;
 #[cfg(not(target_arch = "wasm32"))]
 pub use ai::flux_reasoning;
-#[cfg(not(target_arch = "wasm32"))]
-pub use ai::evolution;
 
-// Backward compatibility - ml_enhancement now in ml/
-pub use ml::enhancement as ml_enhancement;
 // Backward compatibility - models is now in data
 pub use data::models;
-
-// Backward compatibility - generators now in generators/
-pub use generators::grammar as grammar_graph;
-#[cfg(not(target_arch = "wasm32"))]
-pub use generators::subject as subject_generator;
-#[cfg(not(target_arch = "wasm32"))]
-pub use generators::visual as visual_subject_generator;
-// pub use generators::subjects;  // Superseded by subject_definitions
 
 // Curated subject definitions with semantic associations
 pub mod subject_definitions;
@@ -120,11 +100,9 @@ pub use storage::spatial_database;
 
 // Backward compatibility - training is now ml::training
 pub use ml::training as training_module;
-pub mod federated;
 
 // Backward compatibility - hallucinations now in ml/
 pub use ml::hallucinations;
-pub use ml::meta_learning::MetaLearningEngine;
 
 pub use error::{Result, SpatialVortexError};
 pub use data::models::{BeamTensor, BeadTensor, StoredFluxMatrix, ELPTensor};

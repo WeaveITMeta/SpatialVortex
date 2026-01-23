@@ -423,6 +423,89 @@ impl Attributes {
         self.get_number(key).map(|n| n as u32)
     }
     
+    // ========================================================================
+    // ELP (Ethos, Logos, Pathos) Compatibility Methods
+    // ========================================================================
+    
+    /// Get ethos value (backward compatibility)
+    pub fn ethos(&self) -> f32 {
+        self.get_f32("ethos").unwrap_or(0.0)
+    }
+    
+    /// Get logos value (backward compatibility)
+    pub fn logos(&self) -> f32 {
+        self.get_f32("logos").unwrap_or(0.0)
+    }
+    
+    /// Get pathos value (backward compatibility)
+    pub fn pathos(&self) -> f32 {
+        self.get_f32("pathos").unwrap_or(0.0)
+    }
+    
+    /// Set ethos value
+    pub fn set_ethos(&mut self, value: f32) {
+        self.set("ethos", AttributeValue::Number(value as f64));
+    }
+    
+    /// Set logos value
+    pub fn set_logos(&mut self, value: f32) {
+        self.set("logos", AttributeValue::Number(value as f64));
+    }
+    
+    /// Set pathos value
+    pub fn set_pathos(&mut self, value: f32) {
+        self.set("pathos", AttributeValue::Number(value as f64));
+    }
+    
+    /// Get confidence value
+    pub fn confidence(&self) -> f32 {
+        self.get_f32("confidence").unwrap_or(0.0)
+    }
+    
+    /// Set confidence value
+    pub fn set_confidence(&mut self, value: f32) {
+        self.set("confidence", AttributeValue::Number(value as f64));
+    }
+    
+    /// Get ELP as tensor [ethos, logos, pathos]
+    pub fn elp_tensor(&self) -> [f32; 3] {
+        [self.ethos(), self.logos(), self.pathos()]
+    }
+    
+    /// Get ELP normalized to sum to 1.0
+    pub fn elp_normalized(&self) -> [f32; 3] {
+        let e = self.ethos();
+        let l = self.logos();
+        let p = self.pathos();
+        let sum = e + l + p;
+        if sum > 0.0 {
+            [e / sum, l / sum, p / sum]
+        } else {
+            [0.333, 0.333, 0.334]
+        }
+    }
+    
+    /// Set digital root flux position
+    pub fn set_digital_root_flux(&mut self, position: u8) {
+        self.set("digital_root_flux", AttributeValue::Int(position as i64));
+    }
+    
+    /// Get digital root flux position
+    pub fn digital_root_flux(&self) -> Option<u8> {
+        self.get_number("digital_root_flux").map(|n| n as u8)
+    }
+    
+    /// Check if at a sacred position (3, 6, or 9)
+    pub fn is_sacred_position(&self) -> bool {
+        matches!(self.digital_root_flux(), Some(3) | Some(6) | Some(9))
+    }
+    
+    /// Set ELP tensor [ethos, logos, pathos]
+    pub fn set_elp_tensor(&mut self, elp: [f32; 3]) {
+        self.set_ethos(elp[0]);
+        self.set_logos(elp[1]);
+        self.set_pathos(elp[2]);
+    }
 }
 
 // ============================================================================

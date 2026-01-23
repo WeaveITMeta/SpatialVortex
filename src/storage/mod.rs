@@ -11,10 +11,10 @@ pub mod spatial_database;
 // REMOVED: Eustress Lake - will be reimplemented via MCP server
 // pub mod eustress_lake;
 // pub mod eustress_lake_postgres;
-pub mod cache;
+// REMOVED: pub mod cache;  // Redis superseded by RocksDB
 
 // Re-exports
 #[cfg(feature = "lake")]
 pub use confidence_lake::*;
 pub use spatial_database::*;
-pub use cache::*;
+// REMOVED: pub use cache::*;  // Redis superseded by RocksDB
