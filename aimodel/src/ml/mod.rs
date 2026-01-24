@@ -1,26 +1,25 @@
-//! Machine Learning Module (2026 Distilled)
+//! Machine Learning Module
 //!
-//! Minimal, non-redundant ML stack:
-//! - **ProductionEngine** - Primary inference with CALM
-//! - **VortexModel** - Unified transformer with sacred geometry
 //! - **VCP** - Vortex Context Preserver (hallucination detection)
 //! - **EBRM** - Energy-Based Reasoning Model
-//! - **RoPE + GQA** - Modern attention mechanisms
+//! - **SSO** - Spectral Sphere Optimizer (μP-aligned)
+//! - **CALM** - Continuous Autoregressive Language Models
+//! - **BurnSSO** - Burn-native SSO with tensor operations
+//! - **BurnCALM** - Burn-native CALM autoencoder
+//! - **backends** - GPU acceleration (tch/wgpu)
 
 pub mod hallucinations;
 pub mod ebrm;
-pub mod vortex_model;
-pub mod production_engine;
-pub mod autoregressive;
-pub mod rope;
-pub mod gqa;
-pub mod optimized_ops;
-pub mod tokenizer;
+pub mod training;
+pub mod calm;
+pub mod burn_calm;
+pub mod vortex_discovery;
+pub mod backends;
 
-// Re-exports
-pub use hallucinations::{VortexContextPreserver, SignalSubspace, HallucinationDetector};
-pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy, PositionEnergy};
-pub use vortex_model::{VortexModel, VortexModelConfig};
-pub use production_engine::{ProductionEngine, ProductionConfig};
-pub use rope::{RotaryPositionEmbedding, RoPEConfig};
-pub use gqa::{GroupedQueryAttention, GQAConfig};
+pub use hallucinations::{VortexContextPreserver, HallucinationResult};
+pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
+pub use training::{SpectralSphereOptimizer, SSOConfig, SpectralScaler, BurnSSO, SSOState, AdaptiveSSO};
+pub use calm::{CALMEngine, CALMConfig};
+pub use burn_calm::{BurnCALM, BurnCALMConfig, LatentEnergyScorer};
+pub use vortex_discovery::{VortexDiscovery, DiscoveryConfig};
+pub use backends::backend_info;

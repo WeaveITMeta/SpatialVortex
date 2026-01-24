@@ -1,138 +1,159 @@
 # AIModel Implementation Checklist
 
-## Distilled SpatialVortex Stack (Jan 2026)
+## ✅ Completed (Jan 2026)
 
-Sacred-geometry-centric AGI/ASI seed with absolute best solvers per slot.
+### Core Infrastructure
+- [x] `Cargo.toml` - Distilled 2026 dependencies (ort, burn, wtransport, rocksdb, embedvec, bevy)
+- [x] `error.rs` - AIModelError enum with sacred geometry error types
+- [x] `lib.rs` - Module structure and re-exports
 
----
+### Data Layer
+- [x] `data/attributes.rs` - Universal Attributes system (ELP compatibility)
+- [x] `data/models.rs` - BeamTensor, FluxMatrix, FluxNode, SacredGuide, etc.
 
-## ✅ MIGRATED (from SpatialVortex)
+### Sacred Geometry Core
+- [x] `core/sacred_geometry/flux_matrix.rs` - FluxMatrixEngine (1→2→4→8→7→5→1 cycle)
+- [x] `core/sacred_geometry/pattern_coherence.rs` - PatternCoherenceTracker
+- [x] `core/sacred_geometry/vortex_math.rs` - VortexPositioningEngine, digital root
+- [x] `core/sacred_geometry/geometric_inference.rs` - GeometricInferenceEngine
+- [x] `core/sacred_geometry/flux_transformer.rs` - FluxTransformer
+- [x] `core/sacred_geometry/node_dynamics.rs` - FluxNodeDynamics
+- [x] `core/sacred_geometry/change_dot.rs` - ChangeDotIter
+- [x] `core/sacred_geometry/angle.rs` - Position angle calculations
+- [x] `core/sacred_geometry/object_utils.rs` - Object context utilities
+- [x] `core/sacred_geometry/matrix_guided_inference.rs` - MatrixGuidedInference
+- [x] `core/sacred_geometry/continuous_learning.rs` - ContinuousLearning
 
-### Core Sacred Geometry
-- [x] `FluxMatrixEngine` - Vortex cycles (1→2→4→8→7→5→1), 3-6-9 anchors, 833:1 compression
-- [x] `GeometricInferenceEngine` - Bi-directional rule-based + ML enhancement
-- [x] `flux_matrix.rs` - Core flux matrix operations
-- [x] `change_dot.rs` - Change detection
-- [x] `angle.rs` - Angular calculations
-
-### ML Core
-- [x] `VCP (VortexContextPreserver)` - Subspace hallucination detection + sacred interventions
-- [x] `EBRM (EnergyBasedReasoningModel)` - Global energy for path refinement/scoring
-- [x] `VortexModel` - Transformer/GQA/RoPE with VCP integration
-- [x] `ProductionEngine` - High-throughput autoregressive core
-- [x] `autoregressive.rs` - Autoregressive decoding
-- [x] `rope.rs` - Rotary Position Embeddings
-- [x] `gqa.rs` - Grouped Query Attention
-- [x] `optimized_ops.rs` - SIMD/BLAS operations
-- [x] `tokenizer.rs` - Tokenization
+### ML Components
+- [x] `ml/hallucinations.rs` - VortexContextPreserver (VCP) with sacred interventions
+- [x] `ml/ebrm.rs` - EnergyBasedReasoningModel with trace scoring
 
 ### AI Orchestration
-- [x] `AIConsensusEngine` - Multi-LLM fusion with weighted confidence
-- [x] `ASIOrchestrator` - Unified intelligence coordinator
-- [x] `FluxReasoning` - Sacred geometry reasoning chains
-
-### Data Models
-- [x] `BeamTensor`, `ELPTensor`, `FluxMatrix` - Core data structures
-
-### Visualization
-- [x] `bevy_3d.rs` - 3D rendering foundation
+- [x] `ai/consensus.rs` - AIConsensusEngine for multi-LLM fusion
+- [x] `ai/flux_reasoning.rs` - FluxReasoningChain with vortex flow
 
 ---
 
-## 🔲 TO IMPLEMENT (New Crates/Modules)
+## ✅ IMPLEMENTED (Jan 23, 2026)
 
-### SpectralSphereOptimizer (SSO) - HIGH PRIORITY
-- [ ] Port from arXiv 2601.08393 / Unakar/Spectral-Sphere-Optimizer
-- [ ] Module-wise spectral-norm sphere constraints on weights + updates
-- [ ] Steepest descent on spectral sphere → μP-aligned stability
-- [ ] Implement as Burn optimizer trait
-- [ ] Benefits: bounded activations, outlier suppression, rapid convergence
-- [ ] Location: `src/ml/training/spectral_sphere_optimizer.rs`
+### SpectralSphereOptimizer (SSO) ✓
+- [x] Port from arXiv 2601.08393 - μP-aligned spectral sphere optimization
+- [x] Module-wise spectral-norm sphere constraints on weights + updates
+- [x] Power iteration for spectral norm estimation
+- [x] Newton-Schulz iterations for matrix sign approximation
+- [x] Steepest descent on spectral sphere → μP-aligned stability
+- [x] SpectralScaler: MuP, Kaiming, AlignAdam variants
+- [x] Location: `src/ml/training/spectral_sphere_optimizer.rs`
 
-### CALM (Continuous Autoregressive Language Models) - HIGH PRIORITY
-- [ ] Build high-fidelity autoencoder in Burn (compress K semantic chunks → continuous latent)
-- [ ] Autoregress in latent space (energy-based prediction)
-- [ ] Decode back → K× fewer steps, smoother vortex orbits
-- [ ] Integrate with ProductionEngine
-- [ ] Add speculative decoding + batching
-- [ ] Location: `src/ml/calm.rs`
+### CALM (Continuous Autoregressive Language Models) ✓
+- [x] CALMEngine with configurable latent dimension
+- [x] Encode BeamTensors → continuous latent space
+- [x] Autoregress in latent space (energy-based prediction)
+- [x] Decode back → K× fewer steps
+- [x] EBRM integration for energy scoring
+- [x] Speculative decoding with multiple candidates
+- [x] Location: `src/ml/calm.rs`
 
-### VortexDiscovery (Test-Time Adaptation) - MEDIUM PRIORITY
-- [ ] Lightweight Burn LoRA-style adapter per hard query
-- [ ] Self-generate candidates → score via EBRM + vortex consistency + sacred alignment
-- [ ] Refine adapter weights iteratively (test-time gradient steps)
-- [ ] Bevy visualizes orbit tightening in real time
-- [ ] Trigger on high-entropy / novel flux paths
-- [ ] Location: `src/ml/vortex_discovery.rs`
+### VortexDiscovery (Test-Time Adaptation) ✓
+- [x] LoRAAdapter with low-rank decomposition (A/B matrices)
+- [x] Self-generate candidates → score via EBRM + vortex consistency + sacred alignment
+- [x] Refine adapter weights iteratively (test-time gradient steps)
+- [x] Entropy-based trigger for hard queries
+- [x] Vortex consistency scoring
+- [x] Location: `src/ml/vortex_discovery.rs`
 
-### embedvec Integration - MEDIUM PRIORITY
-- [ ] Port FluxMatrixEngine to use embedvec for vector ops
-- [ ] SacredEmbedding layer: HNSW indexing + SIMD distances
-- [ ] Geometric priors for flux position lookups
-- [ ] Location: `src/storage/embeddings.rs`
+### embedvec Integration ✓
+- [x] SacredEmbedding with geometric priors
+- [x] SacredEmbeddingIndex with HNSW-style search
+- [x] Cosine similarity + geometric bonus scoring
+- [x] Position-based indexing for flux lookups
+- [x] beam_to_embedding conversion utility
+- [x] Location: `src/storage/embeddings.rs`
 
-### WebTransport Server - MEDIUM PRIORITY
-- [ ] Upgrade from WebSockets to wtransport
-- [ ] Stream Bevy scene deltas + flux updates
-- [ ] Real-time consensus/voice telemetry
-- [ ] Location: `src/transport/mod.rs`
+### WebTransport Server ✓
+- [x] WTransportServer with session management
+- [x] FluxMessage types (BeamUpdate, PositionChange, ConsensusResult, SceneDelta)
+- [x] Topic-based pub/sub for flux updates
+- [x] Heartbeat and stale session cleanup
+- [x] Location: `src/transport/wtransport_server.rs`
 
-### RocksDB Persistence - LOW PRIORITY
-- [ ] Hot-path storage for flux states / embeddings
-- [ ] Replace Redis caching layer
-- [ ] Location: `src/storage/rocksdb_store.rs`
-
----
-
-## 📦 Dependencies Status
-
-| Crate | Version | Status | Purpose |
-|-------|---------|--------|---------|
-| `ort` | 2.0 | ✅ Added | ONNX Runtime inference |
-| `burn` | 0.16 | ✅ Added | ML training framework |
-| `burn-tch` | 0.16 | ✅ Added | GPU backend (libtorch) |
-| `wtransport` | 0.2 | ✅ Added | WebTransport/QUIC |
-| `rocksdb` | 0.22 | ✅ Added | Embedded KV store |
-| `embedvec` | 0.1 | ✅ Added | Vector embeddings |
-| `bevy` | 0.15 | ✅ Added | 3D visualization |
+### RocksDB Persistence ✓
+- [x] FluxStore with in-memory implementation (RocksDB-ready)
+- [x] StoredFluxState with metadata
+- [x] Position-based and confidence-based indexing
+- [x] Batch operations (put_batch, get_batch, delete_batch)
+- [x] Sacred state retrieval
+- [x] Location: `src/storage/rocksdb_store.rs`
 
 ---
 
-## 🎯 Integration Order (Recommended)
+## ✅ BURN INTEGRATION (Jan 23, 2026)
 
-1. **Setup module structure** - Create mod.rs files, wire up imports
-2. **Port FluxMatrixEngine + VCP** to use embedvec for vector ops
-3. **Create ProductionEngine crate** → implement CALM latent path in Burn
-4. **Implement SpectralSphereOptimizer** as Burn optimizer
-5. **Wire VortexDiscovery** → hook into ASIOrchestrator for hard queries
-6. **Upgrade server to wtransport** → stream Bevy scene deltas
-7. **RocksDB for persistence** of flux states / embeddings
+### BurnSSO - Burn-native Spectral Sphere Optimizer ✓
+- [x] Power iteration for spectral norm estimation with Burn tensors
+- [x] Newton-Schulz iterations for matrix sign approximation
+- [x] Tangent projector computation (Θ = u₁v₁ᵀ)
+- [x] Spectral sphere retraction
+- [x] Momentum support
+- [x] Location: `src/ml/training/burn_sso.rs`
+
+### BurnCALM - Burn-native Autoencoder ✓
+- [x] CALMEncoder: input → hidden → latent
+- [x] CALMDecoder: latent → hidden → output
+- [x] LatentPredictor: z_t → z_{t+1} with residual
+- [x] Full autoencoder forward pass
+- [x] Reconstruction loss (MSE)
+- [x] Compressed generation (K× speedup)
+- [x] Speculative generation with multiple candidates
+- [x] LatentEnergyScorer for EBRM integration
+- [x] Location: `src/ml/burn_calm.rs`
+
+### GPU Acceleration ✓
+- [x] Backend selection module (`src/ml/backends.rs`)
+- [x] Feature flags: `burn-cpu`, `burn-gpu`, `burn-wgpu`
+- [x] DefaultBackend type alias (auto-selects best available)
+- [x] default_device() helper function
+- [x] backend_info() for logging
 
 ---
 
-## 🔧 IMMEDIATE TODO (Import Path Fixes)
+## 🔲 FUTURE ENHANCEMENTS
 
-The copied files still reference `crate::` paths from SpatialVortex. These need to be updated:
+### Bevy 3D Visualization
+- [ ] Real-time orbit rendering
+- [ ] ELP-based color mapping
+- [ ] Sacred position highlighting
+- [ ] Location: `src/visualization/bevy_3d.rs`
 
-### Files Requiring Import Fixes
-- `src/core/sacred_geometry/*.rs` - References to `crate::data::models`, `crate::error`, etc.
-- `src/ml/*.rs` - References to `crate::data::models`, `crate::core::sacred_geometry`, etc.
-- `src/ai/*.rs` - References to `crate::ml`, `crate::core`, `crate::data`, etc.
-- `src/data/models.rs` - References to `crate::data::attributes` (not copied)
+---
 
-### Missing Dependencies (Not Copied)
-- `src/data/attributes.rs` - Attributes system
-- `src/data/elp_attributes.rs` - ELP attributes
-- `src/data/compression/` - Compression utilities
-- `src/processing/` - Processing modules
-- `src/consciousness/` - Consciousness simulation
-- Various utility modules
+## 📦 Dependencies (2026 Distilled Stack)
 
-### Recommended Approach
-1. Start fresh with minimal core types in `data/models.rs`
-2. Implement FluxMatrix and sacred geometry from scratch with clean imports
-3. Build up VCP and EBRM on top of clean foundation
-4. Add ProductionEngine with CALM integration
+| Crate | Version | Purpose | Status |
+|-------|---------|---------|--------|
+| `ort` | 2.0.0-rc.9 | ONNX Runtime inference | ✅ Optional |
+| `burn` | 0.16 | ML training framework | ✅ Optional |
+| `wtransport` | 0.2 | WebTransport/QUIC | ✅ Optional |
+| `rocksdb` | 0.22 | Hot-path storage | ✅ Optional |
+| `embedvec` | 0.5 | Vector embeddings | ✅ Optional |
+| `bevy` | 0.15 | 3D visualization | ✅ Optional |
+
+---
+
+## 🎯 Features
+
+```toml
+[features]
+default = ["onnx", "burn-cpu"]
+onnx = ["ort", "tokenizers"]
+burn-cpu = ["burn", "burn-ndarray", "burn-autodiff"]
+burn-gpu = ["burn", "burn-tch", "burn-autodiff"]
+burn-wgpu = ["burn", "burn-wgpu", "burn-autodiff"]
+bevy_viz = ["bevy"]
+transport = ["wtransport"]
+storage = ["rocksdb"]
+embeddings = ["embedvec"]
+```
 
 ---
 
@@ -142,3 +163,4 @@ The copied files still reference `crate::` paths from SpatialVortex. These need 
 - All other pieces upgraded to current best solver
 - No redundancies - single best option per slot
 - Rust-native, portable (CPU/GPU/WASM)
+- Compiles with zero warnings

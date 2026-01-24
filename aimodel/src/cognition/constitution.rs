@@ -1,0 +1,534 @@
+//! Claude's Constitutional AI - Ethical Principles
+//!
+//! Implements Claude's constitution as training data and runtime guard.
+//! Based on Anthropic's Constitutional AI approach.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// A constitutional principle
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Principle {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub category: PrincipleCategory,
+    pub weight: f32,
+    pub examples: Vec<String>,
+    pub counter_examples: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum PrincipleCategory {
+    Helpfulness,
+    Harmlessness,
+    Honesty,
+    Safety,
+    Privacy,
+    Fairness,
+    Autonomy,
+}
+
+impl Principle {
+    pub fn new(id: &str, name: &str, description: &str, category: PrincipleCategory) -> Self {
+        Self {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: description.to_string(),
+            category,
+            weight: 1.0,
+            examples: Vec::new(),
+            counter_examples: Vec::new(),
+        }
+    }
+
+    pub fn with_weight(mut self, w: f32) -> Self {
+        self.weight = w;
+        self
+    }
+
+    pub fn with_example(mut self, ex: &str) -> Self {
+        self.examples.push(ex.to_string());
+        self
+    }
+
+    pub fn with_counter_example(mut self, ex: &str) -> Self {
+        self.counter_examples.push(ex.to_string());
+        self
+    }
+}
+
+/// The full constitution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Constitution {
+    pub principles: Vec<Principle>,
+    pub version: String,
+}
+
+impl Constitution {
+    /// Create Claude's constitution based on Anthropic's published principles
+    pub fn claude() -> Self {
+        let mut principles = Vec::new();
+
+        // === HELPFULNESS ===
+        principles.push(
+            Principle::new(
+                "helpful_1",
+                "Be genuinely helpful",
+                "Provide accurate, relevant, and useful information that addresses the user's actual needs.",
+                PrincipleCategory::Helpfulness,
+            )
+            .with_weight(1.0)
+            .with_example("Explaining a concept clearly with examples")
+            .with_counter_example("Giving vague or unhelpful responses to avoid engagement")
+        );
+
+        principles.push(
+            Principle::new(
+                "helpful_2",
+                "Understand intent",
+                "Try to understand what the user actually wants, even if their request is ambiguous.",
+                PrincipleCategory::Helpfulness,
+            )
+            .with_weight(0.9)
+        );
+
+        principles.push(
+            Principle::new(
+                "helpful_3",
+                "Be thorough but concise",
+                "Provide complete answers without unnecessary verbosity.",
+                PrincipleCategory::Helpfulness,
+            )
+            .with_weight(0.8)
+        );
+
+        // === HARMLESSNESS ===
+        principles.push(
+            Principle::new(
+                "harmless_1",
+                "Avoid causing harm",
+                "Do not provide information that could be used to harm people, animals, or property.",
+                PrincipleCategory::Harmlessness,
+            )
+            .with_weight(1.5)
+            .with_counter_example("Providing instructions for weapons or dangerous substances")
+        );
+
+        principles.push(
+            Principle::new(
+                "harmless_2",
+                "No deception for harm",
+                "Never deceive users in ways that could cause them harm.",
+                PrincipleCategory::Harmlessness,
+            )
+            .with_weight(1.5)
+        );
+
+        principles.push(
+            Principle::new(
+                "harmless_3",
+                "Refuse harmful requests",
+                "Politely decline requests that would cause harm, explaining why when appropriate.",
+                PrincipleCategory::Harmlessness,
+            )
+            .with_weight(1.4)
+        );
+
+        principles.push(
+            Principle::new(
+                "harmless_4",
+                "No manipulation",
+                "Do not manipulate users psychologically or emotionally.",
+                PrincipleCategory::Harmlessness,
+            )
+            .with_weight(1.3)
+        );
+
+        // === HONESTY ===
+        principles.push(
+            Principle::new(
+                "honest_1",
+                "Be truthful",
+                "Only assert things you believe to be true. Do not lie or deceive.",
+                PrincipleCategory::Honesty,
+            )
+            .with_weight(1.4)
+            .with_example("Admitting when you don't know something")
+            .with_counter_example("Making up facts or citations")
+        );
+
+        principles.push(
+            Principle::new(
+                "honest_2",
+                "Acknowledge uncertainty",
+                "Express appropriate uncertainty about claims. Don't present speculation as fact.",
+                PrincipleCategory::Honesty,
+            )
+            .with_weight(1.2)
+        );
+
+        principles.push(
+            Principle::new(
+                "honest_3",
+                "Acknowledge limitations",
+                "Be transparent about being an AI with limitations in knowledge and capabilities.",
+                PrincipleCategory::Honesty,
+            )
+            .with_weight(1.1)
+        );
+
+        principles.push(
+            Principle::new(
+                "honest_4",
+                "No hallucination",
+                "Do not make up information, especially citations, quotes, or specific facts.",
+                PrincipleCategory::Honesty,
+            )
+            .with_weight(1.5)
+        );
+
+        // === SAFETY ===
+        principles.push(
+            Principle::new(
+                "safety_1",
+                "Protect vulnerable users",
+                "Be especially careful with content that could harm children or vulnerable populations.",
+                PrincipleCategory::Safety,
+            )
+            .with_weight(1.5)
+        );
+
+        principles.push(
+            Principle::new(
+                "safety_2",
+                "No dangerous information",
+                "Do not provide detailed instructions for creating weapons, drugs, or other dangerous items.",
+                PrincipleCategory::Safety,
+            )
+            .with_weight(1.6)
+        );
+
+        principles.push(
+            Principle::new(
+                "safety_3",
+                "Encourage professional help",
+                "For serious issues (medical, legal, mental health), encourage seeking professional help.",
+                PrincipleCategory::Safety,
+            )
+            .with_weight(1.2)
+        );
+
+        // === PRIVACY ===
+        principles.push(
+            Principle::new(
+                "privacy_1",
+                "Protect personal information",
+                "Do not request, store, or share personal identifying information unnecessarily.",
+                PrincipleCategory::Privacy,
+            )
+            .with_weight(1.3)
+        );
+
+        principles.push(
+            Principle::new(
+                "privacy_2",
+                "Respect confidentiality",
+                "Treat user conversations as confidential and do not reference them inappropriately.",
+                PrincipleCategory::Privacy,
+            )
+            .with_weight(1.2)
+        );
+
+        // === FAIRNESS ===
+        principles.push(
+            Principle::new(
+                "fair_1",
+                "Avoid bias",
+                "Strive to be fair and avoid perpetuating harmful stereotypes or biases.",
+                PrincipleCategory::Fairness,
+            )
+            .with_weight(1.2)
+        );
+
+        principles.push(
+            Principle::new(
+                "fair_2",
+                "Present multiple perspectives",
+                "On controversial topics, present multiple viewpoints fairly rather than pushing one view.",
+                PrincipleCategory::Fairness,
+            )
+            .with_weight(1.0)
+        );
+
+        principles.push(
+            Principle::new(
+                "fair_3",
+                "No discrimination",
+                "Treat all users with equal respect regardless of their background.",
+                PrincipleCategory::Fairness,
+            )
+            .with_weight(1.3)
+        );
+
+        // === AUTONOMY ===
+        principles.push(
+            Principle::new(
+                "autonomy_1",
+                "Respect user autonomy",
+                "Respect users' right to make their own decisions. Inform, don't dictate.",
+                PrincipleCategory::Autonomy,
+            )
+            .with_weight(1.1)
+        );
+
+        principles.push(
+            Principle::new(
+                "autonomy_2",
+                "Support informed decisions",
+                "Help users make informed decisions by providing balanced information.",
+                PrincipleCategory::Autonomy,
+            )
+            .with_weight(1.0)
+        );
+
+        Self {
+            principles,
+            version: "1.0.0".to_string(),
+        }
+    }
+
+    /// Get principles by category
+    pub fn by_category(&self, category: PrincipleCategory) -> Vec<&Principle> {
+        self.principles.iter().filter(|p| p.category == category).collect()
+    }
+
+    /// Get all principle IDs
+    pub fn principle_ids(&self) -> Vec<&str> {
+        self.principles.iter().map(|p| p.id.as_str()).collect()
+    }
+
+    /// Get principle by ID
+    pub fn get(&self, id: &str) -> Option<&Principle> {
+        self.principles.iter().find(|p| p.id == id)
+    }
+
+    /// Generate training data pairs (prompt, good_response, bad_response)
+    pub fn generate_training_data(&self) -> Vec<TrainingPair> {
+        let mut pairs = Vec::new();
+
+        for principle in &self.principles {
+            // Generate pairs from examples and counter-examples
+            for (i, example) in principle.examples.iter().enumerate() {
+                if let Some(counter) = principle.counter_examples.get(i) {
+                    pairs.push(TrainingPair {
+                        principle_id: principle.id.clone(),
+                        prompt: format!("Demonstrate: {}", principle.name),
+                        good_response: example.clone(),
+                        bad_response: counter.clone(),
+                        weight: principle.weight,
+                    });
+                }
+            }
+        }
+
+        pairs
+    }
+
+    /// Serialize to JSON for training
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(self)
+    }
+}
+
+impl Default for Constitution {
+    fn default() -> Self {
+        Self::claude()
+    }
+}
+
+/// Training data pair for constitutional AI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingPair {
+    pub principle_id: String,
+    pub prompt: String,
+    pub good_response: String,
+    pub bad_response: String,
+    pub weight: f32,
+}
+
+/// Constitutional guard for runtime checking
+pub struct ConstitutionalGuard {
+    constitution: Constitution,
+    violation_counts: HashMap<String, u32>,
+    strict_mode: bool,
+}
+
+impl ConstitutionalGuard {
+    pub fn new(constitution: Constitution) -> Self {
+        Self {
+            constitution,
+            violation_counts: HashMap::new(),
+            strict_mode: false,
+        }
+    }
+
+    pub fn strict(mut self) -> Self {
+        self.strict_mode = true;
+        self
+    }
+
+    /// Check if a response violates any principles
+    pub fn check(&self, response: &str) -> CheckResult {
+        let mut violations = Vec::new();
+        let mut warnings = Vec::new();
+
+        let response_lower = response.to_lowercase();
+
+        // Check for obvious violations
+        let dangerous_patterns = [
+            ("how to make a bomb", "safety_2"),
+            ("how to hack", "safety_2"),
+            ("kill yourself", "harmless_1"),
+            ("i hate", "fair_1"),
+        ];
+
+        for (pattern, principle_id) in dangerous_patterns {
+            if response_lower.contains(pattern) {
+                if let Some(principle) = self.constitution.get(principle_id) {
+                    violations.push(Violation {
+                        principle_id: principle_id.to_string(),
+                        principle_name: principle.name.clone(),
+                        severity: Severity::High,
+                        description: format!("Response contains potentially harmful content: '{}'", pattern),
+                    });
+                }
+            }
+        }
+
+        // Check for uncertainty markers (positive)
+        let uncertainty_markers = ["i'm not sure", "i don't know", "i believe", "it's possible"];
+        let has_uncertainty = uncertainty_markers.iter().any(|m| response_lower.contains(m));
+
+        // Check for absolute claims without uncertainty
+        let absolute_markers = ["definitely", "certainly", "always", "never", "100%"];
+        for marker in absolute_markers {
+            if response_lower.contains(marker) && !has_uncertainty {
+                warnings.push(Warning {
+                    principle_id: "honest_2".to_string(),
+                    message: format!("Response uses absolute language '{}' without uncertainty markers", marker),
+                });
+            }
+        }
+
+        let passed = violations.is_empty() && (warnings.is_empty() || !self.strict_mode);
+        let violation_count = violations.len();
+
+        CheckResult {
+            passed,
+            violations,
+            warnings,
+            confidence: if passed { 1.0 } else { 0.5 - (violation_count as f32 * 0.1) },
+        }
+    }
+
+    /// Record a violation
+    pub fn record_violation(&mut self, principle_id: &str) {
+        *self.violation_counts.entry(principle_id.to_string()).or_insert(0) += 1;
+    }
+
+    /// Get violation statistics
+    pub fn violation_stats(&self) -> &HashMap<String, u32> {
+        &self.violation_counts
+    }
+
+    /// Get the constitution
+    pub fn constitution(&self) -> &Constitution {
+        &self.constitution
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckResult {
+    pub passed: bool,
+    pub violations: Vec<Violation>,
+    pub warnings: Vec<Warning>,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct Violation {
+    pub principle_id: String,
+    pub principle_name: String,
+    pub severity: Severity,
+    pub description: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Warning {
+    pub principle_id: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constitution_creation() {
+        let constitution = Constitution::claude();
+        
+        assert!(!constitution.principles.is_empty());
+        assert!(constitution.principles.len() >= 15);
+    }
+
+    #[test]
+    fn test_principle_categories() {
+        let constitution = Constitution::claude();
+        
+        let harmless = constitution.by_category(PrincipleCategory::Harmlessness);
+        assert!(!harmless.is_empty());
+        
+        let honest = constitution.by_category(PrincipleCategory::Honesty);
+        assert!(!honest.is_empty());
+    }
+
+    #[test]
+    fn test_constitutional_guard() {
+        let guard = ConstitutionalGuard::new(Constitution::claude());
+        
+        // Safe response
+        let result = guard.check("I'd be happy to help you with that question.");
+        assert!(result.passed);
+        
+        // Potentially problematic response
+        let result = guard.check("I definitely know everything about this topic.");
+        assert!(!result.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_training_data_generation() {
+        let constitution = Constitution::claude();
+        let pairs = constitution.generate_training_data();
+        
+        // Should have some training pairs from examples
+        assert!(!pairs.is_empty() || constitution.principles.iter().all(|p| p.examples.is_empty()));
+    }
+
+    #[test]
+    fn test_constitution_serialization() {
+        let constitution = Constitution::claude();
+        let json = constitution.to_json().unwrap();
+        
+        assert!(json.contains("principles"));
+        assert!(json.contains("Helpfulness"));
+    }
+}

@@ -1,15 +1,12 @@
 //! Storage Module
 //!
-//! Hot-path storage with RocksDB:
-//! - Flux matrices
-//! - Embedvec vectors
-//! - Confidence scores
-//! - Real-time states
+//! Hot-path storage with RocksDB and embedvec integration.
 
-// TODO: Implement RocksDB store
-// #[cfg(feature = "storage")]
-// pub mod rocksdb_store;
+pub mod embeddings;
+pub mod rocksdb_store;
 
-// TODO: Implement embedvec integration
-// #[cfg(feature = "embeddings")]
-// pub mod embeddings;
+pub use embeddings::{
+    SacredEmbedding, SacredEmbeddingIndex, EmbeddingsConfig, 
+    SearchResult, beam_to_embedding
+};
+pub use rocksdb_store::{FluxStore, FluxStoreConfig};
