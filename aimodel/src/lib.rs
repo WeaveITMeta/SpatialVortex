@@ -1,14 +1,32 @@
-//! AIModel - Distilled SpatialVortex AGI/ASI Seed
+//! # AIModel - Distilled SpatialVortex AGI/ASI Seed
 //!
-//! Sacred-geometry-centric AI framework with:
-//! - **FluxMatrixEngine** - Vortex cycles (1→2→4→8→7→5→1), 3-6-9 anchors
+//! Sacred-geometry-centric AI framework with continuous learning through vortex dynamics.
+//!
+//! ## Core Components
+//! - **FluxMatrixEngine** - Vortex cycles (1→2→4→8→7→5→1), 3-6-9 sacred anchors
+//! - **VortexRunner** - Continuous exponential learning with u64::MAX cycle reset
+//! - **ExhaustivePathwayOptimizer** - Exact O(n!) enumeration with entropic objective
+//! - **ThinkingEngine** - 2^n exponential thinking cycles
+//!
+//! ## ML Components
 //! - **VCP** - Vortex Context Preserver (hallucination detection)
 //! - **EBRM** - Energy-Based Reasoning Model
 //! - **SSO** - Spectral Sphere Optimizer (μP-aligned)
-//! - **AIConsensusEngine** - Multi-LLM fusion
-//! - **Cognition** - Thinking, Memory, Constitution, RAG
+//! - **CALM** - Continuous Autoregressive Language Models
 //!
-//! ## 2026 Distilled Stack
+//! ## Cognition
+//! - **ThinkingEngine** - Reasoning with sacred geometry
+//! - **MemoryStore** - RocksDB-backed persistent memory
+//! - **RAGEngine** - Retrieval-augmented generation
+//! - **ToolRegistry** - External tool use for learning
+//!
+//! ## Key Algorithms
+//! - **Entropic Objective**: `J_β(θ) = E_s[log E_a~π[exp(β(s) R(s,a))]]`
+//! - **Adaptive β(s)**: Per-state temperature for KL-bounded policy
+//! - **PUCT Selection**: `Q(s) = max(children)`, `P(s) ∝ rank`, UCB bonus
+//! - **9! Layering**: Exact 362,880 permutation enumeration (not Stirling's approximation)
+//!
+//! ## 2026 Stack
 //! - `ort` - ONNX Runtime inference
 //! - `burn` - ML training framework
 //! - `wtransport` - WebTransport/QUIC
@@ -46,10 +64,32 @@ pub use ml::{
     EnergyBasedReasoningModel,
     SpectralSphereOptimizer,
     SSOConfig,
+    CALMEngine,
+    CALMConfig,
+    ExhaustivePathwayOptimizer,
+    PathwayConfig,
+    ScoredPathway,
+    CompoundingModel,
+    StackedResult,
 };
 
 // AI components
 pub use ai::{
     AIConsensusEngine,
     FluxReasoningChain,
+};
+
+// Cognition components
+pub use cognition::{
+    ThinkingEngine,
+    ThinkingConfig,
+    ThoughtChain,
+    VortexRunner,
+    VortexState,
+    ToolRegistry,
+    ToolCall,
+    ToolResult,
+    RAGEngine,
+    RAGConfig,
+    MemoryStore,
 };

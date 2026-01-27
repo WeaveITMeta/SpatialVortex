@@ -15,6 +15,9 @@ pub mod calm;
 pub mod burn_calm;
 pub mod vortex_discovery;
 pub mod backends;
+pub mod pathway;
+pub mod huggingface;
+pub mod continuous_learning;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
@@ -23,3 +26,12 @@ pub use calm::{CALMEngine, CALMConfig};
 pub use burn_calm::{BurnCALM, BurnCALMConfig, LatentEnergyScorer};
 pub use vortex_discovery::{VortexDiscovery, DiscoveryConfig};
 pub use backends::backend_info;
+pub use pathway::{ExhaustivePathwayOptimizer, PathwayConfig, ScoredPathway, CompoundingModel, StackedResult};
+pub use huggingface::{HFModelLoader, HFModelConfig, RSIState};
+pub use continuous_learning::{
+    ContinuousTrainer, ContinuousLearningConfig,
+    RSIEpochScheduler, RSISignal, TrainingRecommendation,
+    SyntheticDataGenerator, SyntheticExample,
+    TrainingBatch, AdaptiveLearningRate,
+    EpochResult, TrainingSessionResult,
+};

@@ -989,6 +989,193 @@ impl ThinkingEngine {
         };
         self.current_position
     }
+
+    // =========================================================================
+    // Verified Patterning Integration
+    // =========================================================================
+
+    /// Generate a grounded curriculum from verified patterns
+    /// Only includes patterns that have passed scientific verification
+    pub fn generate_verified_curriculum(
+        &self,
+        verified_patterns: &[super::verified_patterning::VerifiedPattern],
+        max_items: usize,
+    ) -> Vec<CurriculumItem> {
+        let mut items = Vec::new();
+
+        for pattern in verified_patterns.iter().take(max_items) {
+            // Only include patterns with high confidence and positive benefit
+            if pattern.verification.confidence < 0.7 || pattern.cumulative_benefit <= 0.0 {
+                continue;
+            }
+
+            // Convert pattern to curriculum item
+            let item = CurriculumItem {
+                id: pattern.hypothesis.id.clone(),
+                description: pattern.hypothesis.description.clone(),
+                difficulty: self.estimate_difficulty(&pattern.hypothesis),
+                prerequisites: self.infer_prerequisites(&pattern.hypothesis),
+                verification_confidence: pattern.verification.confidence,
+                evidence_count: pattern.verification.evidence.len(),
+                expected_benefit: pattern.cumulative_benefit,
+            };
+
+            items.push(item);
+        }
+
+        // Sort by expected benefit (highest first) then by difficulty (easier first)
+        items.sort_by(|a, b| {
+            b.expected_benefit.partial_cmp(&a.expected_benefit)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.difficulty.partial_cmp(&b.difficulty).unwrap_or(std::cmp::Ordering::Equal))
+        });
+
+        items
+    }
+
+    /// Estimate difficulty of a pattern hypothesis (0.0 = easy, 1.0 = hard)
+    fn estimate_difficulty(&self, hypothesis: &super::verified_patterning::PatternHypothesis) -> f64 {
+        use super::verified_patterning::PatternType;
+        
+        match &hypothesis.pattern.pattern_type {
+            PatternType::Factual { .. } => 0.3, // Facts are relatively easy
+            PatternType::Linguistic { .. } => 0.4, // Language patterns moderate
+            PatternType::Reasoning { .. } => 0.7, // Reasoning is harder
+            PatternType::Preference { .. } => 0.5, // Preferences are moderate
+        }
+    }
+
+    /// Infer prerequisites for a pattern
+    fn infer_prerequisites(&self, hypothesis: &super::verified_patterning::PatternHypothesis) -> Vec<String> {
+        use super::verified_patterning::StructureType;
+        
+        match &hypothesis.expected_structure.structure_type {
+            StructureType::Capability { name } => {
+                // Some capabilities have natural prerequisites
+                match name.as_str() {
+                    "arithmetic" => vec!["number_recognition".to_string()],
+                    "algebra" => vec!["arithmetic".to_string()],
+                    "calculus" => vec!["algebra".to_string()],
+                    "reasoning" => vec!["logic_basics".to_string()],
+                    "coding" => vec!["reasoning".to_string(), "syntax".to_string()],
+                    _ => vec![],
+                }
+            }
+            _ => vec![],
+        }
+    }
+
+    /// Create a hypothesis from observed learning
+    /// This is the "patterning" direction: structure → data
+    pub fn create_hypothesis_from_learning(
+        &self,
+        observation: &str,
+        beams: &[BeamTensor],
+        measured_improvement: f64,
+    ) -> super::verified_patterning::PatternHypothesis {
+        use super::verified_patterning::*;
+
+        let id = format!("hyp_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown"));
+        
+        // Analyze beams to determine pattern type
+        let pattern_type = self.infer_pattern_type(beams);
+        
+        // Create feature map from beam statistics
+        let mut features = HashMap::new();
+        if !beams.is_empty() {
+            let avg_confidence: f32 = beams.iter().map(|b| b.confidence).sum::<f32>() / beams.len() as f32;
+            features.insert("avg_confidence".to_string(), avg_confidence as f64);
+            features.insert("beam_count".to_string(), beams.len() as f64);
+            features.insert("measured_improvement".to_string(), measured_improvement);
+        }
+
+        PatternHypothesis {
+            id,
+            description: observation.to_string(),
+            pattern: PatternSpec {
+                pattern_type,
+                features,
+                examples: beams.to_vec(),
+            },
+            expected_structure: StructureSpec {
+                structure_type: StructureType::Capability { 
+                    name: "learned_pattern".to_string() 
+                },
+                properties: HashMap::new(),
+            },
+            predictions: vec![
+                Prediction {
+                    statement: format!("Training on this pattern improves performance by {:.1}%", measured_improvement * 100.0),
+                    metric: "improvement".to_string(),
+                    expected_value: measured_improvement,
+                    tolerance: 0.1,
+                    tested: false,
+                    observed_value: None,
+                },
+            ],
+            status: HypothesisStatus::Proposed,
+            created_at_ms: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0),
+        }
+    }
+
+    /// Infer pattern type from beam characteristics
+    fn infer_pattern_type(&self, beams: &[BeamTensor]) -> super::verified_patterning::PatternType {
+        use super::verified_patterning::PatternType;
+
+        if beams.is_empty() {
+            return PatternType::Factual { domain: "unknown".to_string() };
+        }
+
+        // Analyze beam distribution to infer type
+        let avg_beam: [f32; 9] = {
+            let mut avg = [0.0f32; 9];
+            for beam in beams {
+                for (i, &d) in beam.digits.iter().enumerate() {
+                    avg[i] += d;
+                }
+            }
+            for d in &mut avg {
+                *d /= beams.len() as f32;
+            }
+            avg
+        };
+
+        // Heuristic: high values in certain positions indicate pattern type
+        let max_idx = avg_beam.iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        match max_idx {
+            0..=2 => PatternType::Linguistic { feature: "semantic".to_string() },
+            3..=5 => PatternType::Reasoning { logic_type: "deductive".to_string() },
+            6..=8 => PatternType::Preference { dimension: "quality".to_string() },
+            _ => PatternType::Factual { domain: "general".to_string() },
+        }
+    }
+}
+
+/// A curriculum item for verified learning
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurriculumItem {
+    /// Unique identifier
+    pub id: String,
+    /// Human-readable description
+    pub description: String,
+    /// Estimated difficulty (0.0 = easy, 1.0 = hard)
+    pub difficulty: f64,
+    /// Prerequisites (IDs of other curriculum items)
+    pub prerequisites: Vec<String>,
+    /// Confidence from verification
+    pub verification_confidence: f64,
+    /// Number of evidence sources
+    pub evidence_count: usize,
+    /// Expected benefit from learning this
+    pub expected_benefit: f64,
 }
 
 #[cfg(test)]

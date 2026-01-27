@@ -5,11 +5,14 @@
 //! - **MoE gating** for bottleneck resolution
 //! - **Optimized ops** (SIMD, BLAS) for 10-100x speedup
 //! - **FluxOrchestrator** for unified runtime coordination
+//! - **MCP Server** for Model Context Protocol training/inference
 
 pub mod batch_scheduler;
 pub mod moe_gate;
 pub mod optimized_ops;
+pub mod mcp_server;
 
 pub use batch_scheduler::{ContinuousBatchScheduler, BatchedRequest, BatchConfig};
 pub use moe_gate::{MoEGate, Expert, ExpertType, MoEConfig};
 pub use optimized_ops::{matmul_fast, softmax_fast, normalize_l2_simd, has_avx2};
+pub use mcp_server::{MCPServer, MCPServerConfig, MCPRequest, MCPResponse, MCPTool};
