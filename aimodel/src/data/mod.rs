@@ -19,6 +19,7 @@ pub use models::{BeamTensor, ELPTensor, FluxMatrix, BeadTensor};
 pub use hf_datasets::{
     HFDatasetLoader, DatasetLoaderConfig, DatasetInfo, DatasetCategory,
     TrainingExample, DatasetStats, get_priority_datasets,
+    get_datasets_by_category, get_top_priority_datasets,
 };
 pub use benchmark_eval::{
     BenchmarkEvaluator, BenchmarkEvalResult, BenchmarkQuestion,
@@ -27,4 +28,6 @@ pub use benchmark_eval::{
 pub use real_benchmarks::{
     RealBenchmarkEvaluator, RealBenchmarkResult, RealBenchmarkQuestion,
     load_commonsenseqa, load_squad, load_babi,
+    load_mmlu, load_gsm8k, load_arc, load_hellaswag, load_truthfulqa, load_humaneval,
+    load_swebench,
 };

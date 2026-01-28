@@ -21,6 +21,10 @@ pub mod continuous_learning;
 pub mod gpu_trainer;
 pub mod rag_search;
 pub mod integration_test;
+pub mod jepa;
+pub mod neuro_symbolic;
+pub mod sacred_moe;
+pub mod sacred_swarm;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
@@ -37,4 +41,29 @@ pub use continuous_learning::{
     SyntheticDataGenerator, SyntheticExample,
     TrainingBatch, AdaptiveLearningRate,
     EpochResult, TrainingSessionResult,
+};
+pub use jepa::{
+    JEPAConfig, JEPAPredictor, JEPATrainer, JEPAStats,
+    HierarchicalDeductionEngine, DeductionRules, DeductionStep,
+    jepa_mse_loss, jepa_infonce_loss,
+};
+pub use neuro_symbolic::{
+    LogicTensorNetwork, RuleEmbedding,
+    NeuralTheoremProver, ProofResult, ProofStep,
+    EnergyPathScorer, PathNode, PathScore,
+    HybridInferenceEngine, HybridConfig, HybridStats, HybridInferenceResult,
+    ImaginationEngine, WorldState, CounterfactualResult,
+};
+pub use sacred_moe::{
+    SacredMoEConfig, SacredMoEModel, SacredMoELayer,
+    SacredExpert, ExpertSpecialization,
+    GeometricRouter, RouterOutput,
+    MultiHeadLatentAttention, MoEOutput, ModelStats,
+    PHI, PHI_INV, SACRED_POSITIONS, VORTEX_CYCLE,
+};
+pub use sacred_swarm::{
+    SacredSwarmConfig, SacredSwarm, SwarmAgent, SwarmTask,
+    AgentSpecialization as SwarmAgentSpecialization, AgentState, TaskState,
+    SwarmStepResult, SwarmRunResult, SwarmStats,
+    GeometricOptimizer,
 };

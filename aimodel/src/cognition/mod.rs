@@ -14,6 +14,7 @@ pub mod vortex_runner;
 pub mod tools;
 pub mod atman;
 pub mod verified_patterning;
+pub mod reasoning;
 
 pub use thinking::{ThinkingEngine, Thought, ThoughtChain, ThinkingConfig, ThoughtType};
 pub use memory::{MemoryStore, Memory, MemoryType, MemoryQuery};
@@ -27,4 +28,10 @@ pub use verified_patterning::{
     ContinuousLearner, ContinuousLearningConfig, CycleResult,
     PatternHypothesis, VerifiedPattern, Evidence, EvidenceSource,
     BenchmarkTracker, BenchmarkResult, BenchmarkProgress,
+};
+pub use reasoning::{
+    UnifiedReasoningEngine, ReasoningStep, ReasoningChain, ReasoningConfig, ReasoningStats,
+    LogicalOperation, AxiomDomain, Axiom, InferenceRule,
+    CriticalThinkingEngine, CognitiveBias, LogicalFallacy, ArgumentEvaluation,
+    Hypothesis, HypothesisStatus,
 };

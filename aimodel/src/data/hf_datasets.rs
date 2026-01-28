@@ -31,10 +31,12 @@ pub enum DatasetCategory {
     Math,
     Code,
     Benchmark,
-    Vision,
-    Multimodal,
+    // Vision,      // Disabled - requires image processing
+    // Multimodal,  // Disabled - requires multi-modal processing
     Science,
     QA,
+    Entailment,   // NLI/RTE for deductive reasoning
+    Commonsense,  // ConceptNet, ATOMIC for world knowledge
 }
 
 /// All 105 HuggingFace datasets organized by category
@@ -79,32 +81,16 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         DatasetInfo { hf_path: "thebigpile/python-stackoverflow".to_string(), name: "Python StackOverflow".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 10_000_000, license: "CC-BY-SA".to_string(), priority: 30 },
 
         // =============================================================================
-        // 3. Vision and Image Datasets (31-40)
+        // 3. Vision and Image Datasets (31-40) - DISABLED
         // =============================================================================
-        DatasetInfo { hf_path: "laion/laion5B".to_string(), name: "LAION-5B".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 5_000_000_000, license: "CC-BY".to_string(), priority: 31 },
-        DatasetInfo { hf_path: "cocodataset/coco".to_string(), name: "COCO".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 330_000, license: "CC-BY".to_string(), priority: 32 },
-        DatasetInfo { hf_path: "imagenet-1k".to_string(), name: "ImageNet".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 1_281_167, license: "Custom".to_string(), priority: 33 },
-        DatasetInfo { hf_path: "openimages".to_string(), name: "Open Images".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 9_000_000, license: "CC-BY".to_string(), priority: 34 },
-        DatasetInfo { hf_path: "mpariente/celebA".to_string(), name: "CelebA".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 202_599, license: "Custom".to_string(), priority: 35 },
-        DatasetInfo { hf_path: "google-research-datasets/conceptual_captions".to_string(), name: "Conceptual Captions".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 3_300_000, license: "CC-BY".to_string(), priority: 36 },
-        DatasetInfo { hf_path: "laion/laion-aesthetics".to_string(), name: "LAION-Aesthetics".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 600_000_000, license: "CC-BY".to_string(), priority: 37 },
-        DatasetInfo { hf_path: "krishnam/visual_genome".to_string(), name: "Visual Genome".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 108_000, license: "CC-BY".to_string(), priority: 38 },
-        DatasetInfo { hf_path: "nlphuji/flickr30k".to_string(), name: "Flickr30k".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 31_000, license: "CC-BY".to_string(), priority: 39 },
-        DatasetInfo { hf_path: "csailvision/ade20k".to_string(), name: "ADE20K".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 20_000, license: "BSD".to_string(), priority: 40 },
+        // Vision datasets disabled - requires image processing infrastructure
+        // Re-enable when adding vision capabilities
 
         // =============================================================================
-        // 4. Multimodal Datasets (41-50)
+        // 4. Multimodal Datasets (41-50) - DISABLED  
         // =============================================================================
-        DatasetInfo { hf_path: "google-research-datasets/wit".to_string(), name: "WIT".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 37_600_000, license: "CC-BY-SA".to_string(), priority: 41 },
-        DatasetInfo { hf_path: "audioset".to_string(), name: "AudioSet".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 2_000_000, license: "CC-BY".to_string(), priority: 42 },
-        DatasetInfo { hf_path: "openslr/librispeech_asr".to_string(), name: "LibriSpeech".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 960, license: "CC-BY".to_string(), priority: 43 },
-        DatasetInfo { hf_path: "mozilla-foundation/common_voice_11_0".to_string(), name: "Common Voice".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 2_500, license: "CC0".to_string(), priority: 44 },
-        DatasetInfo { hf_path: "open-mmmu/mmmu".to_string(), name: "MMMU".to_string(), category: DatasetCategory::Multimodal, split: "test".to_string(), estimated_tokens: 11_500, license: "Apache-2.0".to_string(), priority: 45 },
-        DatasetInfo { hf_path: "agcarmy/vqa".to_string(), name: "VQA".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 443_757, license: "CC-BY".to_string(), priority: 46 },
-        DatasetInfo { hf_path: "facebookresearch/hateful_memes".to_string(), name: "Hateful Memes".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 10_000, license: "Custom".to_string(), priority: 47 },
-        DatasetInfo { hf_path: "cocodataset/captions".to_string(), name: "MSCOCO Captions".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 414_113, license: "CC-BY".to_string(), priority: 48 },
-        DatasetInfo { hf_path: "redcaps".to_string(), name: "RedCaps".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 12_000_000, license: "CC-BY".to_string(), priority: 49 },
-        DatasetInfo { hf_path: "openai/clip".to_string(), name: "CLIP Data".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 400_000_000, license: "MIT".to_string(), priority: 50 },
+        // Multimodal datasets disabled - requires multi-modal processing
+        // Re-enable when adding audio/video/image capabilities
 
         // =============================================================================
         // 5. Science, Math, and Reasoning Datasets (51-60)
@@ -123,7 +109,8 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         // =============================================================================
         // 6. Additional Diverse Datasets (61-105)
         // =============================================================================
-        DatasetInfo { hf_path: "glue".to_string(), name: "GLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 100_000, license: "Various".to_string(), priority: 61 },
+        DatasetInfo { hf_path: "cais/mmlu".to_string(), name: "MMLU".to_string(), category: DatasetCategory::Benchmark, split: "test".to_string(), estimated_tokens: 14_042, license: "MIT".to_string(), priority: 61 },
+        DatasetInfo { hf_path: "glue".to_string(), name: "GLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 100_000, license: "Various".to_string(), priority: 62 },
         DatasetInfo { hf_path: "super_glue".to_string(), name: "SuperGLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 50_000, license: "Various".to_string(), priority: 62 },
         DatasetInfo { hf_path: "rajpurkar/squad".to_string(), name: "SQuAD".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 87_599, license: "CC-BY-SA".to_string(), priority: 63 },
         DatasetInfo { hf_path: "cnn_dailymail".to_string(), name: "CNN/Daily Mail".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 300_000, license: "Apache-2.0".to_string(), priority: 64 },
@@ -168,6 +155,34 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         DatasetInfo { hf_path: "anli".to_string(), name: "Abductive NLI".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 169_654, license: "CC-BY-NC".to_string(), priority: 103 },
         DatasetInfo { hf_path: "art".to_string(), name: "ART".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 20_000, license: "CC-BY".to_string(), priority: 104 },
         DatasetInfo { hf_path: "causalnet".to_string(), name: "CausalNet".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 11_000_000, license: "MIT".to_string(), priority: 105 },
+
+        // =============================================================================
+        // 7. Entailment/NLI Datasets for Deductive Reasoning (106-115)
+        // =============================================================================
+        DatasetInfo { hf_path: "snli".to_string(), name: "SNLI".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 570_000, license: "CC-BY-SA".to_string(), priority: 106 },
+        DatasetInfo { hf_path: "multi_nli".to_string(), name: "MultiNLI".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 433_000, license: "Various".to_string(), priority: 107 },
+        DatasetInfo { hf_path: "facebook/anli".to_string(), name: "Adversarial NLI".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 163_000, license: "CC-BY-NC".to_string(), priority: 108 },
+        DatasetInfo { hf_path: "ynie/xnli".to_string(), name: "XNLI".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 392_000, license: "CC-BY-NC".to_string(), priority: 109 },
+        DatasetInfo { hf_path: "sick".to_string(), name: "SICK".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 10_000, license: "CC-BY-NC-SA".to_string(), priority: 110 },
+        DatasetInfo { hf_path: "scitail".to_string(), name: "SciTail-NLI".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 27_000, license: "Apache-2.0".to_string(), priority: 111 },
+        DatasetInfo { hf_path: "hans".to_string(), name: "HANS".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 30_000, license: "MIT".to_string(), priority: 112 },
+        DatasetInfo { hf_path: "paws".to_string(), name: "PAWS".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 49_000, license: "Custom".to_string(), priority: 113 },
+        DatasetInfo { hf_path: "qqp".to_string(), name: "QQP".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 400_000, license: "Custom".to_string(), priority: 114 },
+        DatasetInfo { hf_path: "mrpc".to_string(), name: "MRPC".to_string(), category: DatasetCategory::Entailment, split: "train".to_string(), estimated_tokens: 5_800, license: "Custom".to_string(), priority: 115 },
+
+        // =============================================================================
+        // 8. Commonsense Knowledge Datasets (116-125)
+        // =============================================================================
+        DatasetInfo { hf_path: "conceptnet5".to_string(), name: "ConceptNet".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 34_000_000, license: "CC-BY-SA".to_string(), priority: 116 },
+        DatasetInfo { hf_path: "allenai/atomic".to_string(), name: "ATOMIC".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 877_000, license: "CC-BY".to_string(), priority: 117 },
+        DatasetInfo { hf_path: "allenai/atomic2020".to_string(), name: "ATOMIC 2020".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 1_330_000, license: "CC-BY".to_string(), priority: 118 },
+        DatasetInfo { hf_path: "allenai/comet-atomic-2020".to_string(), name: "COMET-ATOMIC".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 600_000, license: "Apache-2.0".to_string(), priority: 119 },
+        DatasetInfo { hf_path: "commonsense_qa".to_string(), name: "CommonsenseQA".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 12_247, license: "MIT".to_string(), priority: 120 },
+        DatasetInfo { hf_path: "swag".to_string(), name: "SWAG".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 113_000, license: "MIT".to_string(), priority: 121 },
+        DatasetInfo { hf_path: "winogrande".to_string(), name: "WinoGrande".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 44_000, license: "Apache-2.0".to_string(), priority: 122 },
+        DatasetInfo { hf_path: "codah".to_string(), name: "CODAH".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 2_800, license: "MIT".to_string(), priority: 123 },
+        DatasetInfo { hf_path: "glucose".to_string(), name: "GLUCOSE".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 670_000, license: "CC-BY".to_string(), priority: 124 },
+        DatasetInfo { hf_path: "event2mind".to_string(), name: "Event2Mind".to_string(), category: DatasetCategory::Commonsense, split: "train".to_string(), estimated_tokens: 57_000, license: "CC-BY".to_string(), priority: 125 },
     ]
 }
 
@@ -434,43 +449,65 @@ impl HFDatasetLoader {
                     }
                 }).collect()
             }
-            DatasetCategory::Vision => {
-                // Generate vision caption examples (text descriptions)
+            // Vision and Multimodal categories disabled - requires specialized processing
+            // DatasetCategory::Vision => { ... }
+            // DatasetCategory::Multimodal => { ... }
+            DatasetCategory::Entailment => {
+                // Generate NLI/entailment examples for deductive reasoning
+                // Format: premise, hypothesis, label (entailment/neutral/contradiction)
                 (0..count).map(|i| {
+                    let examples = vec![
+                        ("A man is playing a guitar.", "A person is making music.", "entailment"),
+                        ("A woman is reading a book.", "A woman is sleeping.", "contradiction"),
+                        ("Children are playing in the park.", "People are outdoors.", "entailment"),
+                        ("The cat is on the mat.", "The mat is under the cat.", "entailment"),
+                        ("It is raining outside.", "The weather is sunny.", "contradiction"),
+                        ("All birds can fly.", "Penguins can fly.", "neutral"),
+                        ("The restaurant is expensive.", "The food costs a lot.", "entailment"),
+                        ("She finished her homework.", "She started her homework.", "neutral"),
+                        ("The door is open.", "The door is closed.", "contradiction"),
+                        ("He drives to work.", "He has a car.", "entailment"),
+                    ];
+                    let idx = i % examples.len();
+                    let (premise, hypothesis, label) = examples[idx];
                     TrainingExample {
-                        text: format!(
-                            "Image {}: A {} {} in a {} setting with {} lighting. Objects include {} and {}.",
-                            i,
-                            ["small", "large", "medium"][i % 3],
-                            ["cat", "dog", "bird", "person", "car"][i % 5],
-                            ["indoor", "outdoor", "urban", "rural"][i % 4],
-                            ["natural", "artificial", "dim", "bright"][i % 4],
-                            ["table", "chair", "tree", "building"][i % 4],
-                            ["lamp", "window", "door", "fence"][i % 4]
-                        ),
+                        text: format!("Premise: {} Hypothesis: {}", premise, hypothesis),
                         source: info.name.clone(),
                         category: info.category,
-                        question: None,
-                        answer: None,
+                        question: Some(format!("Does the premise entail the hypothesis? Premise: '{}' Hypothesis: '{}'", premise, hypothesis)),
+                        answer: Some(label.to_string()),
                     }
                 }).collect()
             }
-            DatasetCategory::Multimodal => {
-                // Generate multimodal examples (text + description)
+            DatasetCategory::Commonsense => {
+                // Generate commonsense knowledge examples (ConceptNet/ATOMIC style)
+                // Format: head, relation, tail for knowledge graph triples
                 (0..count).map(|i| {
+                    let knowledge = vec![
+                        ("dog", "IsA", "animal", "A dog is a type of animal."),
+                        ("bird", "CapableOf", "fly", "Birds are capable of flying."),
+                        ("ice", "HasProperty", "cold", "Ice has the property of being cold."),
+                        ("PersonX eats food", "xEffect", "PersonX is not hungry", "After eating, a person is not hungry."),
+                        ("PersonX goes to school", "xIntent", "to learn", "People go to school to learn."),
+                        ("fire", "Causes", "heat", "Fire causes heat."),
+                        ("rain", "Causes", "wet ground", "Rain causes the ground to be wet."),
+                        ("sleep", "HasPrerequisite", "tired", "Being tired is a prerequisite for sleep."),
+                        ("PersonX helps PersonY", "xAttr", "kind", "Helping others shows kindness."),
+                        ("car", "UsedFor", "transportation", "Cars are used for transportation."),
+                        ("knife", "UsedFor", "cutting", "Knives are used for cutting."),
+                        ("book", "UsedFor", "reading", "Books are used for reading."),
+                        ("PersonX wins the game", "xReact", "happy", "Winning makes a person happy."),
+                        ("PersonX loses the game", "xReact", "sad", "Losing makes a person sad."),
+                        ("water", "HasProperty", "liquid", "Water is a liquid at room temperature."),
+                    ];
+                    let idx = i % knowledge.len();
+                    let (head, relation, tail, explanation) = knowledge[idx];
                     TrainingExample {
-                        text: format!(
-                            "[IMAGE: scene_{}] Caption: {} {} performing {} in {}.",
-                            i,
-                            ["A", "The", "An"][i % 3],
-                            ["person", "group", "animal", "object"][i % 4],
-                            ["action", "movement", "task", "activity"][i % 4],
-                            ["location", "environment", "setting", "context"][i % 4]
-                        ),
+                        text: format!("[{}, {}, {}] {}", head, relation, tail, explanation),
                         source: info.name.clone(),
                         category: info.category,
-                        question: Some(format!("What is shown in image {}?", i)),
-                        answer: Some(format!("Scene depicting activity {}", i % 100)),
+                        question: Some(format!("What is the {} of '{}'?", relation, head)),
+                        answer: Some(tail.to_string()),
                     }
                 }).collect()
             }
@@ -604,14 +641,20 @@ mod tests {
     #[test]
     fn test_priority_datasets() {
         let datasets = get_priority_datasets();
-        assert_eq!(datasets.len(), 105, "Should have all 105 datasets");
+        // 106 datasets: 86 original + 10 Entailment + 10 Commonsense
+        assert_eq!(datasets.len(), 106, "Should have 106 datasets (including Entailment and Commonsense)");
         
         // Check key datasets are included
         assert!(datasets.iter().any(|d| d.name == "GSM8K"));
         assert!(datasets.iter().any(|d| d.name == "FineWeb"));
         assert!(datasets.iter().any(|d| d.name == "The Stack"));
-        assert!(datasets.iter().any(|d| d.name == "LAION-5B"));
         assert!(datasets.iter().any(|d| d.name == "SQuAD"));
+        // New entailment datasets
+        assert!(datasets.iter().any(|d| d.name == "SNLI"));
+        assert!(datasets.iter().any(|d| d.name == "MultiNLI"));
+        // New commonsense datasets
+        assert!(datasets.iter().any(|d| d.name == "ConceptNet"));
+        assert!(datasets.iter().any(|d| d.name == "ATOMIC"));
     }
     
     #[test]

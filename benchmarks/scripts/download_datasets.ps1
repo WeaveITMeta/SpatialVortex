@@ -79,17 +79,113 @@ try {
 }
 
 # Silesia Corpus
-Write-Host "`n[9/9] Downloading Silesia Corpus..." -ForegroundColor Yellow
+Write-Host "`n[9/15] Downloading Silesia Corpus..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\silesia" | Out-Null
 Invoke-WebRequest -Uri "http://sun.aei.polsl.pl/~sdeor/corpus/silesia.zip" -OutFile "$BENCHMARK_DIR\silesia.zip"
 Expand-Archive -Path "$BENCHMARK_DIR\silesia.zip" -DestinationPath "$BENCHMARK_DIR\silesia" -Force
 Remove-Item "$BENCHMARK_DIR\silesia.zip"
 Write-Host "OK Silesia Corpus downloaded" -ForegroundColor Green
 
+# MMLU (Massive Multitask Language Understanding)
+Write-Host "`n[10/15] Downloading MMLU..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\mmlu" | Out-Null
+try {
+    Invoke-WebRequest -Uri "https://people.eecs.berkeley.edu/~hendrycks/data.tar" -OutFile "$BENCHMARK_DIR\mmlu.tar" -UseBasicParsing
+    tar -xf "$BENCHMARK_DIR\mmlu.tar" -C "$BENCHMARK_DIR\mmlu"
+    Remove-Item "$BENCHMARK_DIR\mmlu.tar"
+    Write-Host "OK MMLU downloaded" -ForegroundColor Green
+} catch {
+    Write-Host "WARN: MMLU download failed - try manual download from HuggingFace" -ForegroundColor Yellow
+}
+
+# GSM8K (Grade School Math)
+Write-Host "`n[11/15] Downloading GSM8K..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\gsm8k" | Out-Null
+try {
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl" -OutFile "$BENCHMARK_DIR\gsm8k\test.jsonl" -UseBasicParsing
+    Write-Host "OK GSM8K downloaded" -ForegroundColor Green
+} catch {
+    Write-Host "WARN: GSM8K download failed" -ForegroundColor Yellow
+}
+
+# ARC (AI2 Reasoning Challenge)
+Write-Host "`n[12/15] Downloading ARC..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\arc\ARC-Challenge" | Out-Null
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\arc\ARC-Easy" | Out-Null
+try {
+    Invoke-WebRequest -Uri "https://ai2-public-datasets.s3.amazonaws.com/arc/ARC-V1-Feb2018.zip" -OutFile "$BENCHMARK_DIR\arc.zip" -UseBasicParsing
+    Expand-Archive -Path "$BENCHMARK_DIR\arc.zip" -DestinationPath "$BENCHMARK_DIR\arc" -Force
+    Remove-Item "$BENCHMARK_DIR\arc.zip"
+    Write-Host "OK ARC downloaded" -ForegroundColor Green
+} catch {
+    Write-Host "WARN: ARC download failed" -ForegroundColor Yellow
+}
+
+# HellaSwag
+Write-Host "`n[13/15] Downloading HellaSwag..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\hellaswag" | Out-Null
+try {
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rowanz/hellaswag/master/data/hellaswag_val.jsonl" -OutFile "$BENCHMARK_DIR\hellaswag\validation.jsonl" -UseBasicParsing
+    Write-Host "OK HellaSwag downloaded" -ForegroundColor Green
+} catch {
+    Write-Host "WARN: HellaSwag download failed" -ForegroundColor Yellow
+}
+
+# TruthfulQA
+Write-Host "`n[14/15] Downloading TruthfulQA..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\truthfulqa" | Out-Null
+try {
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/sylinrl/TruthfulQA/main/TruthfulQA.csv" -OutFile "$BENCHMARK_DIR\truthfulqa\TruthfulQA.csv" -UseBasicParsing
+    Write-Host "OK TruthfulQA downloaded" -ForegroundColor Green
+} catch {
+    Write-Host "WARN: TruthfulQA download failed" -ForegroundColor Yellow
+}
+
+# HumanEval
+Write-Host "`n[15/15] Downloading HumanEval..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\humaneval" | Out-Null
+try {
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/openai/human-eval/master/data/HumanEval.jsonl.gz" -OutFile "$BENCHMARK_DIR\humaneval\HumanEval.jsonl.gz" -UseBasicParsing
+    # Decompress gzip
+    $gzipPath = "$BENCHMARK_DIR\humaneval\HumanEval.jsonl.gz"
+    $outputPath = "$BENCHMARK_DIR\humaneval\HumanEval.jsonl"
+    $input = New-Object System.IO.FileStream $gzipPath, ([IO.FileMode]::Open), ([IO.FileAccess]::Read)
+    $output = New-Object System.IO.FileStream $outputPath, ([IO.FileMode]::Create), ([IO.FileAccess]::Write)
+    $gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::Decompress)
+    $gzipStream.CopyTo($output)
+    $gzipStream.Close(); $input.Close(); $output.Close()
+    Remove-Item $gzipPath
+    Write-Host "OK HumanEval downloaded" -ForegroundColor Green
+} catch {
+    Write-Host "WARN: HumanEval download failed" -ForegroundColor Yellow
+}
+
+# SWE-Bench Lite (Software Engineering)
+Write-Host "`n[16/16] Downloading SWE-Bench Lite..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$BENCHMARK_DIR\swe-bench-lite" | Out-Null
+try {
+    # SWE-Bench Lite from HuggingFace
+    Invoke-WebRequest -Uri "https://huggingface.co/datasets/princeton-nlp/SWE-bench_Lite/resolve/main/data/test-00000-of-00001.parquet" -OutFile "$BENCHMARK_DIR\swe-bench-lite\test.parquet" -UseBasicParsing
+    Write-Host "OK SWE-Bench Lite downloaded (parquet format)" -ForegroundColor Green
+    Write-Host "   Note: Convert parquet to jsonl with Python: pandas.read_parquet().to_json()" -ForegroundColor Yellow
+} catch {
+    Write-Host "WARN: SWE-Bench Lite download failed - try manual download from HuggingFace" -ForegroundColor Yellow
+    Write-Host "   URL: https://huggingface.co/datasets/princeton-nlp/SWE-bench_Lite" -ForegroundColor Yellow
+}
+
 Write-Host "`n==================================" -ForegroundColor Cyan
 Write-Host "SUCCESS! All datasets downloaded" -ForegroundColor Green
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host "Data location: $BENCHMARK_DIR" -ForegroundColor White
+Write-Host "`nBenchmarks available:" -ForegroundColor Yellow
+Write-Host "  - MMLU (57 subjects)"
+Write-Host "  - GSM8K (math)"
+Write-Host "  - ARC-Challenge (science)"
+Write-Host "  - HellaSwag (commonsense)"
+Write-Host "  - TruthfulQA (factual)"
+Write-Host "  - HumanEval (code)"
+Write-Host "  - SWE-Bench Lite (software engineering)"
+Write-Host "  - CommonsenseQA, SQuAD, bAbI"
 Write-Host "`nNext steps:" -ForegroundColor Yellow
 Write-Host "  1. Run: .\benchmarks\scripts\verify_datasets.ps1"
-Write-Host "  2. Run: cargo test --release --package benchmarks"
+Write-Host "  2. Run: cargo run --bin spatialvortex-eval --release --features gpu -- --tasks all"

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpatialVortex AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chat-container { height: calc(100vh - 200px); }
+        .message-enter { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .typing-indicator span {
+            animation: blink 1.4s infinite both;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink {
+            0%, 80%, 100% { opacity: 0; }
+            40% { opacity: 1; }
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .vortex-glow {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto max-w-4xl p-4">
+        <!-- Header -->
+        <header class="text-center py-6">
+            <div class="flex items-center justify-center gap-3 mb-2">
+                <div class="w-12 h-12 gradient-bg rounded-full flex items-center justify-center vortex-glow">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    SpatialVortex AI
+                </h1>
+            </div>
+            <p class="text-gray-400 text-sm">CALM Engine · Vortex Cycles · Multi-Head Attention</p>
+        </header>
+
+        <!-- Chat Messages -->
+        <div id="chat-container" class="chat-container bg-gray-800 rounded-2xl p-4 overflow-y-auto mb-4 vortex-glow">
+            <div id="messages" class="space-y-4">
+                <!-- Welcome message -->
+                <div class="flex gap-3 message-enter">
+                    <div class="w-8 h-8 gradient-bg rounded-full flex-shrink-0 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div class="bg-gray-700 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
+                        <p class="text-gray-100">Hello! I'm SpatialVortex AI, trained with CALM (Continuous Autoregressive Latent Model) and sacred vortex cycles. Ask me anything!</p>
+                        <p class="text-xs text-gray-500 mt-2">Latent Energy: 1.0 · Confidence: 100%</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Typing indicator (hidden by default) -->
+            <div id="typing-indicator" class="hidden flex gap-3 mt-4">
+                <div class="w-8 h-8 gradient-bg rounded-full flex-shrink-0 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <div class="bg-gray-700 rounded-2xl rounded-tl-none px-4 py-3">
+                    <div class="typing-indicator flex gap-1">
+                        <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-gray-800 rounded-2xl p-4 vortex-glow">
+            <form id="chat-form" class="flex gap-3">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Type your message..." 
+                    class="flex-1 bg-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder-gray-400"
+                    autocomplete="off"
+                >
+                <button 
+                    type="submit" 
+                    id="send-btn"
+                    class="gradient-bg px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50"
+                >
+                    <span>Send</span>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center py-4 text-gray-500 text-sm">
+            <p>Powered by CALM Engine · 105 Training Datasets · Sacred Geometry</p>
+        </footer>
+    </div>
+
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
+        
+        let sessionId = null;
+
+        function addMessage(content, isUser, metadata = {}) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex gap-3 message-enter ${isUser ? 'flex-row-reverse' : ''}`;
+            
+            const avatar = isUser ? `
+                <div class="w-8 h-8 bg-blue-500 rounded-full flex-shrink-0 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+            ` : `
+                <div class="w-8 h-8 gradient-bg rounded-full flex-shrink-0 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            `;
+            
+            const bubbleClass = isUser 
+                ? 'bg-blue-600 rounded-2xl rounded-tr-none' 
+                : 'bg-gray-700 rounded-2xl rounded-tl-none';
+            
+            const metadataHtml = !isUser && metadata.latent_energy !== undefined ? `
+                <p class="text-xs text-gray-500 mt-2">
+                    Latent Energy: ${metadata.latent_energy?.toFixed(3) || 'N/A'} · 
+                    Confidence: ${((metadata.confidence || 0) * 100).toFixed(0)}% ·
+                    Tokens: ${metadata.tokens_used || 0}
+                </p>
+            ` : '';
+            
+            messageDiv.innerHTML = `
+                ${avatar}
+                <div class="${bubbleClass} px-4 py-3 max-w-[80%]">
+                    <p class="text-gray-100">${escapeHtml(content)}</p>
+                    ${metadataHtml}
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showTyping() {
+            typingIndicator.classList.remove('hidden');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideTyping() {
+            typingIndicator.classList.add('hidden');
+        }
+
+        async function sendMessage(message) {
+            addMessage(message, true);
+            messageInput.value = '';
+            sendBtn.disabled = true;
+            showTyping();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message,
+                        session_id: sessionId
+                    })
+                });
+
+                const data = await response.json();
+                sessionId = data.session_id;
+                
+                hideTyping();
+                addMessage(data.response, false, {
+                    latent_energy: data.latent_energy,
+                    confidence: data.confidence,
+                    tokens_used: data.tokens_used
+                });
+            } catch (error) {
+                hideTyping();
+                addMessage('Sorry, there was an error processing your message. Please try again.', false);
+                console.error('Chat error:', error);
+            }
+
+            sendBtn.disabled = false;
+            messageInput.focus();
+        }
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message) {
+                sendMessage(message);
+            }
+        });
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
