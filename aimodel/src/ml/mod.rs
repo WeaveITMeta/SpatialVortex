@@ -18,6 +18,9 @@ pub mod backends;
 pub mod pathway;
 pub mod huggingface;
 pub mod continuous_learning;
+pub mod gpu_trainer;
+pub mod rag_search;
+pub mod integration_test;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};

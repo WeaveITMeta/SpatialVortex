@@ -28,7 +28,7 @@ pub struct CALMConfig {
 impl Default for CALMConfig {
     fn default() -> Self {
         Self {
-            latent_dim: 256,
+            latent_dim: 256,  // Balanced dimension for current architecture
             chunk_size: 8,
             compression_ratio: 4,
             energy_threshold: 0.5,
@@ -82,6 +82,12 @@ pub struct CALMEngine {
     decoder_weights: Vec<f32>,
     /// Latent predictor weights
     predictor_weights: Vec<f32>,
+    /// Attention weights for context focusing
+    attention_weights: Vec<f32>,
+    /// Word embeddings learned from training
+    word_embeddings: std::collections::HashMap<String, Vec<f32>>,
+    /// Training step counter
+    training_steps: usize,
 }
 
 impl CALMEngine {
@@ -89,13 +95,145 @@ impl CALMEngine {
         let latent_dim = config.latent_dim;
         let input_dim = config.chunk_size * 9; // 9 digits per BeamTensor
         
+        // Xavier initialization for better gradient flow
+        let encoder_scale = (2.0 / (input_dim + latent_dim) as f32).sqrt();
+        let decoder_scale = (2.0 / (latent_dim + input_dim) as f32).sqrt();
+        let predictor_scale = (2.0 / (latent_dim * 2) as f32).sqrt();
+        
         Self {
             config,
             ebrm: EnergyBasedReasoningModel::new(),
-            encoder_weights: vec![0.01; input_dim * latent_dim],
-            decoder_weights: vec![0.01; latent_dim * input_dim],
-            predictor_weights: vec![0.01; latent_dim * latent_dim],
+            encoder_weights: (0..input_dim * latent_dim)
+                .map(|i| ((i as f32 * 0.1).sin() * encoder_scale))
+                .collect(),
+            decoder_weights: (0..latent_dim * input_dim)
+                .map(|i| ((i as f32 * 0.1).cos() * decoder_scale))
+                .collect(),
+            predictor_weights: (0..latent_dim * latent_dim)
+                .map(|i| ((i as f32 * 0.1).sin() * predictor_scale))
+                .collect(),
+            attention_weights: vec![1.0 / latent_dim as f32; latent_dim],
+            word_embeddings: std::collections::HashMap::new(),
+            training_steps: 0,
         }
+    }
+    
+    /// Train the CALM encoder/decoder on input-target pairs
+    pub fn train_step(&mut self, input: &[BeamTensor], target: &[BeamTensor], learning_rate: f32) {
+        if input.is_empty() || target.is_empty() {
+            return;
+        }
+        
+        self.training_steps += 1;
+        
+        // Encode input
+        let input_latent = self.encode(input);
+        let target_latent = self.encode(target);
+        
+        // Compute error between predicted and target latent
+        let latent_dim = self.config.latent_dim;
+        let input_dim = self.config.chunk_size * 9;
+        
+        // Update encoder weights to minimize reconstruction error
+        let lr = learning_rate / (1.0 + self.training_steps as f32 * 0.0001);
+        
+        for i in 0..latent_dim.min(input_latent.latent.len()).min(target_latent.latent.len()) {
+            let error = target_latent.latent[i] - input_latent.latent[i];
+            
+            // Update encoder weights
+            for j in 0..input_dim.min(self.encoder_weights.len() / latent_dim) {
+                let idx = i * input_dim + j;
+                if idx < self.encoder_weights.len() {
+                    self.encoder_weights[idx] += lr * error * 0.01;
+                }
+            }
+            
+            // Update attention weights
+            if i < self.attention_weights.len() {
+                self.attention_weights[i] += lr * error.abs() * 0.001;
+            }
+        }
+        
+        // Learn word embeddings from input
+        for beam in input.iter().chain(target.iter()) {
+            if !beam.word.is_empty() {
+                let word_lower = beam.word.to_lowercase();
+                let embedding = self.word_embeddings
+                    .entry(word_lower)
+                    .or_insert_with(|| vec![0.0; latent_dim]);
+                
+                // Update embedding toward current latent
+                for (i, e) in embedding.iter_mut().enumerate() {
+                    if i < input_latent.latent.len() {
+                        *e = *e * 0.99 + input_latent.latent[i] * 0.01;
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Compute semantic similarity between two latent states
+    pub fn semantic_similarity(&self, a: &LatentState, b: &LatentState) -> f32 {
+        if a.latent.is_empty() || b.latent.is_empty() {
+            return 0.0;
+        }
+        
+        // Cosine similarity with attention weighting
+        let mut dot = 0.0f32;
+        let mut norm_a = 0.0f32;
+        let mut norm_b = 0.0f32;
+        
+        for i in 0..a.latent.len().min(b.latent.len()) {
+            let weight = self.attention_weights.get(i).copied().unwrap_or(1.0);
+            dot += a.latent[i] * b.latent[i] * weight;
+            norm_a += a.latent[i] * a.latent[i] * weight;
+            norm_b += b.latent[i] * b.latent[i] * weight;
+        }
+        
+        if norm_a > 0.0 && norm_b > 0.0 {
+            dot / (norm_a.sqrt() * norm_b.sqrt())
+        } else {
+            0.0
+        }
+    }
+    
+    /// Get word embedding if learned
+    pub fn get_word_embedding(&self, word: &str) -> Option<Vec<f32>> {
+        self.word_embeddings.get(&word.to_lowercase()).cloned()
+    }
+    
+    /// Compute attention scores over context words
+    pub fn attention_over_context(&self, query: &LatentState, context_words: &[&str]) -> Vec<(String, f32)> {
+        let mut scores = Vec::with_capacity(context_words.len());
+        
+        for word in context_words {
+            let word_lower = word.to_lowercase();
+            if let Some(embedding) = self.word_embeddings.get(&word_lower) {
+                // Create a latent state from embedding
+                let word_latent = LatentState {
+                    latent: embedding.clone(),
+                    energy: 1.0,
+                    sacred_alignment: 0.5,
+                    step: 0,
+                };
+                let sim = self.semantic_similarity(query, &word_latent);
+                scores.push((word_lower, sim));
+            } else {
+                scores.push((word_lower, 0.1)); // Default low score for unknown words
+            }
+        }
+        
+        // Softmax normalization
+        let max_score = scores.iter().map(|(_, s)| *s).fold(f32::NEG_INFINITY, f32::max);
+        let exp_sum: f32 = scores.iter().map(|(_, s)| (s - max_score).exp()).sum();
+        
+        if exp_sum > 0.0 {
+            for (_, score) in scores.iter_mut() {
+                *score = (*score - max_score).exp() / exp_sum;
+            }
+        }
+        
+        scores
     }
 
     /// Encode a chunk of BeamTensors to continuous latent

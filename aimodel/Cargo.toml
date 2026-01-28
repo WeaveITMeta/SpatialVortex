@@ -16,6 +16,8 @@ bevy_viz = ["bevy"]
 transport = ["wtransport"]
 storage = ["rocksdb"]
 embeddings = ["embedvec"]
+# GPU training (use: cargo run --features gpu)
+gpu = ["burn-wgpu"]
 
 [dependencies]
 # Core

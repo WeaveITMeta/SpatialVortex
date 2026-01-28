@@ -11,8 +11,9 @@ pub use burn::backend::NdArray;
 #[cfg(feature = "burn-gpu")]
 pub use burn::backend::LibTorch;
 
+// WGPU backend is in burn_wgpu crate, not burn::backend
 #[cfg(feature = "burn-wgpu")]
-pub use burn::backend::Wgpu;
+pub use burn_wgpu::Wgpu;
 
 #[cfg(feature = "burn-cpu")]
 pub use burn::backend::ndarray::NdArrayDevice;
@@ -21,7 +22,7 @@ pub use burn::backend::ndarray::NdArrayDevice;
 pub use burn::backend::libtorch::LibTorchDevice;
 
 #[cfg(feature = "burn-wgpu")]
-pub use burn::backend::wgpu::WgpuDevice;
+pub use burn_wgpu::WgpuDevice;
 
 /// Default backend type alias based on enabled features
 /// Priority: GPU (tch) > WGPU > CPU (ndarray)
