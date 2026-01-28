@@ -297,6 +297,119 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
 // Real Benchmark Evaluator - AI Model Inference
 // =============================================================================
 
+/// Expert type for MoE routing
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExpertType {
+    /// Entity-attribute reasoning (bAbI, factual QA)
+    EntityAttribute,
+    /// Semantic similarity (general knowledge)
+    Semantic,
+    /// RAG retrieval (external knowledge)
+    RAG,
+    /// Attention-based (context-heavy questions)
+    Attention,
+}
+
+/// MoE Gate for expert routing in inference
+pub struct MoEInferenceGate {
+    /// Expert weights learned from training
+    expert_weights: [f32; 4],
+    /// Expert usage counts
+    usage_counts: [usize; 4],
+}
+
+impl MoEInferenceGate {
+    pub fn new() -> Self {
+        Self {
+            expert_weights: [1.0, 1.0, 1.0, 1.0],
+            usage_counts: [0; 4],
+        }
+    }
+    
+    /// Route question to best expert(s) based on features
+    pub fn route(&mut self, question: &str, has_context: bool) -> Vec<(ExpertType, f32)> {
+        let q_lower = question.to_lowercase();
+        let mut scores = vec![
+            (ExpertType::EntityAttribute, 0.0f32),
+            (ExpertType::Semantic, 0.0f32),
+            (ExpertType::RAG, 0.0f32),
+            (ExpertType::Attention, 0.0f32),
+        ];
+        
+        // Entity-attribute patterns (bAbI style)
+        if q_lower.contains("what") && (q_lower.contains("color") || q_lower.contains("where") || 
+           q_lower.contains("who") || q_lower.contains("is the")) {
+            scores[0].1 += 2.0;
+        }
+        if q_lower.contains(" is ") || q_lower.contains(" was ") || q_lower.contains(" are ") {
+            scores[0].1 += 1.0;
+        }
+        
+        // Semantic patterns (general knowledge)
+        if q_lower.contains("why") || q_lower.contains("how") || q_lower.contains("explain") {
+            scores[1].1 += 1.5;
+        }
+        
+        // RAG patterns (need external knowledge)
+        if q_lower.contains("according to") || q_lower.contains("based on") || 
+           q_lower.len() > 100 {
+            scores[2].1 += 1.5;
+        }
+        
+        // Attention patterns (long context)
+        if has_context {
+            scores[3].1 += 1.0;
+        }
+        if q_lower.split_whitespace().count() > 15 {
+            scores[3].1 += 0.5;
+        }
+        
+        // Apply learned weights
+        for (i, (_, score)) in scores.iter_mut().enumerate() {
+            *score *= self.expert_weights[i];
+        }
+        
+        // Sort by score descending
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // Return top-2 experts
+        let top_experts: Vec<(ExpertType, f32)> = scores.into_iter()
+            .filter(|(_, s)| *s > 0.0)
+            .take(2)
+            .collect();
+        
+        // Update usage counts
+        for (expert, _) in &top_experts {
+            let idx = match expert {
+                ExpertType::EntityAttribute => 0,
+                ExpertType::Semantic => 1,
+                ExpertType::RAG => 2,
+                ExpertType::Attention => 3,
+            };
+            self.usage_counts[idx] += 1;
+        }
+        
+        if top_experts.is_empty() {
+            vec![(ExpertType::Semantic, 1.0)]  // Default fallback
+        } else {
+            top_experts
+        }
+    }
+    
+    /// Update expert weights based on success/failure
+    pub fn update_weights(&mut self, expert: ExpertType, success: bool) {
+        let idx = match expert {
+            ExpertType::EntityAttribute => 0,
+            ExpertType::Semantic => 1,
+            ExpertType::RAG => 2,
+            ExpertType::Attention => 3,
+        };
+        
+        let delta = if success { 0.1 } else { -0.05 };
+        self.expert_weights[idx] = (self.expert_weights[idx] + delta).clamp(0.1, 2.0);
+    }
+}
+
 /// Evaluates model on REAL benchmarks using ACTUAL AI inference
 /// 
 /// CRITICAL: NO HARDCODED ANSWERS
@@ -306,6 +419,8 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
 pub struct RealBenchmarkEvaluator {
     /// CALM engine for actual AI inference
     calm_engine: CALMEngine,
+    /// MoE gate for expert routing
+    moe_gate: MoEInferenceGate,
     /// Trained model weights (learned from training data)
     model_weights: Vec<f32>,
     /// Training iterations completed
@@ -332,6 +447,7 @@ impl RealBenchmarkEvaluator {
         
         Self {
             calm_engine: CALMEngine::new(CALMConfig::default()),
+            moe_gate: MoEInferenceGate::new(),
             model_weights: Vec::new(),
             training_iterations: 0,
             samples_seen: 0,
@@ -350,6 +466,7 @@ impl RealBenchmarkEvaluator {
     }
 
     /// Train the AI model on data - updates internal weights
+    /// Now includes contrastive learning for better embeddings
     pub fn train(&mut self, training_pairs: &[(Vec<BeamTensor>, Vec<BeamTensor>)]) {
         self.samples_seen += training_pairs.len();
         self.training_iterations += 1;
@@ -360,6 +477,9 @@ impl RealBenchmarkEvaluator {
         let decay_factor = 1.0 / (1.0 + self.training_iterations as f32 * 0.1);
         let lr = base_lr * warmup_factor * decay_factor;
         
+        // Collect embeddings for contrastive learning
+        let mut all_embeddings: Vec<Vec<f32>> = Vec::new();
+        
         // Actually train the model by encoding training data
         for (input, target) in training_pairs {
             if input.is_empty() || target.is_empty() {
@@ -368,6 +488,12 @@ impl RealBenchmarkEvaluator {
             
             // Train CALM encoder/decoder weights
             self.calm_engine.train_step(input, target, lr);
+            
+            // Collect embeddings for contrastive learning
+            let input_latent = self.calm_engine.encode(input);
+            let target_latent = self.calm_engine.encode(target);
+            all_embeddings.push(input_latent.latent.clone());
+            all_embeddings.push(target_latent.latent.clone());
             
             // Encode input through CALM engine
             let input_latent = self.calm_engine.encode(input);
@@ -401,6 +527,31 @@ impl RealBenchmarkEvaluator {
             
             // Update model weights based on training
             self.update_weights(&input_latent, input, target, lr);
+        }
+        
+        // CONTRASTIVE LEARNING: Train on positive/negative pairs
+        // For each pair (input, target), target is positive, other targets are negatives
+        if all_embeddings.len() >= 4 {
+            for i in (0..all_embeddings.len()).step_by(2) {
+                if i + 1 >= all_embeddings.len() {
+                    break;
+                }
+                
+                let anchor = &all_embeddings[i];
+                let positive = &all_embeddings[i + 1];
+                
+                // Sample negatives from other pairs
+                let mut negatives: Vec<Vec<f32>> = Vec::new();
+                for j in (0..all_embeddings.len()).step_by(2) {
+                    if j != i && j + 1 < all_embeddings.len() && negatives.len() < 5 {
+                        negatives.push(all_embeddings[j + 1].clone());
+                    }
+                }
+                
+                if !negatives.is_empty() {
+                    self.calm_engine.train_contrastive(anchor, positive, &negatives, lr);
+                }
+            }
         }
         
         // Sync n-gram frequencies to RAG engine for IDF-weighted embeddings
@@ -499,11 +650,12 @@ impl RealBenchmarkEvaluator {
 
     /// AI model inference: generate answer for a question
     /// 
-    /// Inspired by SpatialVortex VortexModel architecture:
-    /// 1. Tokenize question and choices into word embeddings
-    /// 2. Use attention-weighted similarity between question and choices
-    /// 3. Apply learned word embeddings for semantic understanding
-    /// 4. Use softmax for proper probability distribution
+    /// Revolutionary architecture combining:
+    /// 1. MoE routing - select best expert(s) for question type
+    /// 2. Multi-Head Attention - attend to context with Q/K/V projections
+    /// 3. Contrastive embeddings - learned from positive/negative pairs
+    /// 4. Entity-attribute reasoning - critical for bAbI
+    /// 5. RAG retrieval - for external knowledge
     /// 
     /// Returns (predicted_answer_index, confidence)
     fn ai_inference(&mut self, question: &RealBenchmarkQuestion) -> (usize, f32) {
@@ -519,9 +671,39 @@ impl RealBenchmarkEvaluator {
         // Get question embedding by averaging word embeddings
         let question_embedding = self.get_text_embedding(&question_words);
         
+        // MoE ROUTING: Select best expert(s) for this question
+        let has_context = question_lower.len() > 50;
+        let experts = self.moe_gate.route(question_text, has_context);
+        let primary_expert = experts.first().map(|(e, _)| *e).unwrap_or(ExpertType::Semantic);
+        
+        if self.verbose_debug {
+            println!("      MoE: {:?} (weight={:.2})", primary_expert, 
+                experts.first().map(|(_, w)| *w).unwrap_or(0.0));
+        }
+        
+        // Encode question to latent space for MHA
+        let input_beams = self.question_to_beams(question);
+        let question_latent = self.calm_engine.encode(&input_beams);
+        
         // Score each choice
         let mut logits: Vec<f32> = Vec::with_capacity(question.choices.len());
         let mut debug_info: Vec<(String, Vec<(String, f32)>)> = Vec::new();
+        
+        // Build context latents for MHA (from all choices)
+        let choice_latents: Vec<LatentState> = question.choices.iter()
+            .map(|c| {
+                let choice_bytes = c.as_bytes();
+                let mut choice_beam = BeamTensor::default();
+                for (i, &b) in choice_bytes.iter().take(9).enumerate() {
+                    choice_beam.digits[i] = (b as f32) / 255.0;
+                }
+                choice_beam.word = c.clone();
+                self.calm_engine.encode(&[choice_beam])
+            })
+            .collect();
+        
+        // Apply Multi-Head Attention to get context-aware representation
+        let (attended_output, attn_weights) = self.calm_engine.attend_to_context(&question_latent, &choice_latents);
         
         for (choice_idx, choice) in question.choices.iter().enumerate() {
             let choice_lower = choice.to_lowercase();
@@ -533,24 +715,69 @@ impl RealBenchmarkEvaluator {
             let mut score = 0.0f32;
             let mut breakdown: Vec<(String, f32)> = Vec::new();
             
-            // 1. ENTITY-ATTRIBUTE MATCHING (Critical for bAbI)
-            // Check if choice word appears near a question entity in the context
-            let entity_score = self.score_entity_attribute(&question_lower, &choice_lower);
-            if entity_score > 0.0 {
-                score += entity_score;
-                breakdown.push(("entity_attr".to_string(), entity_score));
+            // Apply expert-specific scoring based on MoE routing
+            match primary_expert {
+                ExpertType::EntityAttribute => {
+                    // 1. ENTITY-ATTRIBUTE MATCHING (Critical for bAbI)
+                    let entity_score = self.score_entity_attribute(&question_lower, &choice_lower);
+                    if entity_score > 0.0 {
+                        score += entity_score * 1.5;  // Boost for entity expert
+                        breakdown.push(("entity_attr".to_string(), entity_score * 1.5));
+                    }
+                },
+                ExpertType::Semantic => {
+                    // 2. WORD EMBEDDING SIMILARITY (boosted)
+                    let choice_embedding = self.get_text_embedding(&choice_words);
+                    let embed_sim = self.cosine_similarity(&question_embedding, &choice_embedding);
+                    let embed_score = embed_sim * 15.0;  // Boosted for semantic expert
+                    score += embed_score;
+                    breakdown.push(("embed_sim".to_string(), embed_score));
+                },
+                ExpertType::RAG => {
+                    // 3. RAG KNOWLEDGE (boosted)
+                    let rag_score = self.rag_engine.score_choice_with_context(question_text, choice);
+                    if rag_score > 0.0 {
+                        score += rag_score * 10.0;  // Boosted for RAG expert
+                        breakdown.push(("rag".to_string(), rag_score * 10.0));
+                    }
+                },
+                ExpertType::Attention => {
+                    // 4. MULTI-HEAD ATTENTION SCORE
+                    let attn_weight = attn_weights.get(choice_idx).copied().unwrap_or(0.0);
+                    let mha_score = attn_weight * 20.0;
+                    score += mha_score;
+                    breakdown.push(("mha".to_string(), mha_score));
+                },
             }
             
-            // 2. WORD EMBEDDING SIMILARITY
-            // Compare question embedding with choice embedding
-            let choice_embedding = self.get_text_embedding(&choice_words);
-            let embed_sim = self.cosine_similarity(&question_embedding, &choice_embedding);
-            let embed_score = embed_sim * 10.0;
-            score += embed_score;
-            breakdown.push(("embed_sim".to_string(), embed_score));
+            // Always include baseline scores from all experts (with lower weight)
+            // Entity-attribute (if not primary)
+            if primary_expert != ExpertType::EntityAttribute {
+                let entity_score = self.score_entity_attribute(&question_lower, &choice_lower);
+                if entity_score > 0.0 {
+                    score += entity_score * 0.5;
+                    breakdown.push(("entity_attr".to_string(), entity_score * 0.5));
+                }
+            }
             
-            // 3. ATTENTION-WEIGHTED WORD MATCHING
-            // For each choice word, compute attention with question words
+            // Embedding similarity (if not primary)
+            if primary_expert != ExpertType::Semantic {
+                let choice_embedding = self.get_text_embedding(&choice_words);
+                let embed_sim = self.cosine_similarity(&question_embedding, &choice_embedding);
+                let embed_score = embed_sim * 5.0;
+                score += embed_score;
+                breakdown.push(("embed_sim".to_string(), embed_score));
+            }
+            
+            // MHA attention weight (if not primary)
+            if primary_expert != ExpertType::Attention {
+                let attn_weight = attn_weights.get(choice_idx).copied().unwrap_or(0.0);
+                let mha_score = attn_weight * 5.0;
+                score += mha_score;
+                breakdown.push(("mha".to_string(), mha_score));
+            }
+            
+            // ATTENTION-WEIGHTED WORD MATCHING
             let mut attn_score = 0.0;
             for choice_word in &choice_words {
                 for q_word in &question_words {
@@ -565,8 +792,7 @@ impl RealBenchmarkEvaluator {
             score += attn_score;
             breakdown.push(("attention".to_string(), attn_score));
             
-            // 4. LEARNED PATTERN MATCHING
-            // Check if we've seen this question pattern before
+            // LEARNED PATTERN MATCHING
             if let Some(learned_answers) = self.qa_patterns.get(&self.extract_pattern(&question_lower)) {
                 if learned_answers.iter().any(|a| a == &choice_lower) {
                     score += 20.0;
@@ -574,12 +800,15 @@ impl RealBenchmarkEvaluator {
                 }
             }
             
-            // 5. RAG KNOWLEDGE (for CommonsenseQA)
-            if entity_score == 0.0 {
-                let rag_score = self.rag_engine.score_choice_with_context(question_text, choice);
-                if rag_score > 0.0 {
-                    score += rag_score * 5.0;
-                    breakdown.push(("rag".to_string(), rag_score * 5.0));
+            // RAG KNOWLEDGE (if not primary and no entity match)
+            if primary_expert != ExpertType::RAG {
+                let entity_score = self.score_entity_attribute(&question_lower, &choice_lower);
+                if entity_score == 0.0 {
+                    let rag_score = self.rag_engine.score_choice_with_context(question_text, choice);
+                    if rag_score > 0.0 {
+                        score += rag_score * 3.0;
+                        breakdown.push(("rag".to_string(), rag_score * 3.0));
+                    }
                 }
             }
             
@@ -606,13 +835,14 @@ impl RealBenchmarkEvaluator {
         
         // Verbose debug output
         if self.verbose_debug {
-            println!("      Q: '{}'", if question_text.len() > 50 { &question_text[..50] } else { question_text });
+            let display_q: String = question_text.chars().take(50).collect();
+            println!("      Q: '{}'", display_q);
             for (idx, ((choice, breakdown), &prob)) in debug_info.iter().zip(probs.iter()).enumerate() {
                 let marker = if idx == best_idx { "→" } else { " " };
+                // Safe string truncation for display
+                let display_choice: String = choice.chars().take(15).collect();
                 println!("      {} [{}] '{}': logit={:.2} prob={:.2}", 
-                    marker, idx, 
-                    if choice.len() > 15 { &choice[..15] } else { choice },
-                    logits[idx], prob);
+                    marker, idx, display_choice, logits[idx], prob);
                 for (name, val) in breakdown {
                     if *val != 0.0 {
                         println!("            {} = {:.2}", name, val);

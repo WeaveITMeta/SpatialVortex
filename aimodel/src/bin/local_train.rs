@@ -202,9 +202,9 @@ fn main() {
     let gpu_config = GPUTrainConfig {
         batch_size: 256,        // Larger batches for speed
         learning_rate: 0.001,   // Lower LR for longer training
-        epochs: 100,            // Quick run for debug testing
+        epochs: 12000,          // Quick run for debug testing
         input_dim: 72,          // 8 beams * 9 digits
-        hidden_dim: 256,        // Balanced hidden dimension
+        hidden_dim: 768,        // Balanced hidden dimension
         output_dim: 72,
     };
     

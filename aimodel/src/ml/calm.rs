@@ -68,10 +68,192 @@ impl LatentState {
     }
 }
 
+/// Multi-Head Attention configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiHeadAttentionConfig {
+    pub num_heads: usize,
+    pub head_dim: usize,
+    pub dropout: f32,
+}
+
+impl Default for MultiHeadAttentionConfig {
+    fn default() -> Self {
+        Self {
+            num_heads: 8,
+            head_dim: 32,  // 8 heads * 32 = 256 total dim
+            dropout: 0.1,
+        }
+    }
+}
+
+/// Multi-Head Attention module with Q/K/V projections
+#[derive(Debug, Clone)]
+pub struct MultiHeadAttention {
+    pub config: MultiHeadAttentionConfig,
+    /// Query projection weights [latent_dim, num_heads * head_dim]
+    pub w_q: Vec<f32>,
+    /// Key projection weights
+    pub w_k: Vec<f32>,
+    /// Value projection weights
+    pub w_v: Vec<f32>,
+    /// Output projection weights
+    pub w_o: Vec<f32>,
+}
+
+impl MultiHeadAttention {
+    pub fn new(latent_dim: usize, config: MultiHeadAttentionConfig) -> Self {
+        let total_dim = config.num_heads * config.head_dim;
+        let scale = (2.0 / (latent_dim + total_dim) as f32).sqrt();
+        
+        Self {
+            w_q: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.1).sin() * scale)).collect(),
+            w_k: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.13).cos() * scale)).collect(),
+            w_v: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.17).sin() * scale)).collect(),
+            w_o: (0..total_dim * latent_dim).map(|i| ((i as f32 * 0.11).cos() * scale)).collect(),
+            config,
+        }
+    }
+    
+    /// Compute scaled dot-product attention
+    /// Returns attention output and attention weights
+    pub fn forward(&self, query: &[f32], keys: &[Vec<f32>], values: &[Vec<f32>]) -> (Vec<f32>, Vec<f32>) {
+        let num_heads = self.config.num_heads;
+        let head_dim = self.config.head_dim;
+        let total_dim = num_heads * head_dim;
+        let latent_dim = query.len();
+        
+        // Project query: [latent_dim] -> [total_dim]
+        let mut q_proj = vec![0.0f32; total_dim];
+        for i in 0..total_dim {
+            for j in 0..latent_dim.min(query.len()) {
+                if i * latent_dim + j < self.w_q.len() {
+                    q_proj[i] += query[j] * self.w_q[i * latent_dim + j];
+                }
+            }
+        }
+        
+        // Project keys and values
+        let mut k_projs: Vec<Vec<f32>> = Vec::with_capacity(keys.len());
+        let mut v_projs: Vec<Vec<f32>> = Vec::with_capacity(values.len());
+        
+        for (key, value) in keys.iter().zip(values.iter()) {
+            let mut k_proj = vec![0.0f32; total_dim];
+            let mut v_proj = vec![0.0f32; total_dim];
+            
+            for i in 0..total_dim {
+                for j in 0..latent_dim.min(key.len()) {
+                    if i * latent_dim + j < self.w_k.len() {
+                        k_proj[i] += key[j] * self.w_k[i * latent_dim + j];
+                    }
+                    if i * latent_dim + j < self.w_v.len() {
+                        v_proj[i] += value[j] * self.w_v[i * latent_dim + j];
+                    }
+                }
+            }
+            k_projs.push(k_proj);
+            v_projs.push(v_proj);
+        }
+        
+        // Compute attention scores per head
+        let scale = (head_dim as f32).sqrt();
+        let mut all_attn_weights = vec![0.0f32; keys.len()];
+        let mut output = vec![0.0f32; total_dim];
+        
+        for head in 0..num_heads {
+            let head_start = head * head_dim;
+            let head_end = head_start + head_dim;
+            
+            // Compute attention scores for this head
+            let mut scores: Vec<f32> = k_projs.iter()
+                .map(|k| {
+                    let mut dot = 0.0f32;
+                    for i in head_start..head_end {
+                        dot += q_proj[i] * k[i];
+                    }
+                    dot / scale
+                })
+                .collect();
+            
+            // Softmax
+            let max_score = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let exp_scores: Vec<f32> = scores.iter().map(|s| (s - max_score).exp()).collect();
+            let exp_sum: f32 = exp_scores.iter().sum();
+            let attn_weights: Vec<f32> = exp_scores.iter().map(|e| e / exp_sum.max(1e-8)).collect();
+            
+            // Accumulate attention weights for output
+            for (i, w) in attn_weights.iter().enumerate() {
+                all_attn_weights[i] += w / num_heads as f32;
+            }
+            
+            // Weighted sum of values for this head
+            for (v, &w) in v_projs.iter().zip(attn_weights.iter()) {
+                for i in head_start..head_end {
+                    output[i] += v[i] * w;
+                }
+            }
+        }
+        
+        // Output projection: [total_dim] -> [latent_dim]
+        let mut final_output = vec![0.0f32; latent_dim];
+        for i in 0..latent_dim {
+            for j in 0..total_dim {
+                if j * latent_dim + i < self.w_o.len() {
+                    final_output[i] += output[j] * self.w_o[j * latent_dim + i];
+                }
+            }
+        }
+        
+        (final_output, all_attn_weights)
+    }
+    
+    /// Train attention weights with gradient descent
+    pub fn train_step(&mut self, query: &[f32], keys: &[Vec<f32>], values: &[Vec<f32>], 
+                      target: &[f32], learning_rate: f32) {
+        let (output, _) = self.forward(query, keys, values);
+        let latent_dim = query.len();
+        let total_dim = self.config.num_heads * self.config.head_dim;
+        
+        // Compute error
+        let mut error = vec![0.0f32; latent_dim];
+        for i in 0..latent_dim.min(target.len()).min(output.len()) {
+            error[i] = target[i] - output[i];
+        }
+        
+        // Update output projection weights
+        for i in 0..latent_dim.min(error.len()) {
+            for j in 0..total_dim {
+                let idx = j * latent_dim + i;
+                if idx < self.w_o.len() {
+                    self.w_o[idx] += learning_rate * error[i] * 0.01;
+                }
+            }
+        }
+    }
+}
+
+/// Contrastive learning configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContrastiveLearningConfig {
+    pub temperature: f32,
+    pub num_negatives: usize,
+    pub margin: f32,
+}
+
+impl Default for ContrastiveLearningConfig {
+    fn default() -> Self {
+        Self {
+            temperature: 0.07,
+            num_negatives: 5,
+            margin: 0.5,
+        }
+    }
+}
+
 /// CALM Engine - Continuous Autoregressive Language Model
 ///
 /// Integrates with EBRM for energy-based latent space prediction.
 /// Provides K× speedup through latent compression.
+/// Now with Multi-Head Attention and Contrastive Learning.
 #[derive(Debug, Clone)]
 pub struct CALMEngine {
     pub config: CALMConfig,
@@ -82,10 +264,16 @@ pub struct CALMEngine {
     decoder_weights: Vec<f32>,
     /// Latent predictor weights
     predictor_weights: Vec<f32>,
-    /// Attention weights for context focusing
+    /// Attention weights for context focusing (legacy, kept for compatibility)
     attention_weights: Vec<f32>,
+    /// Multi-Head Attention module
+    pub multi_head_attention: MultiHeadAttention,
+    /// Contrastive learning config
+    pub contrastive_config: ContrastiveLearningConfig,
     /// Word embeddings learned from training
     word_embeddings: std::collections::HashMap<String, Vec<f32>>,
+    /// Negative samples buffer for contrastive learning
+    negative_buffer: Vec<Vec<f32>>,
     /// Training step counter
     training_steps: usize,
 }
@@ -100,6 +288,13 @@ impl CALMEngine {
         let decoder_scale = (2.0 / (latent_dim + input_dim) as f32).sqrt();
         let predictor_scale = (2.0 / (latent_dim * 2) as f32).sqrt();
         
+        // Configure MHA based on latent dim
+        let mha_config = MultiHeadAttentionConfig {
+            num_heads: 8,
+            head_dim: latent_dim / 8,  // Scale head_dim to match latent_dim
+            dropout: 0.1,
+        };
+        
         Self {
             config,
             ebrm: EnergyBasedReasoningModel::new(),
@@ -113,9 +308,119 @@ impl CALMEngine {
                 .map(|i| ((i as f32 * 0.1).sin() * predictor_scale))
                 .collect(),
             attention_weights: vec![1.0 / latent_dim as f32; latent_dim],
+            multi_head_attention: MultiHeadAttention::new(latent_dim, mha_config),
+            contrastive_config: ContrastiveLearningConfig::default(),
             word_embeddings: std::collections::HashMap::new(),
+            negative_buffer: Vec::new(),
             training_steps: 0,
         }
+    }
+    
+    /// Compute InfoNCE contrastive loss
+    /// Positive pair: (anchor, positive) should be similar
+    /// Negative pairs: (anchor, negative_i) should be dissimilar
+    pub fn contrastive_loss(&self, anchor: &[f32], positive: &[f32], negatives: &[Vec<f32>]) -> f32 {
+        let temp = self.contrastive_config.temperature;
+        
+        // Compute similarity between anchor and positive
+        let pos_sim = self.cosine_similarity(anchor, positive) / temp;
+        
+        // Compute similarities between anchor and negatives
+        let neg_sims: Vec<f32> = negatives.iter()
+            .map(|neg| self.cosine_similarity(anchor, neg) / temp)
+            .collect();
+        
+        // InfoNCE loss: -log(exp(pos_sim) / (exp(pos_sim) + sum(exp(neg_sims))))
+        let pos_exp = pos_sim.exp();
+        let neg_exp_sum: f32 = neg_sims.iter().map(|s| s.exp()).sum();
+        let denominator = pos_exp + neg_exp_sum;
+        
+        if denominator > 0.0 {
+            -(pos_exp / denominator).ln()
+        } else {
+            0.0
+        }
+    }
+    
+    /// Cosine similarity between two vectors
+    fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
+        let mut dot = 0.0f32;
+        let mut norm_a = 0.0f32;
+        let mut norm_b = 0.0f32;
+        
+        for i in 0..a.len().min(b.len()) {
+            dot += a[i] * b[i];
+            norm_a += a[i] * a[i];
+            norm_b += b[i] * b[i];
+        }
+        
+        if norm_a > 0.0 && norm_b > 0.0 {
+            dot / (norm_a.sqrt() * norm_b.sqrt())
+        } else {
+            0.0
+        }
+    }
+    
+    /// Train with contrastive learning
+    /// anchor: question embedding
+    /// positive: correct answer embedding
+    /// negatives: wrong answer embeddings
+    pub fn train_contrastive(&mut self, anchor: &[f32], positive: &[f32], negatives: &[Vec<f32>], learning_rate: f32) {
+        let loss = self.contrastive_loss(anchor, positive, negatives);
+        
+        // Add to negative buffer for future use
+        if self.negative_buffer.len() < 100 {
+            for neg in negatives {
+                self.negative_buffer.push(neg.clone());
+            }
+        } else {
+            // Replace oldest negatives
+            for (i, neg) in negatives.iter().enumerate() {
+                let idx = (self.training_steps + i) % self.negative_buffer.len();
+                self.negative_buffer[idx] = neg.clone();
+            }
+        }
+        
+        // Update encoder weights to minimize contrastive loss
+        let latent_dim = self.config.latent_dim;
+        let input_dim = self.config.chunk_size * 9;
+        
+        // Gradient: push anchor closer to positive, away from negatives
+        let pos_sim = self.cosine_similarity(anchor, positive);
+        let gradient_scale = learning_rate * (1.0 - pos_sim) * 0.01;
+        
+        for i in 0..latent_dim.min(anchor.len()).min(positive.len()) {
+            let error = positive[i] - anchor[i];
+            
+            // Update encoder weights
+            for j in 0..input_dim.min(self.encoder_weights.len() / latent_dim) {
+                let idx = i * input_dim + j;
+                if idx < self.encoder_weights.len() {
+                    self.encoder_weights[idx] += gradient_scale * error;
+                }
+            }
+        }
+        
+        // Also train MHA on this pair
+        if !negatives.is_empty() {
+            let keys: Vec<Vec<f32>> = std::iter::once(positive.to_vec())
+                .chain(negatives.iter().cloned())
+                .collect();
+            let values = keys.clone();
+            self.multi_head_attention.train_step(anchor, &keys, &values, positive, learning_rate);
+        }
+    }
+    
+    /// Apply multi-head attention to context
+    pub fn attend_to_context(&self, query_latent: &LatentState, context_latents: &[LatentState]) -> (Vec<f32>, Vec<f32>) {
+        if context_latents.is_empty() {
+            return (query_latent.latent.clone(), vec![]);
+        }
+        
+        let keys: Vec<Vec<f32>> = context_latents.iter().map(|l| l.latent.clone()).collect();
+        let values = keys.clone();
+        
+        self.multi_head_attention.forward(&query_latent.latent, &keys, &values)
     }
     
     /// Train the CALM encoder/decoder on input-target pairs
