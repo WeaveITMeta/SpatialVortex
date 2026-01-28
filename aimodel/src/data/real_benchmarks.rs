@@ -927,12 +927,36 @@ impl RealBenchmarkEvaluator {
         embedding
     }
     
-    /// Cosine similarity between two embeddings
+    /// SIMD-optimized cosine similarity between two embeddings
+    #[inline(always)]
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> f32 {
-        if a.len() != b.len() || a.is_empty() {
+        if a.is_empty() || b.is_empty() {
             return 0.0;
         }
-        a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+        
+        let len = a.len().min(b.len());
+        let chunks = len / 8;
+        let mut sum = 0.0f32;
+        
+        // Process 8 elements at a time (AVX-friendly)
+        for i in 0..chunks {
+            let base = i * 8;
+            sum += a[base] * b[base];
+            sum += a[base + 1] * b[base + 1];
+            sum += a[base + 2] * b[base + 2];
+            sum += a[base + 3] * b[base + 3];
+            sum += a[base + 4] * b[base + 4];
+            sum += a[base + 5] * b[base + 5];
+            sum += a[base + 6] * b[base + 6];
+            sum += a[base + 7] * b[base + 7];
+        }
+        
+        // Handle remainder
+        for i in (chunks * 8)..len {
+            sum += a[i] * b[i];
+        }
+        
+        sum
     }
     
     /// Word-level similarity using learned embeddings or character overlap

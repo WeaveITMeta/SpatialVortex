@@ -31,100 +31,158 @@ pub enum DatasetCategory {
     Math,
     Code,
     Benchmark,
+    Vision,
+    Multimodal,
+    Science,
+    QA,
 }
 
-/// Priority datasets from the checklist
+/// All 105 HuggingFace datasets organized by category
 pub fn get_priority_datasets() -> Vec<DatasetInfo> {
     vec![
-        // Pre-Training (Priority 1-2)
-        DatasetInfo {
-            hf_path: "HuggingFaceFW/fineweb-edu".to_string(),
-            name: "FineWeb-Edu".to_string(),
-            category: DatasetCategory::PreTraining,
-            split: "train".to_string(),
-            estimated_tokens: 5_400_000_000,
-            license: "ODC-BY".to_string(),
-            priority: 1,
-        },
-        DatasetInfo {
-            hf_path: "cerebras/SlimPajama-627B".to_string(),
-            name: "SlimPajama".to_string(),
-            category: DatasetCategory::PreTraining,
-            split: "train".to_string(),
-            estimated_tokens: 627_000_000_000,
-            license: "Apache-2.0".to_string(),
-            priority: 2,
-        },
-        
-        // Math/Reasoning (Priority 3-4)
-        DatasetInfo {
-            hf_path: "openai/gsm8k".to_string(),
-            name: "GSM8K".to_string(),
-            category: DatasetCategory::Math,
-            split: "train".to_string(),
-            estimated_tokens: 8_500,
-            license: "MIT".to_string(),
-            priority: 3,
-        },
-        DatasetInfo {
-            hf_path: "EleutherAI/proof-pile-2".to_string(),
-            name: "ProofPile-2".to_string(),
-            category: DatasetCategory::Math,
-            split: "train".to_string(),
-            estimated_tokens: 55_000_000_000,
-            license: "Apache-2.0".to_string(),
-            priority: 4,
-        },
-        DatasetInfo {
-            hf_path: "hendrycks/math".to_string(),
-            name: "MATH".to_string(),
-            category: DatasetCategory::Math,
-            split: "train".to_string(),
-            estimated_tokens: 12_500,
-            license: "MIT".to_string(),
-            priority: 5,
-        },
-        
-        // Benchmarks (Priority 6-9)
-        DatasetInfo {
-            hf_path: "cais/mmlu".to_string(),
-            name: "MMLU".to_string(),
-            category: DatasetCategory::Benchmark,
-            split: "test".to_string(),
-            estimated_tokens: 14_000,
-            license: "MIT".to_string(),
-            priority: 6,
-        },
-        DatasetInfo {
-            hf_path: "allenai/ai2_arc".to_string(),
-            name: "ARC".to_string(),
-            category: DatasetCategory::Benchmark,
-            split: "train".to_string(),
-            estimated_tokens: 7_800,
-            license: "Apache-2.0".to_string(),
-            priority: 7,
-        },
-        DatasetInfo {
-            hf_path: "Rowan/hellaswag".to_string(),
-            name: "HellaSwag".to_string(),
-            category: DatasetCategory::Benchmark,
-            split: "train".to_string(),
-            estimated_tokens: 70_000,
-            license: "MIT".to_string(),
-            priority: 8,
-        },
-        
-        // Code (Priority 10)
-        DatasetInfo {
-            hf_path: "bigcode/starcoderdata".to_string(),
-            name: "StarCoderData".to_string(),
-            category: DatasetCategory::Code,
-            split: "train".to_string(),
-            estimated_tokens: 3_000_000_000_000,
-            license: "Various".to_string(),
-            priority: 10,
-        },
+        // =============================================================================
+        // 1. Large-Scale Text/Language Corpora (1-20)
+        // =============================================================================
+        DatasetInfo { hf_path: "HuggingFaceFW/fineweb".to_string(), name: "FineWeb".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 15_000_000_000, license: "ODC-BY".to_string(), priority: 1 },
+        DatasetInfo { hf_path: "HuggingFaceFW/fineweb-edu".to_string(), name: "FineWeb-Edu".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 5_400_000_000, license: "ODC-BY".to_string(), priority: 2 },
+        DatasetInfo { hf_path: "allenai/dolma".to_string(), name: "Dolma".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 3_000_000_000_000, license: "ODC-BY".to_string(), priority: 3 },
+        DatasetInfo { hf_path: "togethercomputer/RedPajama-Data-1T".to_string(), name: "RedPajama".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 1_200_000_000_000, license: "Apache-2.0".to_string(), priority: 4 },
+        DatasetInfo { hf_path: "EleutherAI/the_pile".to_string(), name: "The Pile".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 825_000_000_000, license: "MIT".to_string(), priority: 5 },
+        DatasetInfo { hf_path: "allenai/c4".to_string(), name: "C4".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 750_000_000_000, license: "ODC-BY".to_string(), priority: 6 },
+        DatasetInfo { hf_path: "oscar-corpus/OSCAR-2109".to_string(), name: "OSCAR".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 400_000_000_000, license: "CC-BY".to_string(), priority: 7 },
+        DatasetInfo { hf_path: "EleutherAI/bookcorpus".to_string(), name: "BookCorpus".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 985_000_000, license: "MIT".to_string(), priority: 8 },
+        DatasetInfo { hf_path: "wikipedia".to_string(), name: "Wikipedia".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 6_000_000_000, license: "CC-BY-SA".to_string(), priority: 9 },
+        DatasetInfo { hf_path: "skylion007/openwebtext".to_string(), name: "OpenWebText".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 8_000_000_000, license: "MIT".to_string(), priority: 10 },
+        DatasetInfo { hf_path: "allenai/cc-news".to_string(), name: "CC-News".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 76_000_000_000, license: "CC-BY".to_string(), priority: 11 },
+        DatasetInfo { hf_path: "allenai/mc4".to_string(), name: "MC4".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 100_000_000_000, license: "ODC-BY".to_string(), priority: 12 },
+        DatasetInfo { hf_path: "bigscience-data/roots".to_string(), name: "ROOTS".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 1_600_000_000_000, license: "Apache-2.0".to_string(), priority: 13 },
+        DatasetInfo { hf_path: "tiiuae/falcon-refinedweb".to_string(), name: "RefinedWeb".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 600_000_000_000, license: "ODC-BY".to_string(), priority: 14 },
+        DatasetInfo { hf_path: "nguyentito/CultureX".to_string(), name: "CultureX".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 50_000_000_000, license: "CC-BY".to_string(), priority: 15 },
+        DatasetInfo { hf_path: "togethercomputer/proof-pile".to_string(), name: "ProofPile".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 8_000_000_000, license: "Apache-2.0".to_string(), priority: 16 },
+        DatasetInfo { hf_path: "cerebras/SlimPajama-627B".to_string(), name: "SlimPajama".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 627_000_000_000, license: "Apache-2.0".to_string(), priority: 17 },
+        DatasetInfo { hf_path: "Skywork/SkyPile-150B".to_string(), name: "SkyPile".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 150_000_000_000, license: "Apache-2.0".to_string(), priority: 18 },
+        DatasetInfo { hf_path: "EleutherAI/webtext2".to_string(), name: "WebText2".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 40_000_000_000, license: "MIT".to_string(), priority: 19 },
+        DatasetInfo { hf_path: "allenai/cc-stories".to_string(), name: "CC-Stories".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 31_000_000_000, license: "CC-BY".to_string(), priority: 20 },
+
+        // =============================================================================
+        // 2. Code and Programming Datasets (21-30)
+        // =============================================================================
+        DatasetInfo { hf_path: "openai_humaneval".to_string(), name: "HumanEval".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 164, license: "MIT".to_string(), priority: 21 },
+        DatasetInfo { hf_path: "bigcode/the-stack".to_string(), name: "The Stack".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 3_000_000_000_000, license: "Various".to_string(), priority: 22 },
+        DatasetInfo { hf_path: "codeparrot/github-code".to_string(), name: "GitHub Code".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 1_000_000_000_000, license: "Various".to_string(), priority: 23 },
+        DatasetInfo { hf_path: "hendrycks/apps".to_string(), name: "APPS".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 10_000, license: "MIT".to_string(), priority: 24 },
+        DatasetInfo { hf_path: "microsoft/CodeXGLUE".to_string(), name: "CodeXGLUE".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 50_000, license: "MIT".to_string(), priority: 25 },
+        DatasetInfo { hf_path: "google-research/mbpp".to_string(), name: "MBPP".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 974, license: "CC-BY".to_string(), priority: 26 },
+        DatasetInfo { hf_path: "microsoft/ds1000".to_string(), name: "DS-1000".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 1_000, license: "MIT".to_string(), priority: 27 },
+        DatasetInfo { hf_path: "bigcode-project/bigcodebench".to_string(), name: "BigCodeBench".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 5_000, license: "Apache-2.0".to_string(), priority: 28 },
+        DatasetInfo { hf_path: "bigcode/starcoderdata".to_string(), name: "StarCoderData".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 250_000_000_000, license: "Various".to_string(), priority: 29 },
+        DatasetInfo { hf_path: "thebigpile/python-stackoverflow".to_string(), name: "Python StackOverflow".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 10_000_000, license: "CC-BY-SA".to_string(), priority: 30 },
+
+        // =============================================================================
+        // 3. Vision and Image Datasets (31-40)
+        // =============================================================================
+        DatasetInfo { hf_path: "laion/laion5B".to_string(), name: "LAION-5B".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 5_000_000_000, license: "CC-BY".to_string(), priority: 31 },
+        DatasetInfo { hf_path: "cocodataset/coco".to_string(), name: "COCO".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 330_000, license: "CC-BY".to_string(), priority: 32 },
+        DatasetInfo { hf_path: "imagenet-1k".to_string(), name: "ImageNet".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 1_281_167, license: "Custom".to_string(), priority: 33 },
+        DatasetInfo { hf_path: "openimages".to_string(), name: "Open Images".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 9_000_000, license: "CC-BY".to_string(), priority: 34 },
+        DatasetInfo { hf_path: "mpariente/celebA".to_string(), name: "CelebA".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 202_599, license: "Custom".to_string(), priority: 35 },
+        DatasetInfo { hf_path: "google-research-datasets/conceptual_captions".to_string(), name: "Conceptual Captions".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 3_300_000, license: "CC-BY".to_string(), priority: 36 },
+        DatasetInfo { hf_path: "laion/laion-aesthetics".to_string(), name: "LAION-Aesthetics".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 600_000_000, license: "CC-BY".to_string(), priority: 37 },
+        DatasetInfo { hf_path: "krishnam/visual_genome".to_string(), name: "Visual Genome".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 108_000, license: "CC-BY".to_string(), priority: 38 },
+        DatasetInfo { hf_path: "nlphuji/flickr30k".to_string(), name: "Flickr30k".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 31_000, license: "CC-BY".to_string(), priority: 39 },
+        DatasetInfo { hf_path: "csailvision/ade20k".to_string(), name: "ADE20K".to_string(), category: DatasetCategory::Vision, split: "train".to_string(), estimated_tokens: 20_000, license: "BSD".to_string(), priority: 40 },
+
+        // =============================================================================
+        // 4. Multimodal Datasets (41-50)
+        // =============================================================================
+        DatasetInfo { hf_path: "google-research-datasets/wit".to_string(), name: "WIT".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 37_600_000, license: "CC-BY-SA".to_string(), priority: 41 },
+        DatasetInfo { hf_path: "audioset".to_string(), name: "AudioSet".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 2_000_000, license: "CC-BY".to_string(), priority: 42 },
+        DatasetInfo { hf_path: "openslr/librispeech_asr".to_string(), name: "LibriSpeech".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 960, license: "CC-BY".to_string(), priority: 43 },
+        DatasetInfo { hf_path: "mozilla-foundation/common_voice_11_0".to_string(), name: "Common Voice".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 2_500, license: "CC0".to_string(), priority: 44 },
+        DatasetInfo { hf_path: "open-mmmu/mmmu".to_string(), name: "MMMU".to_string(), category: DatasetCategory::Multimodal, split: "test".to_string(), estimated_tokens: 11_500, license: "Apache-2.0".to_string(), priority: 45 },
+        DatasetInfo { hf_path: "agcarmy/vqa".to_string(), name: "VQA".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 443_757, license: "CC-BY".to_string(), priority: 46 },
+        DatasetInfo { hf_path: "facebookresearch/hateful_memes".to_string(), name: "Hateful Memes".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 10_000, license: "Custom".to_string(), priority: 47 },
+        DatasetInfo { hf_path: "cocodataset/captions".to_string(), name: "MSCOCO Captions".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 414_113, license: "CC-BY".to_string(), priority: 48 },
+        DatasetInfo { hf_path: "redcaps".to_string(), name: "RedCaps".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 12_000_000, license: "CC-BY".to_string(), priority: 49 },
+        DatasetInfo { hf_path: "openai/clip".to_string(), name: "CLIP Data".to_string(), category: DatasetCategory::Multimodal, split: "train".to_string(), estimated_tokens: 400_000_000, license: "MIT".to_string(), priority: 50 },
+
+        // =============================================================================
+        // 5. Science, Math, and Reasoning Datasets (51-60)
+        // =============================================================================
+        DatasetInfo { hf_path: "openai/gsm8k".to_string(), name: "GSM8K".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 8_500, license: "MIT".to_string(), priority: 51 },
+        DatasetInfo { hf_path: "hendrycks/math".to_string(), name: "MATH".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 12_500, license: "MIT".to_string(), priority: 52 },
+        DatasetInfo { hf_path: "arxiv_dataset".to_string(), name: "arXiv".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 2_000_000_000, license: "CC-BY".to_string(), priority: 53 },
+        DatasetInfo { hf_path: "pubmed_qa".to_string(), name: "PubMedQA".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 211_000, license: "MIT".to_string(), priority: 54 },
+        DatasetInfo { hf_path: "bioasq".to_string(), name: "BioASQ".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 50_000, license: "Custom".to_string(), priority: 55 },
+        DatasetInfo { hf_path: "allenai/sciq".to_string(), name: "SciQ".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 13_679, license: "CC-BY".to_string(), priority: 56 },
+        DatasetInfo { hf_path: "allenai/ai2_arc".to_string(), name: "ARC".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 7_800, license: "Apache-2.0".to_string(), priority: 57 },
+        DatasetInfo { hf_path: "allenai/openbookqa".to_string(), name: "OpenBookQA".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 5_957, license: "Apache-2.0".to_string(), priority: 58 },
+        DatasetInfo { hf_path: "EleutherAI/proof-pile-2".to_string(), name: "Proof-Pile-2".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 55_000_000_000, license: "Apache-2.0".to_string(), priority: 59 },
+        DatasetInfo { hf_path: "wenhu/theoremqa".to_string(), name: "TheoremQA".to_string(), category: DatasetCategory::Math, split: "test".to_string(), estimated_tokens: 800, license: "MIT".to_string(), priority: 60 },
+
+        // =============================================================================
+        // 6. Additional Diverse Datasets (61-105)
+        // =============================================================================
+        DatasetInfo { hf_path: "glue".to_string(), name: "GLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 100_000, license: "Various".to_string(), priority: 61 },
+        DatasetInfo { hf_path: "super_glue".to_string(), name: "SuperGLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 50_000, license: "Various".to_string(), priority: 62 },
+        DatasetInfo { hf_path: "rajpurkar/squad".to_string(), name: "SQuAD".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 87_599, license: "CC-BY-SA".to_string(), priority: 63 },
+        DatasetInfo { hf_path: "cnn_dailymail".to_string(), name: "CNN/Daily Mail".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 300_000, license: "Apache-2.0".to_string(), priority: 64 },
+        DatasetInfo { hf_path: "hendrycks/ethics".to_string(), name: "Ethics".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 130_000, license: "MIT".to_string(), priority: 65 },
+        DatasetInfo { hf_path: "truthful_qa".to_string(), name: "TruthfulQA".to_string(), category: DatasetCategory::Benchmark, split: "validation".to_string(), estimated_tokens: 817, license: "Apache-2.0".to_string(), priority: 66 },
+        DatasetInfo { hf_path: "Rowan/hellaswag".to_string(), name: "HellaSwag".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 70_000, license: "MIT".to_string(), priority: 67 },
+        DatasetInfo { hf_path: "piqa".to_string(), name: "PIQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 16_000, license: "AFL-3.0".to_string(), priority: 68 },
+        DatasetInfo { hf_path: "sap2019/socialiqa".to_string(), name: "SocialIQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 33_410, license: "CC-BY".to_string(), priority: 69 },
+        DatasetInfo { hf_path: "allenai/cosmosqa".to_string(), name: "CosmosQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 25_262, license: "CC-BY".to_string(), priority: 70 },
+        DatasetInfo { hf_path: "quac".to_string(), name: "QuAC".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 83_568, license: "CC-BY-SA".to_string(), priority: 71 },
+        DatasetInfo { hf_path: "coqa".to_string(), name: "CoQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 108_647, license: "Various".to_string(), priority: 72 },
+        DatasetInfo { hf_path: "allenai/drop".to_string(), name: "DROP".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 77_409, license: "Apache-2.0".to_string(), priority: 73 },
+        DatasetInfo { hf_path: "boolq".to_string(), name: "BoolQ".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 9_427, license: "CC-BY-SA".to_string(), priority: 74 },
+        DatasetInfo { hf_path: "multi_rc".to_string(), name: "MultiRC".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 27_243, license: "Various".to_string(), priority: 75 },
+        DatasetInfo { hf_path: "record".to_string(), name: "ReCoRD".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 100_730, license: "Various".to_string(), priority: 76 },
+        DatasetInfo { hf_path: "hotpot_qa".to_string(), name: "HotpotQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 90_447, license: "CC-BY-SA".to_string(), priority: 77 },
+        DatasetInfo { hf_path: "trivia_qa".to_string(), name: "TriviaQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 138_384, license: "Apache-2.0".to_string(), priority: 78 },
+        DatasetInfo { hf_path: "natural_questions".to_string(), name: "Natural Questions".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 307_373, license: "CC-BY-SA".to_string(), priority: 79 },
+        DatasetInfo { hf_path: "scitail".to_string(), name: "SciTail".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 23_596, license: "Apache-2.0".to_string(), priority: 80 },
+        DatasetInfo { hf_path: "race".to_string(), name: "RACE".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 87_866, license: "Custom".to_string(), priority: 81 },
+        DatasetInfo { hf_path: "dream".to_string(), name: "DREAM".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 6_116, license: "Custom".to_string(), priority: 82 },
+        DatasetInfo { hf_path: "allenai/qasc".to_string(), name: "QASC".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 8_134, license: "CC-BY".to_string(), priority: 83 },
+        DatasetInfo { hf_path: "quoref".to_string(), name: "Quoref".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 19_399, license: "CC-BY-SA".to_string(), priority: 84 },
+        DatasetInfo { hf_path: "ropes".to_string(), name: "ROPES".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 10_924, license: "CC-BY".to_string(), priority: 85 },
+        DatasetInfo { hf_path: "wiki_qa".to_string(), name: "WikiQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 20_360, license: "Custom".to_string(), priority: 86 },
+        DatasetInfo { hf_path: "duorc".to_string(), name: "DuoRC".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 186_089, license: "MIT".to_string(), priority: 87 },
+        DatasetInfo { hf_path: "cb".to_string(), name: "CB".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 250, license: "CC-BY".to_string(), priority: 88 },
+        DatasetInfo { hf_path: "copa".to_string(), name: "COPA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 400, license: "BSD".to_string(), priority: 89 },
+        DatasetInfo { hf_path: "rte".to_string(), name: "RTE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 2_490, license: "Various".to_string(), priority: 90 },
+        DatasetInfo { hf_path: "wic".to_string(), name: "WiC".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 5_428, license: "CC-BY-NC".to_string(), priority: 91 },
+        DatasetInfo { hf_path: "wsc".to_string(), name: "WSC".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 554, license: "CC-BY".to_string(), priority: 92 },
+        DatasetInfo { hf_path: "pdp".to_string(), name: "PDP".to_string(), category: DatasetCategory::Reasoning, split: "test".to_string(), estimated_tokens: 60, license: "Custom".to_string(), priority: 93 },
+        DatasetInfo { hf_path: "dpr".to_string(), name: "DPR".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 58_880, license: "CC-BY-SA".to_string(), priority: 94 },
+        DatasetInfo { hf_path: "fiqa".to_string(), name: "FiQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 5_500, license: "Custom".to_string(), priority: 95 },
+        DatasetInfo { hf_path: "tweet_qa".to_string(), name: "TweetQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 10_692, license: "CC-BY".to_string(), priority: 96 },
+        DatasetInfo { hf_path: "newsqa".to_string(), name: "NewsQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 92_549, license: "Custom".to_string(), priority: 97 },
+        DatasetInfo { hf_path: "search_qa".to_string(), name: "SearchQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 140_461, license: "Apache-2.0".to_string(), priority: 98 },
+        DatasetInfo { hf_path: "quail".to_string(), name: "QuAIL".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 10_246, license: "CC-BY-SA".to_string(), priority: 99 },
+        DatasetInfo { hf_path: "biomrc".to_string(), name: "BioMRC".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 812_752, license: "Apache-2.0".to_string(), priority: 100 },
+        DatasetInfo { hf_path: "clutrr".to_string(), name: "CLUTRR".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 10_000, license: "MIT".to_string(), priority: 101 },
+        DatasetInfo { hf_path: "logiqa".to_string(), name: "LogiQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 7_376, license: "Custom".to_string(), priority: 102 },
+        DatasetInfo { hf_path: "anli".to_string(), name: "Abductive NLI".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 169_654, license: "CC-BY-NC".to_string(), priority: 103 },
+        DatasetInfo { hf_path: "art".to_string(), name: "ART".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 20_000, license: "CC-BY".to_string(), priority: 104 },
+        DatasetInfo { hf_path: "causalnet".to_string(), name: "CausalNet".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 11_000_000, license: "MIT".to_string(), priority: 105 },
     ]
+}
+
+/// Get datasets by category
+pub fn get_datasets_by_category(category: DatasetCategory) -> Vec<DatasetInfo> {
+    get_priority_datasets().into_iter()
+        .filter(|d| d.category == category)
+        .collect()
+}
+
+/// Get top N priority datasets
+pub fn get_top_priority_datasets(n: usize) -> Vec<DatasetInfo> {
+    let mut datasets = get_priority_datasets();
+    datasets.sort_by_key(|d| d.priority);
+    datasets.into_iter().take(n).collect()
 }
 
 // =============================================================================
@@ -274,16 +332,22 @@ impl HFDatasetLoader {
         
         let examples: Vec<TrainingExample> = match info.category {
             DatasetCategory::Math => {
-                // Generate math-style examples
+                // Generate math-style examples with varied operations
                 (0..count).map(|i| {
                     let a = (i % 100) + 1;
                     let b = ((i * 7) % 100) + 1;
+                    let op = match i % 4 {
+                        0 => ("+", a + b),
+                        1 => ("-", if a > b { a - b } else { b - a }),
+                        2 => ("*", a * b),
+                        _ => ("/", if b > 0 { a / b.max(1) } else { a }),
+                    };
                     TrainingExample {
                         text: String::new(),
                         source: info.name.clone(),
                         category: info.category,
-                        question: Some(format!("What is {} + {}?", a, b)),
-                        answer: Some(format!("{}", a + b)),
+                        question: Some(format!("What is {} {} {}?", a, op.0, b)),
+                        answer: Some(format!("{}", op.1)),
                     }
                 }).collect()
             }
@@ -300,12 +364,89 @@ impl HFDatasetLoader {
                 }).collect()
             }
             DatasetCategory::Code => {
-                // Generate code examples
+                // Generate code examples in multiple languages
+                (0..count).map(|i| {
+                    let lang = match i % 4 {
+                        0 => format!("fn example_{}() -> i32 {{\n    let x = {};\n    let y = {};\n    x + y\n}}", i, i % 100, (i * 3) % 100),
+                        1 => format!("def example_{}():\n    x = {}\n    y = {}\n    return x + y", i, i % 100, (i * 3) % 100),
+                        2 => format!("function example{}() {{\n    const x = {};\n    const y = {};\n    return x + y;\n}}", i, i % 100, (i * 3) % 100),
+                        _ => format!("public int example{}() {{\n    int x = {};\n    int y = {};\n    return x + y;\n}}", i, i % 100, (i * 3) % 100),
+                    };
+                    TrainingExample {
+                        text: lang,
+                        source: info.name.clone(),
+                        category: info.category,
+                        question: None,
+                        answer: None,
+                    }
+                }).collect()
+            }
+            DatasetCategory::Reasoning => {
+                // Generate reasoning examples with logical chains
+                (0..count).map(|i| {
+                    let premises = vec![
+                        format!("If A then B. A is true."),
+                        format!("All X are Y. Z is an X."),
+                        format!("Either P or Q. Not P."),
+                        format!("If it rains, the ground is wet. The ground is wet."),
+                    ];
+                    let conclusions = vec!["Therefore B.", "Therefore Z is Y.", "Therefore Q.", "It may have rained."];
+                    let idx = i % premises.len();
+                    TrainingExample {
+                        text: String::new(),
+                        source: info.name.clone(),
+                        category: info.category,
+                        question: Some(premises[idx].clone()),
+                        answer: Some(conclusions[idx].to_string()),
+                    }
+                }).collect()
+            }
+            DatasetCategory::Science => {
+                // Generate science Q&A examples
+                (0..count).map(|i| {
+                    let topics = vec![
+                        ("What is the chemical formula for water?", "H2O"),
+                        ("What is the speed of light?", "299,792,458 meters per second"),
+                        ("What is DNA?", "Deoxyribonucleic acid, the molecule carrying genetic instructions"),
+                        ("What is photosynthesis?", "The process plants use to convert light into energy"),
+                        ("What is gravity?", "A fundamental force that attracts objects with mass"),
+                    ];
+                    let idx = i % topics.len();
+                    TrainingExample {
+                        text: String::new(),
+                        source: info.name.clone(),
+                        category: info.category,
+                        question: Some(topics[idx].0.to_string()),
+                        answer: Some(topics[idx].1.to_string()),
+                    }
+                }).collect()
+            }
+            DatasetCategory::QA => {
+                // Generate general Q&A examples
+                (0..count).map(|i| {
+                    TrainingExample {
+                        text: String::new(),
+                        source: info.name.clone(),
+                        category: info.category,
+                        question: Some(format!("Context: The {} is located in region {}. Question: Where is the {}?", 
+                            i % 100, i % 10, i % 100)),
+                        answer: Some(format!("Region {}", i % 10)),
+                    }
+                }).collect()
+            }
+            DatasetCategory::Vision => {
+                // Generate vision caption examples (text descriptions)
                 (0..count).map(|i| {
                     TrainingExample {
                         text: format!(
-                            "fn example_{}() -> i32 {{\n    let x = {};\n    let y = {};\n    x + y\n}}",
-                            i, i % 100, (i * 3) % 100
+                            "Image {}: A {} {} in a {} setting with {} lighting. Objects include {} and {}.",
+                            i,
+                            ["small", "large", "medium"][i % 3],
+                            ["cat", "dog", "bird", "person", "car"][i % 5],
+                            ["indoor", "outdoor", "urban", "rural"][i % 4],
+                            ["natural", "artificial", "dim", "bright"][i % 4],
+                            ["table", "chair", "tree", "building"][i % 4],
+                            ["lamp", "window", "door", "fence"][i % 4]
                         ),
                         source: info.name.clone(),
                         category: info.category,
@@ -314,15 +455,40 @@ impl HFDatasetLoader {
                     }
                 }).collect()
             }
-            _ => {
-                // Pre-training style text
+            DatasetCategory::Multimodal => {
+                // Generate multimodal examples (text + description)
                 (0..count).map(|i| {
                     TrainingExample {
                         text: format!(
-                            "This is training example {} from {}. The quick brown fox jumps over the lazy dog. \
-                            Machine learning models learn patterns from data. Neural networks process information \
-                            through layers of interconnected nodes. Training involves adjusting weights to minimize loss.",
-                            i, info.name
+                            "[IMAGE: scene_{}] Caption: {} {} performing {} in {}.",
+                            i,
+                            ["A", "The", "An"][i % 3],
+                            ["person", "group", "animal", "object"][i % 4],
+                            ["action", "movement", "task", "activity"][i % 4],
+                            ["location", "environment", "setting", "context"][i % 4]
+                        ),
+                        source: info.name.clone(),
+                        category: info.category,
+                        question: Some(format!("What is shown in image {}?", i)),
+                        answer: Some(format!("Scene depicting activity {}", i % 100)),
+                    }
+                }).collect()
+            }
+            DatasetCategory::PreTraining => {
+                // Pre-training style text with varied content
+                (0..count).map(|i| {
+                    let topics = vec![
+                        "Machine learning models learn patterns from data through iterative optimization.",
+                        "Neural networks process information through layers of interconnected nodes.",
+                        "Natural language processing enables computers to understand human language.",
+                        "Deep learning has revolutionized computer vision and speech recognition.",
+                        "Transformers use attention mechanisms to process sequential data efficiently.",
+                    ];
+                    TrainingExample {
+                        text: format!(
+                            "Training example {} from {}: {} {}",
+                            i, info.name, topics[i % topics.len()],
+                            "Training involves adjusting weights to minimize loss functions."
                         ),
                         source: info.name.clone(),
                         category: info.category,
@@ -438,11 +604,29 @@ mod tests {
     #[test]
     fn test_priority_datasets() {
         let datasets = get_priority_datasets();
-        assert!(datasets.len() >= 8);
+        assert_eq!(datasets.len(), 105, "Should have all 105 datasets");
         
-        // Check GSM8K is included
+        // Check key datasets are included
         assert!(datasets.iter().any(|d| d.name == "GSM8K"));
-        // Check MMLU is included
-        assert!(datasets.iter().any(|d| d.name == "MMLU"));
+        assert!(datasets.iter().any(|d| d.name == "FineWeb"));
+        assert!(datasets.iter().any(|d| d.name == "The Stack"));
+        assert!(datasets.iter().any(|d| d.name == "LAION-5B"));
+        assert!(datasets.iter().any(|d| d.name == "SQuAD"));
+    }
+    
+    #[test]
+    fn test_datasets_by_category() {
+        let code_datasets = get_datasets_by_category(DatasetCategory::Code);
+        assert!(code_datasets.len() >= 10, "Should have at least 10 code datasets");
+        
+        let math_datasets = get_datasets_by_category(DatasetCategory::Math);
+        assert!(math_datasets.len() >= 4, "Should have at least 4 math datasets");
+    }
+    
+    #[test]
+    fn test_top_priority_datasets() {
+        let top_10 = get_top_priority_datasets(10);
+        assert_eq!(top_10.len(), 10);
+        assert_eq!(top_10[0].priority, 1);
     }
 }

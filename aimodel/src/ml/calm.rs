@@ -114,7 +114,48 @@ impl MultiHeadAttention {
         }
     }
     
-    /// Compute scaled dot-product attention
+    /// SIMD-optimized dot product for f32 slices
+    #[inline(always)]
+    fn simd_dot_product(a: &[f32], b: &[f32]) -> f32 {
+        // Process 4 elements at a time (SSE/NEON compatible)
+        let len = a.len().min(b.len());
+        let chunks = len / 4;
+        let remainder = len % 4;
+        
+        let mut sum = 0.0f32;
+        
+        // Vectorized loop (compiler will auto-vectorize)
+        for i in 0..chunks {
+            let base = i * 4;
+            sum += a[base] * b[base];
+            sum += a[base + 1] * b[base + 1];
+            sum += a[base + 2] * b[base + 2];
+            sum += a[base + 3] * b[base + 3];
+        }
+        
+        // Handle remainder
+        for i in (chunks * 4)..len {
+            sum += a[i] * b[i];
+        }
+        
+        sum
+    }
+    
+    /// Fast matrix-vector multiply using SIMD-friendly layout
+    #[inline]
+    fn fast_matvec(&self, weights: &[f32], input: &[f32], output: &mut [f32], in_dim: usize, out_dim: usize) {
+        for i in 0..out_dim {
+            let row_start = i * in_dim;
+            let row_end = (row_start + in_dim).min(weights.len());
+            if row_end > row_start {
+                let weight_slice = &weights[row_start..row_end];
+                let input_slice = &input[..weight_slice.len().min(input.len())];
+                output[i] = Self::simd_dot_product(weight_slice, input_slice);
+            }
+        }
+    }
+    
+    /// Compute scaled dot-product attention (SIMD optimized)
     /// Returns attention output and attention weights
     pub fn forward(&self, query: &[f32], keys: &[Vec<f32>], values: &[Vec<f32>]) -> (Vec<f32>, Vec<f32>) {
         let num_heads = self.config.num_heads;
@@ -122,17 +163,123 @@ impl MultiHeadAttention {
         let total_dim = num_heads * head_dim;
         let latent_dim = query.len();
         
-        // Project query: [latent_dim] -> [total_dim]
+        // Fast path for small number of keys (avoid rayon overhead)
+        if keys.len() <= 8 {
+            return self.forward_sequential(query, keys, values);
+        }
+        
+        // Fast query projection using SIMD
         let mut q_proj = vec![0.0f32; total_dim];
-        for i in 0..total_dim {
-            for j in 0..latent_dim.min(query.len()) {
-                if i * latent_dim + j < self.w_q.len() {
-                    q_proj[i] += query[j] * self.w_q[i * latent_dim + j];
+        self.fast_matvec(&self.w_q, query, &mut q_proj, latent_dim, total_dim);
+        
+        // Project keys and values in parallel using rayon
+        use rayon::prelude::*;
+        let projections: Vec<(Vec<f32>, Vec<f32>)> = keys.par_iter()
+            .zip(values.par_iter())
+            .map(|(key, value)| {
+                let mut k_proj = vec![0.0f32; total_dim];
+                let mut v_proj = vec![0.0f32; total_dim];
+                
+                // SIMD-friendly projection
+                for i in 0..total_dim {
+                    let row_start = i * latent_dim;
+                    let row_end = (row_start + latent_dim).min(self.w_k.len());
+                    if row_end > row_start {
+                        let k_slice = &self.w_k[row_start..row_end];
+                        let v_slice = &self.w_v[row_start..row_end.min(self.w_v.len())];
+                        let key_slice = &key[..k_slice.len().min(key.len())];
+                        let val_slice = &value[..v_slice.len().min(value.len())];
+                        k_proj[i] = Self::simd_dot_product(k_slice, key_slice);
+                        v_proj[i] = Self::simd_dot_product(v_slice, val_slice);
+                    }
                 }
+                (k_proj, v_proj)
+            })
+            .collect();
+        
+        let k_projs: Vec<Vec<f32>> = projections.iter().map(|(k, _)| k.clone()).collect();
+        let v_projs: Vec<Vec<f32>> = projections.iter().map(|(_, v)| v.clone()).collect();
+        
+        // Compute attention scores per head (parallelized)
+        let scale = (head_dim as f32).sqrt();
+        let num_keys = keys.len();
+        
+        // Parallel head computation
+        let head_outputs: Vec<(Vec<f32>, Vec<f32>)> = (0..num_heads)
+            .into_par_iter()
+            .map(|head| {
+                let head_start = head * head_dim;
+                let head_end = head_start + head_dim;
+                
+                // Compute attention scores for this head using SIMD
+                let scores: Vec<f32> = k_projs.iter()
+                    .map(|k| {
+                        let q_slice = &q_proj[head_start..head_end];
+                        let k_slice = &k[head_start..head_end];
+                        Self::simd_dot_product(q_slice, k_slice) / scale
+                    })
+                    .collect();
+                
+                // Softmax
+                let max_score = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                let exp_scores: Vec<f32> = scores.iter().map(|s| (s - max_score).exp()).collect();
+                let exp_sum: f32 = exp_scores.iter().sum();
+                let attn_weights: Vec<f32> = exp_scores.iter().map(|e| e / exp_sum.max(1e-8)).collect();
+                
+                // Weighted sum of values for this head
+                let mut head_output = vec![0.0f32; head_dim];
+                for (v, &w) in v_projs.iter().zip(attn_weights.iter()) {
+                    for i in 0..head_dim {
+                        head_output[i] += v[head_start + i] * w;
+                    }
+                }
+                
+                (head_output, attn_weights)
+            })
+            .collect();
+        
+        // Combine head outputs
+        let mut output = vec![0.0f32; total_dim];
+        let mut all_attn_weights = vec![0.0f32; num_keys];
+        
+        for (head, (head_output, attn_weights)) in head_outputs.into_iter().enumerate() {
+            let head_start = head * head_dim;
+            for (i, &val) in head_output.iter().enumerate() {
+                output[head_start + i] = val;
+            }
+            for (i, &w) in attn_weights.iter().enumerate() {
+                all_attn_weights[i] += w / num_heads as f32;
             }
         }
         
-        // Project keys and values
+        // Output projection using SIMD
+        let mut final_output = vec![0.0f32; latent_dim];
+        for i in 0..latent_dim {
+            let mut sum = 0.0f32;
+            for j in 0..total_dim {
+                let idx = j * latent_dim + i;
+                if idx < self.w_o.len() {
+                    sum += output[j] * self.w_o[idx];
+                }
+            }
+            final_output[i] = sum;
+        }
+        
+        (final_output, all_attn_weights)
+    }
+    
+    /// Sequential forward pass for small number of keys (avoids rayon overhead)
+    fn forward_sequential(&self, query: &[f32], keys: &[Vec<f32>], values: &[Vec<f32>]) -> (Vec<f32>, Vec<f32>) {
+        let num_heads = self.config.num_heads;
+        let head_dim = self.config.head_dim;
+        let total_dim = num_heads * head_dim;
+        let latent_dim = query.len();
+        
+        // Fast query projection using SIMD
+        let mut q_proj = vec![0.0f32; total_dim];
+        self.fast_matvec(&self.w_q, query, &mut q_proj, latent_dim, total_dim);
+        
+        // Project keys and values sequentially
         let mut k_projs: Vec<Vec<f32>> = Vec::with_capacity(keys.len());
         let mut v_projs: Vec<Vec<f32>> = Vec::with_capacity(values.len());
         
@@ -141,13 +288,15 @@ impl MultiHeadAttention {
             let mut v_proj = vec![0.0f32; total_dim];
             
             for i in 0..total_dim {
-                for j in 0..latent_dim.min(key.len()) {
-                    if i * latent_dim + j < self.w_k.len() {
-                        k_proj[i] += key[j] * self.w_k[i * latent_dim + j];
-                    }
-                    if i * latent_dim + j < self.w_v.len() {
-                        v_proj[i] += value[j] * self.w_v[i * latent_dim + j];
-                    }
+                let row_start = i * latent_dim;
+                let row_end = (row_start + latent_dim).min(self.w_k.len());
+                if row_end > row_start {
+                    let k_slice = &self.w_k[row_start..row_end];
+                    let v_slice = &self.w_v[row_start..row_end.min(self.w_v.len())];
+                    let key_slice = &key[..k_slice.len().min(key.len())];
+                    let val_slice = &value[..v_slice.len().min(value.len())];
+                    k_proj[i] = Self::simd_dot_product(k_slice, key_slice);
+                    v_proj[i] = Self::simd_dot_product(v_slice, val_slice);
                 }
             }
             k_projs.push(k_proj);
@@ -156,21 +305,20 @@ impl MultiHeadAttention {
         
         // Compute attention scores per head
         let scale = (head_dim as f32).sqrt();
-        let mut all_attn_weights = vec![0.0f32; keys.len()];
+        let num_keys = keys.len();
+        let mut all_attn_weights = vec![0.0f32; num_keys];
         let mut output = vec![0.0f32; total_dim];
         
         for head in 0..num_heads {
             let head_start = head * head_dim;
             let head_end = head_start + head_dim;
             
-            // Compute attention scores for this head
-            let mut scores: Vec<f32> = k_projs.iter()
+            // Compute attention scores for this head using SIMD
+            let scores: Vec<f32> = k_projs.iter()
                 .map(|k| {
-                    let mut dot = 0.0f32;
-                    for i in head_start..head_end {
-                        dot += q_proj[i] * k[i];
-                    }
-                    dot / scale
+                    let q_slice = &q_proj[head_start..head_end];
+                    let k_slice = &k[head_start..head_end];
+                    Self::simd_dot_product(q_slice, k_slice) / scale
                 })
                 .collect();
             
@@ -180,8 +328,8 @@ impl MultiHeadAttention {
             let exp_sum: f32 = exp_scores.iter().sum();
             let attn_weights: Vec<f32> = exp_scores.iter().map(|e| e / exp_sum.max(1e-8)).collect();
             
-            // Accumulate attention weights for output
-            for (i, w) in attn_weights.iter().enumerate() {
+            // Accumulate attention weights
+            for (i, &w) in attn_weights.iter().enumerate() {
                 all_attn_weights[i] += w / num_heads as f32;
             }
             
@@ -193,14 +341,17 @@ impl MultiHeadAttention {
             }
         }
         
-        // Output projection: [total_dim] -> [latent_dim]
+        // Output projection using SIMD
         let mut final_output = vec![0.0f32; latent_dim];
         for i in 0..latent_dim {
+            let mut sum = 0.0f32;
             for j in 0..total_dim {
-                if j * latent_dim + i < self.w_o.len() {
-                    final_output[i] += output[j] * self.w_o[j * latent_dim + i];
+                let idx = j * latent_dim + i;
+                if idx < self.w_o.len() {
+                    sum += output[j] * self.w_o[idx];
                 }
             }
+            final_output[i] = sum;
         }
         
         (final_output, all_attn_weights)
