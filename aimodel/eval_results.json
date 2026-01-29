@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-29T01:41:47.586556300+00:00",
+  "timestamp": "2026-01-29T02:14:50.268115300+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 100,
@@ -14,11 +14,11 @@
   "task_results": [
     {
       "task": "mmlu",
-      "accuracy": 30.0,
-      "num_correct": 30,
+      "accuracy": 32.0,
+      "num_correct": 32,
       "total": 100,
-      "avg_confidence": 0.6956506,
-      "time_secs": 2.4500502,
+      "avg_confidence": 0.7111136,
+      "time_secs": 0.6459264,
       "wrong_samples": []
     },
     {
@@ -26,8 +26,8 @@
       "accuracy": 26.0,
       "num_correct": 26,
       "total": 100,
-      "avg_confidence": 0.69642454,
-      "time_secs": 6.2014579,
+      "avg_confidence": 0.7086483,
+      "time_secs": 1.1028976,
       "wrong_samples": []
     },
     {
@@ -35,8 +35,8 @@
       "accuracy": 15.0,
       "num_correct": 15,
       "total": 100,
-      "avg_confidence": 0.80357087,
-      "time_secs": 5.8040257,
+      "avg_confidence": 0.8097775,
+      "time_secs": 1.113666,
       "wrong_samples": []
     },
     {
@@ -44,8 +44,8 @@
       "accuracy": 31.0,
       "num_correct": 31,
       "total": 100,
-      "avg_confidence": 0.8960373,
-      "time_secs": 5.6242911,
+      "avg_confidence": 0.90252715,
+      "time_secs": 1.5443582,
       "wrong_samples": []
     },
     {
@@ -54,16 +54,16 @@
       "num_correct": 20,
       "total": 100,
       "avg_confidence": 0.69078964,
-      "time_secs": 2.8446169,
+      "time_secs": 1.0305309,
       "wrong_samples": []
     },
     {
       "task": "humaneval",
-      "accuracy": 83.0,
-      "num_correct": 83,
+      "accuracy": 84.0,
+      "num_correct": 84,
       "total": 100,
-      "avg_confidence": 0.97601783,
-      "time_secs": 4.5833741,
+      "avg_confidence": 0.9786055,
+      "time_secs": 2.1921457,
       "wrong_samples": []
     },
     {
@@ -71,17 +71,17 @@
       "accuracy": 19.0,
       "num_correct": 19,
       "total": 100,
-      "avg_confidence": 0.8160769,
-      "time_secs": 4.2311630000000005,
+      "avg_confidence": 0.81793565,
+      "time_secs": 1.8089363,
       "wrong_samples": []
     },
     {
       "task": "squad",
-      "accuracy": 11.0,
-      "num_correct": 11,
+      "accuracy": 10.0,
+      "num_correct": 10,
       "total": 100,
-      "avg_confidence": 0.86199623,
-      "time_secs": 3.4345684,
+      "avg_confidence": 0.8671564,
+      "time_secs": 1.5768941,
       "wrong_samples": []
     },
     {
@@ -90,7 +90,7 @@
       "num_correct": 84,
       "total": 100,
       "avg_confidence": 0.9079658,
-      "time_secs": 1.9511756,
+      "time_secs": 1.4465154,
       "wrong_samples": []
     },
     {
@@ -99,7 +99,7 @@
       "num_correct": 72,
       "total": 100,
       "avg_confidence": 0.87394875,
-      "time_secs": 2.0099756,
+      "time_secs": 1.511072,
       "wrong_samples": []
     },
     {
@@ -108,7 +108,7 @@
       "num_correct": 85,
       "total": 100,
       "avg_confidence": 0.82391965,
-      "time_secs": 2.1184119,
+      "time_secs": 1.5695048,
       "wrong_samples": []
     },
     {
@@ -117,7 +117,7 @@
       "num_correct": 78,
       "total": 100,
       "avg_confidence": 0.9786173,
-      "time_secs": 1.9851293,
+      "time_secs": 1.4757879,
       "wrong_samples": []
     },
     {
@@ -126,14 +126,14 @@
       "num_correct": 100,
       "total": 100,
       "avg_confidence": 1.0,
-      "time_secs": 2.7061931,
+      "time_secs": 2.0892338,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 654,
+    "total_correct": 656,
     "total_questions": 1300,
-    "overall_accuracy": 50.30769230769231,
-    "total_time_secs": 46.0011307
+    "overall_accuracy": 50.46153846153846,
+    "total_time_secs": 38.1193648
   }
 }
