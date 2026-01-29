@@ -20,7 +20,7 @@ pub use thinking::{ThinkingEngine, Thought, ThoughtChain, ThinkingConfig, Though
 pub use memory::{MemoryStore, Memory, MemoryType, MemoryQuery};
 pub use constitution::{Constitution, Principle, ConstitutionalGuard};
 pub use rag::{RAGEngine, RAGConfig, RetrievedContext, Document};
-pub use vortex_runner::{VortexRunner, VortexState, Subject, FluxNode, LadderEntry, SourceType};
+pub use vortex_runner::{VortexRunner, VortexState, Subject, FluxNode, LadderEntry, SourceType, SharedCALM};
 pub use tools::{Tool, ToolRegistry, ToolCall, ToolResult, ToolType};
 pub use atman::{Atman, AtmanConfig, AtmanSearchResult, DiscoveredImpl, ImplType};
 pub use verified_patterning::{

@@ -277,6 +277,9 @@ impl LadderEntry {
     }
 }
 
+/// Shared CALM engine type for unified embedding access across components
+pub type SharedCALM = Arc<RwLock<CALMEngine>>;
+
 /// Continuous Vortex Runner
 pub struct VortexRunner {
     /// Current cycle count (resets at u64::MAX)
@@ -285,8 +288,8 @@ pub struct VortexRunner {
     pub subjects: Arc<RwLock<HashMap<String, Subject>>>,
     /// Ladder index for ranking
     pub ladder: Arc<RwLock<Vec<LadderEntry>>>,
-    /// CALM engine for latent space operations
-    pub calm: CALMEngine,
+    /// CALM engine for latent space operations (shared across components)
+    pub calm: SharedCALM,
     /// Global accumulated latent state
     pub global_latent: Arc<RwLock<LatentState>>,
     /// Learning rate for reinforcement
@@ -327,19 +330,31 @@ impl VortexRunner {
 
     /// Create with custom storage path
     pub fn with_store_path(path: &str) -> Self {
+        let calm = Arc::new(RwLock::new(CALMEngine::new(CALMConfig::new().with_latent_dim(256))));
+        Self::with_shared_calm(path, calm)
+    }
+    
+    /// Create with a shared CALM engine (for unified embedding access)
+    /// This allows multiple components to share the same knowledge base
+    pub fn with_shared_calm(path: &str, calm: SharedCALM) -> Self {
         let flux_store = FluxStore::new(FluxStoreConfig::new(path));
         Self {
             cycle: 0,
             subjects: Arc::new(RwLock::new(HashMap::new())),
             ladder: Arc::new(RwLock::new(Vec::new())),
-            calm: CALMEngine::new(CALMConfig::new().with_latent_dim(128)),
-            global_latent: Arc::new(RwLock::new(LatentState::new(128))),
+            calm,
+            global_latent: Arc::new(RwLock::new(LatentState::new(256))),
             learning_rate: 0.1,
             next_entry_id: Arc::new(RwLock::new(0)),
             source_memory: Arc::new(RwLock::new(Vec::new())),
             flux_store: Arc::new(RwLock::new(flux_store)),
             tools: Arc::new(RwLock::new(ToolRegistry::new())),
         }
+    }
+    
+    /// Get a clone of the shared CALM reference (for passing to other components)
+    pub fn get_shared_calm(&self) -> SharedCALM {
+        Arc::clone(&self.calm)
     }
 
     /// Execute a tool and learn from the result
@@ -395,22 +410,31 @@ impl VortexRunner {
             global.step as u64
         };
 
-        // Encode input to latent space
-        let mut latent = self.calm.encode(input_beams);
+        // Encode input to latent space (using shared CALM)
+        let mut latent = {
+            let calm = self.calm.read().await;
+            calm.encode(input_beams)
+        };
 
         // Vortex cycle: 1 → 2 → 4 → 8 → 7 → 5 → 1 (exponential doubling, then halving)
         let vortex_positions = [1u8, 2, 4, 8, 7, 5];
 
         for &pos in &vortex_positions {
             // Evolve latent at each position
-            latent = self.calm.predict_next(&latent);
+            {
+                let calm = self.calm.read().await;
+                latent = calm.predict_next(&latent);
+            }
 
             // Decode to beams at this position
-            let position_beams = self.calm.decode(&latent);
+            let position_beams = {
+                let calm = self.calm.read().await;
+                calm.decode(&latent)
+            };
 
             // Evaluate all subjects at this position
             let subjects = self.subjects.read().await;
-            for (subject_name, subject) in subjects.iter() {
+            for (_subject_name, subject) in subjects.iter() {
                 if let Some(node_or_guide) = subject.get_at_position(pos) {
                     // Think with node title
                     self.evaluate_at_position(&node_or_guide, &position_beams, &latent, cycle as u64).await;
@@ -420,13 +444,17 @@ impl VortexRunner {
 
         // Sacred checkpoints: 3, 6, 9
         for &sacred_pos in &[3u8, 6, 9] {
-            latent = self.calm.predict_next(&latent);
+            {
+                let calm = self.calm.read().await;
+                latent = calm.predict_next(&latent);
+            }
 
             // Sacred positions have stronger anchor pull
             latent.sacred_alignment = (latent.sacred_alignment + 0.1).min(1.0);
 
             // Update ladder rankings at sacred positions
             self.update_ladder_rankings().await;
+            let _ = sacred_pos; // Suppress unused warning
         }
 
         // Accumulate into global latent
@@ -443,7 +471,10 @@ impl VortexRunner {
         }
 
         // Persist learned state to FluxStore
-        let output_beams = self.calm.decode(&latent);
+        let output_beams = {
+            let calm = self.calm.read().await;
+            calm.decode(&latent)
+        };
         if !output_beams.is_empty() {
             let state_id = format!("cycle_{}", cycle);
             let stored = StoredFluxState::new(state_id, output_beams)
@@ -461,10 +492,17 @@ impl VortexRunner {
     /// Run N cycles exponentially (2^n iterations)
     pub async fn run_exponential(&self, input_beams: &[BeamTensor], power: u32) -> LatentState {
         let iterations = 2u64.pow(power);
-        let mut latent = self.calm.encode(input_beams);
+        let mut latent = {
+            let calm = self.calm.read().await;
+            calm.encode(input_beams)
+        };
 
         for _ in 0..iterations {
-            latent = self.run_cycle(&self.calm.decode(&latent)).await;
+            let decoded = {
+                let calm = self.calm.read().await;
+                calm.decode(&latent)
+            };
+            latent = self.run_cycle(&decoded).await;
 
             // Early exit if energy drops too low
             if latent.energy < 0.01 {
@@ -480,8 +518,8 @@ impl VortexRunner {
         &self,
         node_or_guide: &NodeOrGuide,
         beams: &[BeamTensor],
-        latent: &LatentState,
-        cycle: u64,
+        _latent: &LatentState,
+        _cycle: u64,
     ) {
         match node_or_guide {
             NodeOrGuide::Node(node) => {
@@ -492,8 +530,11 @@ impl VortexRunner {
                     .cloned()
                     .collect();
 
-                // Encode combined for evaluation
-                let eval_latent = self.calm.encode(&combined);
+                // Encode combined for evaluation (using shared CALM)
+                let eval_latent = {
+                    let calm = self.calm.read().await;
+                    calm.encode(&combined)
+                };
 
                 // Calculate reward based on energy alignment
                 let reward = eval_latent.energy - 0.5; // Positive if above average
@@ -734,7 +775,10 @@ impl VortexRunner {
 
                 // Get accumulated latent and run a cycle
                 let global = runner.global_latent.read().await;
-                let beams = runner.calm.decode(&global);
+                let beams = {
+                    let calm = runner.calm.read().await;
+                    calm.decode(&global)
+                };
                 drop(global);
 
                 if !beams.is_empty() {
@@ -758,7 +802,10 @@ impl VortexRunner {
         
         while start.elapsed() < duration {
             let global = self.global_latent.read().await;
-            let beams = self.calm.decode(&global);
+            let beams = {
+                let calm = self.calm.read().await;
+                calm.decode(&global)
+            };
             drop(global);
 
             if !beams.is_empty() {
@@ -774,7 +821,10 @@ impl VortexRunner {
     pub async fn run_n_cycles(&self, n: u64) {
         for _ in 0..n {
             let global = self.global_latent.read().await;
-            let beams = self.calm.decode(&global);
+            let beams = {
+                let calm = self.calm.read().await;
+                calm.decode(&global)
+            };
             drop(global);
 
             if !beams.is_empty() {
@@ -819,9 +869,13 @@ impl VortexRunner {
             trainer.update_patterns(verified_patterns);
 
             // Run training session with CALM-based loss
-            let calm = &self.calm;
+            // Get a snapshot of CALM for the sync closure
+            let calm_snapshot = {
+                let calm_guard = self.calm.blocking_read();
+                calm_guard.clone()
+            };
             let result = trainer.train_session(&training_data, |batch, lr| {
-                self.compute_batch_loss(batch, calm, lr)
+                self.compute_batch_loss(batch, &calm_snapshot, lr)
             });
 
             // Verify training before reinforcing
