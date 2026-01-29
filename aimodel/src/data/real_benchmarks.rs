@@ -970,6 +970,12 @@ pub struct RealBenchmarkEvaluator {
     quantum_jepa: crate::ml::jepa::QuantumJEPAOptimizer,
     /// Transitive Flux Reasoner for spatial/size reasoning with ladder index
     transitive_reasoner: crate::ml::transitive_flux::TransitiveFluxReasoner,
+    /// Comprehensive Reasoner for temporal state, multi-hop, span extraction, math
+    comprehensive_reasoner: crate::ml::reasoning_engine::ComprehensiveReasoner,
+    /// Unified Inference Engine - single forward pass, no competing experts
+    unified_engine: crate::ml::unified_inference::UnifiedInferenceEngine,
+    /// Whether to use unified inference (true) or multi-expert voting (false)
+    use_unified_inference: bool,
 }
 
 impl RealBenchmarkEvaluator {
@@ -1034,6 +1040,11 @@ impl RealBenchmarkEvaluator {
             use_generative_mode: true, // Enable generative mode by default
             quantum_jepa: crate::ml::jepa::QuantumJEPAOptimizer::new(JEPAConfig::default()),
             transitive_reasoner: crate::ml::transitive_flux::TransitiveFluxReasoner::new(256),
+            comprehensive_reasoner: crate::ml::reasoning_engine::ComprehensiveReasoner::new(),
+            unified_engine: crate::ml::unified_inference::UnifiedInferenceEngine::new(
+                crate::ml::unified_inference::UnifiedConfig::default()
+            ),
+            use_unified_inference: true, // Use unified inference by default
         };
         
         // Load all HuggingFace datasets to bootstrap knowledge
@@ -2378,6 +2389,29 @@ impl RealBenchmarkEvaluator {
     fn generative_inference(&mut self, question: &RealBenchmarkQuestion) -> (usize, f32) {
         use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig};
         
+        // =================================================================
+        // UNIFIED INFERENCE: Single forward pass through reasoning layer
+        // Replaces 18+ competing experts with one coherent model
+        // =================================================================
+        if self.use_unified_inference {
+            // Split question into context and actual question
+            let parts: Vec<&str> = question.question.split('\n').collect();
+            let (context, q_text) = if parts.len() > 1 {
+                let q = parts.last().unwrap_or(&"");
+                let ctx = parts[..parts.len()-1].join("\n");
+                (ctx, q.to_string())
+            } else {
+                (String::new(), question.question.clone())
+            };
+            
+            let (answer_idx, confidence) = self.unified_engine.infer(
+                &context,
+                &q_text,
+                &question.choices,
+            );
+            return (answer_idx, confidence);
+        }
+        
         let question_text = &question.question;
         let question_lower = question_text.to_lowercase();
         
@@ -2406,6 +2440,11 @@ impl RealBenchmarkEvaluator {
         // Uses Vortex Flux Matrix ladder index for transitive chains
         // =================================================================
         self.transitive_reasoner.extract_relations(&question_lower);
+        
+        // =================================================================
+        // COMPREHENSIVE REASONING: Temporal state, multi-hop, span, math
+        // =================================================================
+        self.comprehensive_reasoner.process_context(&question_lower);
         
         // Tokenize question
         let question_words: Vec<&str> = question_lower
@@ -2589,6 +2628,14 @@ impl RealBenchmarkEvaluator {
                     score += 20.0;
                 }
             }
+            
+            // ----- EXPERT 18: COMPREHENSIVE REASONING -----
+            // Temporal state tracking, multi-hop reasoning, span extraction, symbolic math
+            let comprehensive_score = self.comprehensive_reasoner.score_answer(
+                question_text,
+                &choice_lower,
+            );
+            score += comprehensive_score;
             
             logits.push(score);
         }

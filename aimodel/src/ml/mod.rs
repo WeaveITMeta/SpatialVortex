@@ -29,6 +29,10 @@ pub mod generative_arch;
 pub mod transitive_flux;
 pub mod flux_object_macro;
 pub mod flux_compression_sota;
+pub mod reasoning_engine;
+pub mod unified_inference;
+pub mod recursive_chains;
+pub mod conceptual_agglomeration;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
@@ -51,7 +55,10 @@ pub use jepa::{
     HierarchicalDeductionEngine, DeductionRules, DeductionStep,
     jepa_mse_loss, jepa_infonce_loss, QuantumJEPAOptimizer,
 };
-pub use transitive_flux::TransitiveFluxReasoner;
+pub use transitive_flux::{
+    TransitiveFluxReasoner, TransitiveRelation,
+    CountingMode, GraphPath, ExtractedContext,
+};
 pub use neuro_symbolic::{
     LogicTensorNetwork, RuleEmbedding,
     NeuralTheoremProver, ProofResult, ProofStep,
@@ -102,4 +109,18 @@ pub use flux_object_macro::{
     has_cross_ref, set_cross_ref,
     has_reversal_flag, set_reversal_flag,
     extract_elp_component, pack_adjusted_confidence,
+};
+pub use reasoning_engine::{
+    TemporalStateTracker, TemporalFact, Polarity,
+    MultiHopReasoner, ReasoningChain,
+    SpanExtractor,
+    SymbolicMathEngine, MathOp,
+    ComprehensiveReasoner,
+};
+pub use recursive_chains::{SNOATNode, SNOATChain, ChainPathwayReasoner};
+pub use conceptual_agglomeration::{
+    ConceptNode, ConceptGraph, ConceptualReasoner,
+    ConceptRef, ConceptRelation, ConceptRelationType,
+    ResolvedAttributes, ResolvedValue,
+    SACRED_DEPTH, CONFIDENCE_DECAY, CONCEPT_LATENT_DIM,
 };
