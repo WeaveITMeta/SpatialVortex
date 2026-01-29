@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-29T00:56:00.707409700+00:00",
+  "timestamp": "2026-01-29T01:41:47.586556300+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 100,
@@ -14,38 +14,38 @@
   "task_results": [
     {
       "task": "mmlu",
-      "accuracy": 27.0,
-      "num_correct": 27,
+      "accuracy": 30.0,
+      "num_correct": 30,
       "total": 100,
-      "avg_confidence": 0.6131144,
-      "time_secs": 1.3908112,
+      "avg_confidence": 0.6956506,
+      "time_secs": 2.4500502,
       "wrong_samples": []
     },
     {
       "task": "gsm8k",
-      "accuracy": 27.0,
-      "num_correct": 27,
+      "accuracy": 26.0,
+      "num_correct": 26,
       "total": 100,
-      "avg_confidence": 0.6985199,
-      "time_secs": 0.9104345,
+      "avg_confidence": 0.69642454,
+      "time_secs": 6.2014579,
       "wrong_samples": []
     },
     {
       "task": "arc",
-      "accuracy": 25.0,
-      "num_correct": 25,
+      "accuracy": 15.0,
+      "num_correct": 15,
       "total": 100,
-      "avg_confidence": 0.6135759,
-      "time_secs": 0.69558,
+      "avg_confidence": 0.80357087,
+      "time_secs": 5.8040257,
       "wrong_samples": []
     },
     {
       "task": "hellaswag",
-      "accuracy": 28.000000000000004,
-      "num_correct": 28,
+      "accuracy": 31.0,
+      "num_correct": 31,
       "total": 100,
-      "avg_confidence": 0.7304966,
-      "time_secs": 0.8701801,
+      "avg_confidence": 0.8960373,
+      "time_secs": 5.6242911,
       "wrong_samples": []
     },
     {
@@ -53,71 +53,71 @@
       "accuracy": 20.0,
       "num_correct": 20,
       "total": 100,
-      "avg_confidence": 0.6476791,
-      "time_secs": 0.3417871,
+      "avg_confidence": 0.69078964,
+      "time_secs": 2.8446169,
       "wrong_samples": []
     },
     {
       "task": "humaneval",
-      "accuracy": 70.0,
-      "num_correct": 70,
+      "accuracy": 83.0,
+      "num_correct": 83,
       "total": 100,
-      "avg_confidence": 0.7340263,
-      "time_secs": 1.2339348,
+      "avg_confidence": 0.97601783,
+      "time_secs": 4.5833741,
       "wrong_samples": []
     },
     {
       "task": "commonsenseqa",
-      "accuracy": 23.0,
-      "num_correct": 23,
+      "accuracy": 19.0,
+      "num_correct": 19,
       "total": 100,
-      "avg_confidence": 0.60539746,
-      "time_secs": 0.6357734,
+      "avg_confidence": 0.8160769,
+      "time_secs": 4.2311630000000005,
       "wrong_samples": []
     },
     {
       "task": "squad",
-      "accuracy": 14.000000000000002,
-      "num_correct": 14,
+      "accuracy": 11.0,
+      "num_correct": 11,
       "total": 100,
-      "avg_confidence": 0.6546844,
-      "time_secs": 0.4930751,
+      "avg_confidence": 0.86199623,
+      "time_secs": 3.4345684,
       "wrong_samples": []
     },
     {
       "task": "babi1",
-      "accuracy": 83.0,
-      "num_correct": 83,
+      "accuracy": 84.0,
+      "num_correct": 84,
       "total": 100,
-      "avg_confidence": 0.9046998,
-      "time_secs": 0.3823241,
+      "avg_confidence": 0.9079658,
+      "time_secs": 1.9511756,
       "wrong_samples": []
     },
     {
       "task": "babi2",
-      "accuracy": 85.0,
-      "num_correct": 85,
+      "accuracy": 72.0,
+      "num_correct": 72,
       "total": 100,
-      "avg_confidence": 0.77799493,
-      "time_secs": 0.3896225,
+      "avg_confidence": 0.87394875,
+      "time_secs": 2.0099756,
       "wrong_samples": []
     },
     {
       "task": "babi3",
-      "accuracy": 86.0,
-      "num_correct": 86,
+      "accuracy": 85.0,
+      "num_correct": 85,
       "total": 100,
-      "avg_confidence": 0.79395694,
-      "time_secs": 0.4773079,
+      "avg_confidence": 0.82391965,
+      "time_secs": 2.1184119,
       "wrong_samples": []
     },
     {
       "task": "babi15",
-      "accuracy": 20.0,
-      "num_correct": 20,
+      "accuracy": 78.0,
+      "num_correct": 78,
       "total": 100,
-      "avg_confidence": 0.7054634,
-      "time_secs": 0.4009346,
+      "avg_confidence": 0.9786173,
+      "time_secs": 1.9851293,
       "wrong_samples": []
     },
     {
@@ -126,14 +126,14 @@
       "num_correct": 100,
       "total": 100,
       "avg_confidence": 1.0,
-      "time_secs": 0.9264404,
+      "time_secs": 2.7061931,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 608,
+    "total_correct": 654,
     "total_questions": 1300,
-    "overall_accuracy": 46.76923076923077,
-    "total_time_secs": 9.1599528
+    "overall_accuracy": 50.30769230769231,
+    "total_time_secs": 46.0011307
   }
 }

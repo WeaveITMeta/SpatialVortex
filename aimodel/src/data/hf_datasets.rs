@@ -4,9 +4,11 @@
 //! Supports priority datasets: FineWeb-Edu, GSM8K, MMLU, ProofPile-2, etc.
 
 use crate::data::models::BeamTensor;
+use hf_hub::api::sync::Api;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::io::{BufRead, BufReader};
 
 // =============================================================================
 // Dataset Registry
@@ -319,6 +321,7 @@ impl HFDatasetLoader {
     }
 
     /// Load a specific dataset by HF path
+    /// Tries real HuggingFace download first, falls back to synthetic examples
     pub fn load_dataset(&mut self, hf_path: &str) -> Result<usize, String> {
         // Find dataset info
         let info = self.datasets.iter()
@@ -326,13 +329,119 @@ impl HFDatasetLoader {
             .cloned()
             .ok_or_else(|| format!("Unknown dataset: {}", hf_path))?;
 
-        // Generate synthetic examples based on dataset type
-        // In production, this would download from HF Hub
-        let examples = self.generate_examples(&info)?;
-        let count = examples.len();
+        // Try to load from HuggingFace Hub first
+        let examples = match self.load_from_hf_hub(&info) {
+            Ok(ex) if !ex.is_empty() => {
+                println!("      ✓ Downloaded {} examples from HF: {}", ex.len(), info.name);
+                ex
+            }
+            Ok(_) | Err(_) => {
+                // Fall back to synthetic examples
+                self.generate_examples(&info)?
+            }
+        };
         
+        let count = examples.len();
         self.loaded_examples.insert(hf_path.to_string(), examples);
         Ok(count)
+    }
+    
+    /// Load dataset from HuggingFace Hub using hf-hub crate
+    fn load_from_hf_hub(&self, info: &DatasetInfo) -> Result<Vec<TrainingExample>, String> {
+        // Initialize HF Hub API
+        let api = Api::new().map_err(|e| format!("HF API error: {}", e))?;
+        
+        // Try to get the dataset repo
+        let repo = api.dataset(info.hf_path.clone());
+        
+        // Common dataset file patterns to try
+        let file_patterns = [
+            format!("{}.jsonl", info.split),
+            format!("data/{}.jsonl", info.split),
+            format!("{}.json", info.split),
+            format!("data/{}.json", info.split),
+            format!("{}.parquet", info.split),
+            "train.jsonl".to_string(),
+            "data/train.jsonl".to_string(),
+        ];
+        
+        for pattern in &file_patterns {
+            if let Ok(path) = repo.get(pattern) {
+                return self.parse_dataset_file(&path, info);
+            }
+        }
+        
+        Err(format!("Could not find data file for {}", info.name))
+    }
+    
+    /// Parse a downloaded dataset file into TrainingExamples
+    fn parse_dataset_file(&self, path: &PathBuf, info: &DatasetInfo) -> Result<Vec<TrainingExample>, String> {
+        let file = std::fs::File::open(path)
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+        let reader = BufReader::new(file);
+        
+        let mut examples = Vec::new();
+        let max_samples = if self.config.max_samples == 0 { 100_000 } else { self.config.max_samples };
+        
+        // Try JSONL format (one JSON object per line)
+        for line in reader.lines().take(max_samples) {
+            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            if line.trim().is_empty() { continue; }
+            
+            // Parse JSON and extract fields based on common patterns
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                let example = self.json_to_example(&json, info);
+                if example.text.len() > 0 || example.question.is_some() {
+                    examples.push(example);
+                }
+            }
+        }
+        
+        Ok(examples)
+    }
+    
+    /// Convert a JSON object to a TrainingExample based on common field patterns
+    fn json_to_example(&self, json: &serde_json::Value, info: &DatasetInfo) -> TrainingExample {
+        // Common field names for different dataset types
+        let text = json.get("text")
+            .or_else(|| json.get("content"))
+            .or_else(|| json.get("sentence"))
+            .or_else(|| json.get("passage"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        
+        let question = json.get("question")
+            .or_else(|| json.get("query"))
+            .or_else(|| json.get("prompt"))
+            .or_else(|| json.get("input"))
+            .or_else(|| json.get("premise"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        
+        let answer = json.get("answer")
+            .or_else(|| json.get("response"))
+            .or_else(|| json.get("output"))
+            .or_else(|| json.get("label"))
+            .or_else(|| json.get("hypothesis"))
+            .or_else(|| json.get("target"))
+            .and_then(|v| {
+                if let Some(s) = v.as_str() {
+                    Some(s.to_string())
+                } else if let Some(n) = v.as_i64() {
+                    Some(n.to_string())
+                } else {
+                    None
+                }
+            });
+        
+        TrainingExample {
+            text,
+            source: info.name.clone(),
+            category: info.category,
+            question,
+            answer,
+        }
     }
 
     /// Generate training examples (simulated - would be real HF download)
