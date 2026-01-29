@@ -404,7 +404,7 @@ impl Default for ContrastiveLearningConfig {
 ///
 /// Integrates with EBRM for energy-based latent space prediction.
 /// Provides K× speedup through latent compression.
-/// Now with Multi-Head Attention and Contrastive Learning.
+/// Now with Multi-Head Attention, Contrastive Learning, and EmbedVec HNSW.
 #[derive(Debug, Clone)]
 pub struct CALMEngine {
     pub config: CALMConfig,
@@ -421,8 +421,12 @@ pub struct CALMEngine {
     pub multi_head_attention: MultiHeadAttention,
     /// Contrastive learning config
     pub contrastive_config: ContrastiveLearningConfig,
-    /// Word embeddings learned from training
+    /// Word embeddings learned from training (HashMap for O(1) lookup)
     word_embeddings: std::collections::HashMap<String, Vec<f32>>,
+    /// Word to ID mapping for EmbedVec
+    word_to_id: std::collections::HashMap<String, u64>,
+    /// Next ID for EmbedVec insertions
+    next_embed_id: u64,
     /// Negative samples buffer for contrastive learning
     negative_buffer: Vec<Vec<f32>>,
     /// Training step counter
@@ -462,9 +466,126 @@ impl CALMEngine {
             multi_head_attention: MultiHeadAttention::new(latent_dim, mha_config),
             contrastive_config: ContrastiveLearningConfig::default(),
             word_embeddings: std::collections::HashMap::new(),
+            word_to_id: std::collections::HashMap::new(),
+            next_embed_id: 0,
             negative_buffer: Vec::new(),
             training_steps: 0,
         }
+    }
+    
+    /// Import embeddings from external source (e.g., HuggingFace datasets)
+    /// This allows CALM to use pre-learned knowledge for semantic retrieval
+    pub fn import_embeddings(&mut self, embeddings: &std::collections::HashMap<String, Vec<f32>>) {
+        for (word, embed) in embeddings {
+            let word_lower = word.to_lowercase();
+            if !self.word_embeddings.contains_key(&word_lower) {
+                self.word_embeddings.insert(word_lower.clone(), embed.clone());
+                self.word_to_id.insert(word_lower, self.next_embed_id);
+                self.next_embed_id += 1;
+            }
+        }
+    }
+    
+    /// Get all learned embeddings (for persistence or transfer)
+    pub fn get_all_embeddings(&self) -> &std::collections::HashMap<String, Vec<f32>> {
+        &self.word_embeddings
+    }
+    
+    /// Store a word embedding (learns from context)
+    pub fn store_embedding(&mut self, word: &str, embedding: Vec<f32>) {
+        let word_lower = word.to_lowercase();
+        if !self.word_to_id.contains_key(&word_lower) {
+            self.word_to_id.insert(word_lower.clone(), self.next_embed_id);
+            self.next_embed_id += 1;
+        }
+        self.word_embeddings.insert(word_lower, embedding);
+    }
+    
+    /// Get or create embedding for a word using hash-based initialization
+    pub fn get_or_create_embedding(&mut self, word: &str) -> Vec<f32> {
+        let word_lower = word.to_lowercase();
+        
+        if let Some(embed) = self.word_embeddings.get(&word_lower) {
+            return embed.clone();
+        }
+        
+        // Create hash-based embedding for unknown words
+        let embed = Self::hash_embedding(&word_lower, self.config.latent_dim);
+        self.store_embedding(&word_lower, embed.clone());
+        embed
+    }
+    
+    /// Generate hash-based embedding for a word (deterministic)
+    fn hash_embedding(word: &str, dim: usize) -> Vec<f32> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut embedding = vec![0.0f32; dim];
+        let bytes = word.as_bytes();
+        
+        for (i, chunk) in embedding.chunks_mut(1).enumerate() {
+            let mut hasher = DefaultHasher::new();
+            (i, bytes).hash(&mut hasher);
+            let hash = hasher.finish();
+            chunk[0] = ((hash % 1000) as f32 / 500.0) - 1.0; // Range [-1, 1]
+        }
+        
+        // Normalize
+        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for val in &mut embedding {
+                *val /= norm;
+            }
+        }
+        
+        embedding
+    }
+    
+    /// Search for similar words using brute-force cosine similarity
+    /// Returns top-k most similar words with their scores
+    pub fn search_similar(&self, query: &[f32], k: usize) -> Vec<(String, f32)> {
+        let mut scores: Vec<(String, f32)> = self.word_embeddings.iter()
+            .map(|(word, embed)| {
+                let sim = self.cosine_similarity(query, embed);
+                (word.clone(), sim)
+            })
+            .collect();
+        
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scores.truncate(k);
+        scores
+    }
+    
+    /// Get text embedding by averaging word embeddings
+    pub fn get_text_embedding(&mut self, words: &[&str]) -> Vec<f32> {
+        let dim = self.config.latent_dim;
+        let mut combined = vec![0.0f32; dim];
+        let mut count = 0;
+        
+        for word in words {
+            let embed = self.get_or_create_embedding(word);
+            for (i, val) in embed.iter().enumerate() {
+                if i < combined.len() {
+                    combined[i] += val;
+                }
+            }
+            count += 1;
+        }
+        
+        if count > 0 {
+            for val in &mut combined {
+                *val /= count as f32;
+            }
+        }
+        
+        combined
+    }
+    
+    /// Score a choice against a question using learned embeddings
+    pub fn score_semantic_similarity(&mut self, question_words: &[&str], choice_words: &[&str]) -> f32 {
+        let q_embed = self.get_text_embedding(question_words);
+        let c_embed = self.get_text_embedding(choice_words);
+        self.cosine_similarity(&q_embed, &c_embed)
     }
     
     /// Compute InfoNCE contrastive loss

@@ -1216,6 +1216,11 @@ impl RealBenchmarkEvaluator {
                     .or_insert_with(|| Self::simple_concept_embedding(&word_lower));
             }
         }
+        
+        // CRITICAL: Sync all learned embeddings to CALM engine
+        // This unifies the knowledge base - CALM becomes the single source of truth
+        self.calm_engine.import_embeddings(&self.learned_embeddings);
+        println!("   Synced {} embeddings to CALM engine", self.learned_embeddings.len());
     }
     
     /// Initialize commonsense knowledge for CommonsenseQA-style questions
@@ -1679,14 +1684,63 @@ impl RealBenchmarkEvaluator {
         score
     }
     
-    /// Get embedding using learned embeddings (falls back to hash-based)
+    /// Score using CALM's semantic retrieval from unified knowledge base
+    /// This searches for similar concepts learned from HuggingFace datasets
+    fn score_with_calm_retrieval(&self, question_embedding: &[f32], choice_words: &[&str]) -> f32 {
+        let mut score = 0.0f32;
+        
+        // Search CALM's knowledge base for words similar to the question
+        let similar_to_question = self.calm_engine.search_similar(question_embedding, 10);
+        
+        // Boost score if choice words appear in similar concepts
+        for choice_word in choice_words {
+            let choice_lower = choice_word.to_lowercase();
+            for (similar_word, similarity) in &similar_to_question {
+                // Direct match or substring match
+                if similar_word == &choice_lower || similar_word.contains(&choice_lower) || choice_lower.contains(similar_word) {
+                    score += similarity * 8.0;
+                }
+            }
+        }
+        
+        // Also check if any similar words share semantic relationships
+        for (word1, sim1) in &similar_to_question {
+            for choice_word in choice_words {
+                // Check if the similar word and choice word are semantically related
+                // via shared prefixes/suffixes (morphological similarity)
+                if word1.len() > 4 && choice_word.len() > 4 {
+                    let prefix_match = word1.chars().take(4).collect::<String>() == 
+                                       choice_word.chars().take(4).collect::<String>();
+                    if prefix_match {
+                        score += sim1 * 3.0;
+                    }
+                }
+            }
+        }
+        
+        score
+    }
+    
+    /// Get embedding using CALM's unified embedding store
+    /// This delegates to CALM engine which is the single source of truth
     fn get_learned_embedding(&self, words: &[&str]) -> Vec<f32> {
+        // Use CALM's embeddings (read-only path for scoring)
+        let calm_embeds = self.calm_engine.get_all_embeddings();
+        
         let mut combined = vec![0.0f32; 256];
         let mut count = 0;
         
         for word in words {
             let word_lower = word.to_lowercase();
-            if let Some(embed) = self.learned_embeddings.get(&word_lower) {
+            if let Some(embed) = calm_embeds.get(&word_lower) {
+                for (i, &val) in embed.iter().enumerate() {
+                    if i < combined.len() {
+                        combined[i] += val;
+                    }
+                }
+                count += 1;
+            } else if let Some(embed) = self.learned_embeddings.get(&word_lower) {
+                // Fallback to local cache
                 for (i, &val) in embed.iter().enumerate() {
                     if i < combined.len() {
                         combined[i] += val;
@@ -2107,6 +2161,14 @@ impl RealBenchmarkEvaluator {
             if learned_score > 0.0 {
                 score += learned_score;
                 breakdown.push(("one_shot".to_string(), learned_score));
+            }
+            
+            // CALM SEMANTIC RETRIEVAL - Search for similar concepts in unified knowledge base
+            // This uses CALM's learned embeddings from HuggingFace datasets
+            let calm_score = self.score_with_calm_retrieval(&question_embedding, &choice_words);
+            if calm_score > 0.0 {
+                score += calm_score;
+                breakdown.push(("calm_retrieval".to_string(), calm_score));
             }
             
             // COMMONSENSE REASONING - Query learned world knowledge
