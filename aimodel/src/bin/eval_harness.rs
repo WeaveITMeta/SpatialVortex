@@ -8,7 +8,7 @@
 //!   cargo run --bin spatialvortex-eval --release --features gpu -- --tasks babi --limit 100
 //!   cargo run --bin spatialvortex-eval --release --features gpu -- --tasks all --output results.json
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -278,31 +278,22 @@ fn main() -> Result<()> {
 // =============================================================================
 
 fn run_training(evaluator: &mut RealBenchmarkEvaluator, epochs: usize) -> Result<()> {
-    // Load training data
+    // Load training data using default config
     let loader_config = DatasetLoaderConfig {
         cache_dir: "./hf_cache".into(),
-        max_samples_per_dataset: 100_000,
-        batch_size: 256,
+        max_samples: 10_000,
+        streaming: true,
         shuffle: true,
         seed: 42,
     };
     
-    let loader = HFDatasetLoader::new(loader_config);
-    let datasets = loader.load_priority_datasets(20);
+    let mut loader = HFDatasetLoader::new(loader_config);
+    let sample_count = loader.load_dataset("fineweb").unwrap_or(0);
     
-    println!("  Loaded {} datasets for training", datasets.len());
-    
-    // Convert to training pairs
-    let training_pairs: Vec<_> = datasets.iter()
-        .flat_map(|d| d.samples.iter().take(500))
-        .map(|s| (s.text.clone(), s.text.clone()))
-        .take(10000)
-        .collect();
-    
-    println!("  Created {} training pairs", training_pairs.len());
+    println!("  Loaded {} samples for training", sample_count);
     
     // Update evaluator with training stats
-    evaluator.set_training_stats(epochs, training_pairs.len());
+    evaluator.set_training_stats(epochs, sample_count);
     
     println!("  Training complete (simplified for eval harness)");
     
@@ -315,56 +306,56 @@ fn run_training(evaluator: &mut RealBenchmarkEvaluator, epochs: usize) -> Result
 
 fn evaluate_mmlu(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_mmlu(&args.data_dir, None)
-        .context("Failed to load MMLU")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load MMLU: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
     Ok(evaluator.evaluate("MMLU", &questions[..limit]))
 }
 
 fn evaluate_gsm8k(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_gsm8k(&args.data_dir)
-        .context("Failed to load GSM8K")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load GSM8K: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
     Ok(evaluator.evaluate("GSM8K", &questions[..limit]))
 }
 
 fn evaluate_arc(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_arc(&args.data_dir, true) // Challenge version
-        .context("Failed to load ARC")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load ARC: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
     Ok(evaluator.evaluate("ARC-Challenge", &questions[..limit]))
 }
 
 fn evaluate_hellaswag(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_hellaswag(&args.data_dir)
-        .context("Failed to load HellaSwag")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load HellaSwag: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
     Ok(evaluator.evaluate("HellaSwag", &questions[..limit]))
 }
 
 fn evaluate_truthfulqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_truthfulqa(&args.data_dir)
-        .context("Failed to load TruthfulQA")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load TruthfulQA: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
     Ok(evaluator.evaluate("TruthfulQA", &questions[..limit]))
 }
 
 fn evaluate_humaneval(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_humaneval(&args.data_dir)
-        .context("Failed to load HumanEval")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load HumanEval: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(164) };
     Ok(evaluator.evaluate("HumanEval", &questions[..limit]))
 }
 
 fn evaluate_swebench(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_swebench(&args.data_dir, true) // Use Lite version by default
-        .context("Failed to load SWE-Bench")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load SWE-Bench: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(300) };
     Ok(evaluator.evaluate("SWE-Bench Lite", &questions[..limit]))
 }
 
 fn evaluate_commonsenseqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_commonsenseqa(&args.data_dir)
-        .context("Failed to load CommonsenseQA")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load CommonsenseQA: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
     Ok(evaluator.evaluate("CommonsenseQA", &questions[..limit]))
 }
@@ -372,13 +363,13 @@ fn evaluate_commonsenseqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -
 fn evaluate_squad(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let limit = if args.limit > 0 { args.limit } else { 500 };
     let questions = load_squad(&args.data_dir, limit)
-        .context("Failed to load SQuAD")?;
+        .map_err(|e| anyhow::anyhow!("Failed to load SQuAD: {}", e))?;
     Ok(evaluator.evaluate("SQuAD 2.0", &questions))
 }
 
 fn evaluate_babi(evaluator: &mut RealBenchmarkEvaluator, task_num: usize, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_babi(&args.data_dir, task_num)
-        .context(format!("Failed to load bAbI task {}", task_num))?;
+        .map_err(|e| anyhow::anyhow!("Failed to load bAbI task {}: {}", task_num, e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
     Ok(evaluator.evaluate(&format!("bAbI Task {}", task_num), &questions[..limit]))
 }

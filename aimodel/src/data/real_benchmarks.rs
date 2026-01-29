@@ -266,7 +266,16 @@ pub fn load_mmlu(data_dir: &str, subject: Option<&str>) -> Result<Vec<RealBenchm
     let mut questions = Vec::new();
     
     // MMLU format: CSV with columns: question, A, B, C, D, answer
-    let test_dir = format!("{}/test", mmlu_dir);
+    // Try multiple paths (archive extracts to data/ subdirectory)
+    let possible_test_dirs = vec![
+        format!("{}/data/test", mmlu_dir),
+        format!("{}/test", mmlu_dir),
+    ];
+    
+    let test_dir = possible_test_dirs.iter()
+        .find(|p| Path::new(p).exists())
+        .ok_or_else(|| format!("MMLU test dir not found. Tried: {:?}", possible_test_dirs))?
+        .clone();
     if let Ok(entries) = fs::read_dir(&test_dir) {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().to_string();
@@ -370,10 +379,18 @@ pub fn load_gsm8k(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, String> 
 /// Load ARC benchmark (Challenge or Easy)
 pub fn load_arc(data_dir: &str, challenge: bool) -> Result<Vec<RealBenchmarkQuestion>, String> {
     let subset = if challenge { "ARC-Challenge" } else { "ARC-Easy" };
-    let arc_path = format!("{}/arc/{}/test.jsonl", data_dir, subset);
-    if !Path::new(&arc_path).exists() {
-        return Err(format!("ARC not found at {}. Run download_datasets.ps1", arc_path));
-    }
+    
+    // Try multiple possible paths (different archive structures)
+    let possible_paths = vec![
+        format!("{}/arc/ARC-V1-Feb2018-2/{}/{}-Test.jsonl", data_dir, subset, subset),
+        format!("{}/arc/{}/{}-Test.jsonl", data_dir, subset, subset),
+        format!("{}/arc/{}/test.jsonl", data_dir, subset),
+    ];
+    
+    let arc_path = possible_paths.iter()
+        .find(|p| Path::new(p).exists())
+        .ok_or_else(|| format!("ARC not found. Tried paths: {:?}. Run download_datasets.ps1", possible_paths))?
+        .clone();
     
     let mut questions = Vec::new();
     let content = fs::read_to_string(&arc_path)
@@ -381,35 +398,36 @@ pub fn load_arc(data_dir: &str, challenge: bool) -> Result<Vec<RealBenchmarkQues
     
     for (i, line) in content.lines().enumerate() {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-            let question = json.get("question").and_then(|v| v.as_str()).unwrap_or("");
+            // ARC format: {"question": {"stem": "...", "choices": [{"text": "...", "label": "A"}, ...]}, "answerKey": "C"}
+            let question_obj = json.get("question");
+            let question_stem = question_obj
+                .and_then(|q| q.get("stem"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let answer_key = json.get("answerKey").and_then(|v| v.as_str()).unwrap_or("A");
             
-            let choices_obj = json.get("choices").and_then(|v| v.as_object());
             let mut choices = Vec::new();
             let mut correct = 0;
             
-            if let Some(c) = choices_obj {
-                if let Some(labels) = c.get("label").and_then(|v| v.as_array()) {
-                    if let Some(texts) = c.get("text").and_then(|v| v.as_array()) {
-                        for (j, (label, text)) in labels.iter().zip(texts.iter()).enumerate() {
-                            let l = label.as_str().unwrap_or("");
-                            let t = text.as_str().unwrap_or("");
-                            choices.push(t.to_string());
-                            if l == answer_key {
-                                correct = j;
-                            }
-                        }
+            // Parse choices array from question.choices
+            if let Some(choices_arr) = question_obj.and_then(|q| q.get("choices")).and_then(|v| v.as_array()) {
+                for (j, choice) in choices_arr.iter().enumerate() {
+                    let label = choice.get("label").and_then(|v| v.as_str()).unwrap_or("");
+                    let text = choice.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                    choices.push(text.to_string());
+                    if label == answer_key {
+                        correct = j;
                     }
                 }
             }
             
-            if choices.is_empty() {
-                choices = vec!["A".to_string(), "B".to_string(), "C".to_string(), "D".to_string()];
+            if choices.is_empty() || question_stem.is_empty() {
+                continue; // Skip malformed entries
             }
             
             questions.push(RealBenchmarkQuestion {
                 id: format!("arc_{}_{}", if challenge { "c" } else { "e" }, i),
-                question: question.to_string(),
+                question: question_stem.to_string(),
                 choices,
                 correct_answer: correct,
                 category: "science".to_string(),

@@ -26,7 +26,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn, AttributeArgs};
+use syn::{parse_macro_input, ItemFn};
 
 // =============================================================================
 // RSI State (loaded at compile time)
@@ -120,9 +120,8 @@ fn parse_rsi_json(content: &str) -> Option<RSIConfig> {
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn rsi_optimized(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn rsi_optimized(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
-    let _attrs = parse_macro_input!(attr as AttributeArgs);
     
     // Load RSI config at compile time
     let config = load_rsi_config();
