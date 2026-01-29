@@ -347,6 +347,233 @@ impl JEPATrainer {
     }
 }
 
+// =============================================================================
+// QUANTUM-INSPIRED JEPA + EXHAUSTIVE PATHWAY SEARCH
+// =============================================================================
+//
+// Analogy to Grover's Algorithm:
+// - JEPA Predictor = Quantum Oracle (marks the target state)
+// - Exhaustive Pathway = Amplitude Amplification (searches all paths)
+// - Energy Function = Quantum Interference (constructive for correct paths)
+//
+// Key insight: JEPA predicts WHERE to go, Pathway finds HOW to get there optimally
+
+use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig, ScoredPathway};
+
+/// Quantum-inspired cognitive optimizer combining JEPA + Exhaustive Pathway
+#[derive(Debug)]
+pub struct QuantumJEPAOptimizer {
+    /// JEPA predictor (quantum oracle)
+    pub predictor: JEPAPredictor,
+    /// Hierarchical deduction engine
+    pub deduction_engine: HierarchicalDeductionEngine,
+    /// Configuration
+    pub config: JEPAConfig,
+    /// Energy function temperature
+    pub energy_temperature: f32,
+}
+
+impl QuantumJEPAOptimizer {
+    pub fn new(config: JEPAConfig) -> Self {
+        let predictor = JEPAPredictor::new(config.clone());
+        let deduction_engine = HierarchicalDeductionEngine::new(config.clone());
+        Self {
+            predictor,
+            deduction_engine,
+            config,
+            energy_temperature: 0.1,
+        }
+    }
+    
+    /// QUANTUM ORACLE: Predict target embedding from context
+    /// This is like marking the solution state in Grover's algorithm
+    pub fn predict_target(&self, context_embed: &[f32]) -> Vec<f32> {
+        self.predictor.forward(context_embed)
+    }
+    
+    /// AMPLITUDE AMPLIFICATION: Find optimal pathway to target
+    /// Uses exhaustive search over all n! permutations
+    pub fn find_optimal_pathway(
+        &self,
+        context_embed: &[f32],
+        choice_embeds: &[Vec<f32>],
+        node_embeds: &[Vec<f32>],
+    ) -> Vec<ScoredPathway> {
+        // Predict target using JEPA (quantum oracle)
+        let predicted_target = self.predict_target(context_embed);
+        
+        // Configure exhaustive pathway search
+        let mut pathway_config = PathwayConfig::default();
+        pathway_config.n_nodes = node_embeds.len().min(7); // Cap at 7! = 5040
+        pathway_config.dimension = self.config.embed_dim;
+        pathway_config.parallel = true; // GPU-like parallelism
+        
+        let mut optimizer = ExhaustivePathwayOptimizer::new(pathway_config);
+        optimizer.set_embeddings(node_embeds);
+        optimizer.set_target(&predicted_target);
+        
+        // Run exhaustive search (amplitude amplification)
+        optimizer.fast_search(choice_embeds.len())
+    }
+    
+    /// ENERGY FUNCTION: Compute energy for a (context, choice, path) triple
+    /// Low energy = good match (like constructive quantum interference)
+    pub fn compute_energy(
+        &self,
+        context_embed: &[f32],
+        choice_embed: &[f32],
+        predicted_target: &[f32],
+        pathway_score: f64,
+    ) -> f32 {
+        // E1: JEPA prediction error (how well does choice match predicted target?)
+        let jepa_error = jepa_mse_loss(choice_embed, predicted_target);
+        
+        // E2: Context-choice alignment
+        let alignment = 1.0 - cosine_similarity(context_embed, choice_embed).max(0.0);
+        
+        // E3: Pathway optimality (lower is better, so negate and normalize)
+        let pathway_energy = 1.0 / (1.0 + pathway_score.abs() as f32);
+        
+        // E4: Hierarchical deduction confidence
+        let deduction_steps = self.deduction_engine.deduce_hierarchical(choice_embed, 3);
+        let deduction_confidence: f32 = deduction_steps.iter()
+            .map(|s| s.confidence)
+            .sum::<f32>() / deduction_steps.len().max(1) as f32;
+        let deduction_energy = 1.0 - deduction_confidence;
+        
+        // Total energy (weighted sum)
+        let total_energy = 
+            0.4 * jepa_error +           // JEPA prediction match
+            0.2 * alignment +             // Context alignment
+            0.2 * pathway_energy +        // Pathway optimality
+            0.2 * deduction_energy;       // Deduction confidence
+        
+        total_energy
+    }
+    
+    /// QUANTUM SEARCH: Find best choice using JEPA + Exhaustive Pathway
+    /// Returns (best_choice_idx, confidence)
+    pub fn quantum_search(
+        &self,
+        context_embed: &[f32],
+        choice_embeds: &[Vec<f32>],
+    ) -> (usize, f32) {
+        // Step 1: JEPA predicts target (quantum oracle marks solution)
+        let predicted_target = self.predict_target(context_embed);
+        
+        // Step 2: For each choice, compute energy
+        let mut energies: Vec<(usize, f32)> = Vec::new();
+        
+        for (idx, choice_embed) in choice_embeds.iter().enumerate() {
+            // Build reasoning nodes from choice embedding
+            let node_embeds = self.build_reasoning_nodes(context_embed, choice_embed);
+            
+            // Find optimal pathway (amplitude amplification)
+            let mut pathway_config = PathwayConfig::default();
+            pathway_config.n_nodes = node_embeds.len().min(7);
+            pathway_config.dimension = self.config.embed_dim;
+            pathway_config.parallel = true;
+            
+            let mut optimizer = ExhaustivePathwayOptimizer::new(pathway_config);
+            optimizer.set_embeddings(&node_embeds);
+            optimizer.set_target(&predicted_target);
+            
+            let pathways = optimizer.fast_search(1);
+            let pathway_score = pathways.first().map(|p| p.score).unwrap_or(0.0);
+            
+            // Compute total energy
+            let energy = self.compute_energy(
+                context_embed,
+                choice_embed,
+                &predicted_target,
+                pathway_score,
+            );
+            
+            energies.push((idx, energy));
+        }
+        
+        // Step 3: Select lowest energy choice (quantum interference selects correct state)
+        energies.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        
+        let (best_idx, best_energy) = energies.first().copied().unwrap_or((0, 1.0));
+        
+        // Convert energy to confidence (lower energy = higher confidence)
+        let confidence = (-best_energy / self.energy_temperature).exp();
+        
+        (best_idx, confidence.min(1.0))
+    }
+    
+    /// Build reasoning nodes from context and choice embeddings
+    fn build_reasoning_nodes(&self, context: &[f32], choice: &[f32]) -> Vec<Vec<f32>> {
+        let dim = self.config.embed_dim;
+        let mut nodes = Vec::new();
+        
+        // Node 1: Context embedding
+        nodes.push(context.to_vec());
+        
+        // Node 2: Choice embedding
+        nodes.push(choice.to_vec());
+        
+        // Node 3: Context-choice interaction (element-wise product)
+        let interaction: Vec<f32> = context.iter()
+            .zip(choice.iter())
+            .map(|(c, ch)| c * ch)
+            .collect();
+        nodes.push(interaction);
+        
+        // Node 4: JEPA predicted target
+        let predicted = self.predictor.forward(context);
+        nodes.push(predicted);
+        
+        // Node 5: Deduction step embedding (level 3 - sacred position)
+        let deduction_steps = self.deduction_engine.deduce_hierarchical(choice, 3);
+        if let Some(step) = deduction_steps.last() {
+            nodes.push(step.embedding.clone());
+        } else {
+            nodes.push(vec![0.0; dim]);
+        }
+        
+        // Ensure all nodes have correct dimension
+        for node in &mut nodes {
+            node.resize(dim, 0.0);
+        }
+        
+        nodes
+    }
+    
+    /// Train JEPA predictor on (context, target) pairs
+    pub fn train(&mut self, context: &[f32], target: &[f32], learning_rate: f32) -> f32 {
+        let pred = self.predictor.forward(context);
+        let loss = jepa_mse_loss(&pred, target);
+        
+        // Simplified gradient update (in production, use autodiff)
+        // Update predictor weights based on prediction error
+        let embed_dim = self.config.embed_dim;
+        let hidden_dim = self.config.hidden_dim;
+        
+        // Compute gradient for output layer
+        let grad_output: Vec<f32> = pred.iter()
+            .zip(target.iter())
+            .map(|(p, t)| 2.0 * (p - t) / embed_dim as f32)
+            .collect();
+        
+        // Update w2 and b2
+        for i in 0..embed_dim.min(self.predictor.b2.len()) {
+            self.predictor.b2[i] -= learning_rate * grad_output[i];
+        }
+        
+        // Update w2 (simplified - just the diagonal for efficiency)
+        for i in 0..hidden_dim.min(embed_dim) {
+            let idx = i * embed_dim + i;
+            if idx < self.predictor.w2.len() {
+                self.predictor.w2[idx] -= learning_rate * grad_output[i % embed_dim] * 0.1;
+            }
+        }
+        
+        loss
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

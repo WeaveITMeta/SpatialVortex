@@ -236,12 +236,178 @@ impl RAGSearchEngine {
         ]);
     }
     
-    /// Add knowledge entries for a topic
+    /// Add knowledge entries for a topic (internal)
     fn add_knowledge(&mut self, topic: &str, facts: Vec<&str>) {
         self.knowledge_base.insert(
             topic.to_lowercase(),
             facts.iter().map(|s| s.to_string()).collect()
         );
+    }
+    
+    /// Add knowledge entries for a topic (public API)
+    pub fn add_knowledge_entry(&mut self, topic: &str, fact: &str) {
+        self.knowledge_base
+            .entry(topic.to_lowercase())
+            .or_insert_with(Vec::new)
+            .push(fact.to_string());
+    }
+    
+    /// Bulk add knowledge from entity-attribute pairs
+    pub fn import_entity_attributes(&mut self, entity_attrs: &std::collections::HashMap<String, std::collections::HashMap<String, f32>>) {
+        for (entity, attrs) in entity_attrs {
+            let facts: Vec<String> = attrs.iter()
+                .filter(|(_, &score)| score > 0.5)  // Only high-confidence attributes
+                .map(|(attr, _)| format!("{} is associated with {}", entity, attr))
+                .collect();
+            
+            if !facts.is_empty() {
+                let entry = self.knowledge_base.entry(entity.to_lowercase()).or_insert_with(Vec::new);
+                for fact in facts {
+                    if !entry.contains(&fact) {
+                        entry.push(fact);
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Bulk add knowledge from causal patterns
+    pub fn import_causal_patterns(&mut self, causal: &std::collections::HashMap<String, Vec<(String, f32)>>) {
+        for (cause, effects) in causal {
+            let facts: Vec<String> = effects.iter()
+                .filter(|(_, score)| *score > 0.5)
+                .map(|(effect, _)| format!("{} leads to {}", cause, effect))
+                .collect();
+            
+            if !facts.is_empty() {
+                let entry = self.knowledge_base.entry(cause.to_lowercase()).or_insert_with(Vec::new);
+                for fact in facts {
+                    if !entry.contains(&fact) {
+                        entry.push(fact);
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Bulk add knowledge from Q&A patterns
+    pub fn import_qa_patterns(&mut self, qa_patterns: &std::collections::HashMap<String, Vec<String>>) {
+        for (pattern, answers) in qa_patterns {
+            // Extract key topic from pattern
+            let topic_words: Vec<&str> = pattern
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|w| w.len() > 3)
+                .take(2)
+                .collect();
+            
+            if let Some(topic) = topic_words.first() {
+                let facts: Vec<String> = answers.iter()
+                    .take(3)  // Limit facts per topic
+                    .map(|a| format!("Answer: {}", a))
+                    .collect();
+                
+                let entry = self.knowledge_base.entry(topic.to_lowercase()).or_insert_with(Vec::new);
+                for fact in facts {
+                    if !entry.contains(&fact) {
+                        entry.push(fact);
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Get knowledge base size for diagnostics
+    pub fn knowledge_size(&self) -> (usize, usize) {
+        let topics = self.knowledge_base.len();
+        let facts: usize = self.knowledge_base.values().map(|v| v.len()).sum();
+        (topics, facts)
+    }
+    
+    /// Get all facts from the knowledge base for CALM pretraining
+    pub fn get_all_facts(&self) -> Vec<String> {
+        self.knowledge_base.values()
+            .flat_map(|facts| facts.iter().cloned())
+            .collect()
+    }
+    
+    /// Import implications from 369 sacred attention heads
+    /// These are dynamic implications extracted by comparing node labels to attributes
+    pub fn import_implications(&mut self, implications: &[(String, String, String, f32)]) {
+        // implications format: (source_label, attribute_key, implication_type, strength)
+        for (source, attr_key, impl_type, strength) in implications {
+            if *strength < 0.3 {
+                continue; // Skip weak implications
+            }
+            
+            // Create fact from implication
+            let fact = match impl_type.as_str() {
+                "property" => format!("{} has property {}", source, attr_key),
+                "causal" => format!("{} causes or leads to {}", source, attr_key),
+                "temporal" => format!("{} occurs before/after {}", source, attr_key),
+                "spatial" => format!("{} is located near/at {}", source, attr_key),
+                "logical" => format!("{} implies {}", source, attr_key),
+                "semantic" => format!("{} is related to {}", source, attr_key),
+                "sacred_verification" => format!("{} verified at sacred position with {}", source, attr_key),
+                _ => format!("{} is associated with {}", source, attr_key),
+            };
+            
+            // Add to knowledge base with source as topic
+            let entry = self.knowledge_base
+                .entry(source.to_lowercase())
+                .or_insert_with(Vec::new);
+            if !entry.contains(&fact) {
+                entry.push(fact.clone());
+            }
+            
+            // Also index by attribute key
+            let attr_entry = self.knowledge_base
+                .entry(attr_key.to_lowercase())
+                .or_insert_with(Vec::new);
+            if !attr_entry.contains(&fact) {
+                attr_entry.push(fact);
+            }
+        }
+        
+        // Clear cache since knowledge changed
+        self.cache.clear();
+    }
+    
+    /// Score a choice using implications as additional context
+    /// This boosts choices that align with extracted implications
+    pub fn score_with_implications(
+        &self,
+        question: &str,
+        choice: &str,
+        implications: &[(String, String, String, f32)],
+    ) -> f32 {
+        let question_lower = question.to_lowercase();
+        let choice_lower = choice.to_lowercase();
+        
+        let mut score = 0.0f32;
+        
+        for (source, attr_key, impl_type, strength) in implications {
+            // Check if choice relates to the implication
+            let source_match = choice_lower.contains(&source.to_lowercase()) 
+                || question_lower.contains(&source.to_lowercase());
+            let attr_match = choice_lower.contains(&attr_key.to_lowercase());
+            
+            if source_match && attr_match {
+                // Strong match - choice contains both source and attribute
+                let type_weight = match impl_type.as_str() {
+                    "causal" => 1.5,      // Causal implications are highly relevant
+                    "property" => 1.2,    // Properties help identify correct answers
+                    "logical" => 1.3,     // Logical implications support reasoning
+                    "sacred_verification" => 1.4, // Verified at sacred positions
+                    _ => 1.0,
+                };
+                score += strength * type_weight * 5.0;
+            } else if attr_match {
+                // Partial match - choice contains attribute
+                score += strength * 2.0;
+            }
+        }
+        
+        score
     }
     
     /// Update n-gram frequencies from training data (for IDF weighting in embeddings)
@@ -276,17 +442,19 @@ impl RAGSearchEngine {
         for keyword in &keywords {
             if let Some(facts) = self.knowledge_base.get(*keyword) {
                 for fact in facts {
-                    let relevance = self.compute_relevance(&query_lower, fact);
-                    if relevance >= self.config.min_relevance {
-                        let level = self.get_relevance_level(relevance);
-                        results.push(RetrievedContext {
-                            content: fact.clone(),
-                            source: format!("knowledge_base:{}", keyword),
-                            relevance,
-                            embedding: self.text_to_embedding(fact),
-                            relevance_level: level,
-                        });
-                    }
+                    // Direct keyword match gets high base relevance
+                    let base_relevance = 0.5;
+                    let text_relevance = self.compute_relevance(&query_lower, fact);
+                    let relevance = base_relevance + text_relevance * 0.5;
+                    
+                    let level = self.get_relevance_level(relevance);
+                    results.push(RetrievedContext {
+                        content: fact.clone(),
+                        source: format!("knowledge_base:{}", keyword),
+                        relevance,
+                        embedding: self.text_to_embedding(fact),
+                        relevance_level: level,
+                    });
                 }
             }
         }

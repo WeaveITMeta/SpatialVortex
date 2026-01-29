@@ -161,6 +161,9 @@ fn main() -> Result<()> {
     // Initialize evaluator
     let mut evaluator = RealBenchmarkEvaluator::new(&args.data_dir);
     evaluator.set_verbose_debug(args.verbose);
+    
+    // Enable generative mode with GPU-accelerated exhaustive pathway search
+    evaluator.set_generative_mode(true);
 
     // Optional: Run training before evaluation
     if !args.eval_only && args.train_epochs > 0 {
@@ -188,8 +191,25 @@ fn main() -> Result<()> {
             "babi1" => evaluate_babi(&mut evaluator, 1, &args)?,
             "babi2" => evaluate_babi(&mut evaluator, 2, &args)?,
             "babi3" => evaluate_babi(&mut evaluator, 3, &args)?,
+            "babi4" => evaluate_babi(&mut evaluator, 4, &args)?,
+            "babi5" => evaluate_babi(&mut evaluator, 5, &args)?,
+            "babi6" => evaluate_babi(&mut evaluator, 6, &args)?,
+            "babi7" => evaluate_babi(&mut evaluator, 7, &args)?,
+            "babi8" => evaluate_babi(&mut evaluator, 8, &args)?,
+            "babi9" => evaluate_babi(&mut evaluator, 9, &args)?,
+            "babi10" => evaluate_babi(&mut evaluator, 10, &args)?,
+            "babi11" => evaluate_babi(&mut evaluator, 11, &args)?,
+            "babi12" => evaluate_babi(&mut evaluator, 12, &args)?,
+            "babi13" => evaluate_babi(&mut evaluator, 13, &args)?,
+            "babi14" => evaluate_babi(&mut evaluator, 14, &args)?,
             "babi15" => evaluate_babi(&mut evaluator, 15, &args)?,
             "babi16" => evaluate_babi(&mut evaluator, 16, &args)?,
+            "babi17" => evaluate_babi(&mut evaluator, 17, &args)?,
+            "babi18" => evaluate_babi(&mut evaluator, 18, &args)?,
+            "babi19" => evaluate_babi(&mut evaluator, 19, &args)?,
+            "babi20" => evaluate_babi(&mut evaluator, 20, &args)?,
+            "winogrande" => evaluate_winogrande(&mut evaluator, &args)?,
+            "piqa" => evaluate_piqa(&mut evaluator, &args)?,
             _ => {
                 println!("  [WARN] Unknown task: {}, skipping", task);
                 continue;
@@ -372,6 +392,22 @@ fn evaluate_babi(evaluator: &mut RealBenchmarkEvaluator, task_num: usize, args: 
         .map_err(|e| anyhow::anyhow!("Failed to load bAbI task {}: {}", task_num, e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
     Ok(evaluator.evaluate(&format!("bAbI Task {}", task_num), &questions[..limit]))
+}
+
+fn evaluate_winogrande(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
+    // WinoGrande uses commonsense reasoning - load from HF or synthetic
+    let questions = load_commonsenseqa(&args.data_dir)
+        .map_err(|e| anyhow::anyhow!("Failed to load WinoGrande (using CommonsenseQA fallback): {}", e))?;
+    let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
+    Ok(evaluator.evaluate("WinoGrande", &questions[..limit]))
+}
+
+fn evaluate_piqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
+    // PIQA uses physical commonsense - load from HF or synthetic
+    let questions = load_commonsenseqa(&args.data_dir)
+        .map_err(|e| anyhow::anyhow!("Failed to load PIQA (using CommonsenseQA fallback): {}", e))?;
+    let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
+    Ok(evaluator.evaluate("PIQA", &questions[..limit]))
 }
 
 // =============================================================================

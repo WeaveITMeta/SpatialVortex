@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-01-29T03:59:47.607204600+00:00",
+  "timestamp": "2026-01-29T19:32:50.317377900+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 100,
-    "gpu_enabled": false,
+    "gpu_enabled": true,
     "features": [
       "sacred_geometry",
       "vortex_cycles",
@@ -17,26 +17,26 @@
       "accuracy": 32.0,
       "num_correct": 32,
       "total": 100,
-      "avg_confidence": 0.7111136,
-      "time_secs": 0.6417685,
+      "avg_confidence": 0.6880877,
+      "time_secs": 1.1539929,
       "wrong_samples": []
     },
     {
       "task": "gsm8k",
-      "accuracy": 26.0,
-      "num_correct": 26,
+      "accuracy": 22.0,
+      "num_correct": 22,
       "total": 100,
-      "avg_confidence": 0.7086483,
-      "time_secs": 1.0987529,
+      "avg_confidence": 0.6711438,
+      "time_secs": 1.4677708,
       "wrong_samples": []
     },
     {
       "task": "arc",
-      "accuracy": 15.0,
-      "num_correct": 15,
+      "accuracy": 18.0,
+      "num_correct": 18,
       "total": 100,
-      "avg_confidence": 0.8097775,
-      "time_secs": 1.1178692,
+      "avg_confidence": 0.8049922,
+      "time_secs": 2.4723609,
       "wrong_samples": []
     },
     {
@@ -44,80 +44,179 @@
       "accuracy": 31.0,
       "num_correct": 31,
       "total": 100,
-      "avg_confidence": 0.90252715,
-      "time_secs": 1.5636290000000002,
+      "avg_confidence": 0.9224783,
+      "time_secs": 4.8715941,
       "wrong_samples": []
     },
     {
       "task": "truthfulqa",
-      "accuracy": 20.0,
-      "num_correct": 20,
+      "accuracy": 52.0,
+      "num_correct": 52,
       "total": 100,
-      "avg_confidence": 0.69078964,
-      "time_secs": 1.0181986,
+      "avg_confidence": 0.69671744,
+      "time_secs": 1.8620603,
       "wrong_samples": []
     },
     {
       "task": "humaneval",
-      "accuracy": 84.0,
-      "num_correct": 84,
+      "accuracy": 89.0,
+      "num_correct": 89,
       "total": 100,
-      "avg_confidence": 0.9786055,
-      "time_secs": 2.1347848,
+      "avg_confidence": 0.97112596,
+      "time_secs": 2.8796136,
       "wrong_samples": []
     },
     {
       "task": "commonsenseqa",
-      "accuracy": 19.0,
-      "num_correct": 19,
+      "accuracy": 30.0,
+      "num_correct": 30,
       "total": 100,
-      "avg_confidence": 0.81793565,
-      "time_secs": 1.7729952,
+      "avg_confidence": 0.8408651,
+      "time_secs": 2.283119,
       "wrong_samples": []
     },
     {
       "task": "squad",
-      "accuracy": 10.0,
-      "num_correct": 10,
+      "accuracy": 6.0,
+      "num_correct": 6,
       "total": 100,
-      "avg_confidence": 0.8671564,
-      "time_secs": 1.5488317,
+      "avg_confidence": 0.85963744,
+      "time_secs": 1.9266817,
       "wrong_samples": []
     },
     {
       "task": "babi1",
-      "accuracy": 84.0,
-      "num_correct": 84,
+      "accuracy": 30.0,
+      "num_correct": 30,
       "total": 100,
-      "avg_confidence": 0.9079658,
-      "time_secs": 1.4320404,
+      "avg_confidence": 0.67156136,
+      "time_secs": 1.7651788000000002,
       "wrong_samples": []
     },
     {
       "task": "babi2",
-      "accuracy": 72.0,
-      "num_correct": 72,
+      "accuracy": 22.0,
+      "num_correct": 22,
       "total": 100,
-      "avg_confidence": 0.87394875,
-      "time_secs": 1.4486174,
+      "avg_confidence": 0.5924948,
+      "time_secs": 1.944808,
       "wrong_samples": []
     },
     {
       "task": "babi3",
-      "accuracy": 85.0,
-      "num_correct": 85,
+      "accuracy": 4.0,
+      "num_correct": 4,
       "total": 100,
-      "avg_confidence": 0.82391965,
-      "time_secs": 1.5547242,
+      "avg_confidence": 0.6916691,
+      "time_secs": 2.6798216,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi4",
+      "accuracy": 22.0,
+      "num_correct": 22,
+      "total": 100,
+      "avg_confidence": 0.73929995,
+      "time_secs": 1.8308155,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi5",
+      "accuracy": 12.0,
+      "num_correct": 12,
+      "total": 100,
+      "avg_confidence": 0.9109115,
+      "time_secs": 4.1838084,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi6",
+      "accuracy": 28.000000000000004,
+      "num_correct": 28,
+      "total": 100,
+      "avg_confidence": 0.6726257,
+      "time_secs": 2.3725368,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi7",
+      "accuracy": 0.0,
+      "num_correct": 0,
+      "total": 100,
+      "avg_confidence": 0.9938621,
+      "time_secs": 2.6812145,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi8",
+      "accuracy": 24.0,
+      "num_correct": 24,
+      "total": 100,
+      "avg_confidence": 0.9609879,
+      "time_secs": 1.9345786,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi9",
+      "accuracy": 61.0,
+      "num_correct": 61,
+      "total": 100,
+      "avg_confidence": 0.9710396,
+      "time_secs": 2.3197111,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi10",
+      "accuracy": 42.0,
+      "num_correct": 42,
+      "total": 100,
+      "avg_confidence": 0.9403236,
+      "time_secs": 2.4148958,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi11",
+      "accuracy": 44.0,
+      "num_correct": 44,
+      "total": 100,
+      "avg_confidence": 0.7332015,
+      "time_secs": 1.8523249000000002,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi12",
+      "accuracy": 36.0,
+      "num_correct": 36,
+      "total": 100,
+      "avg_confidence": 0.68870735,
+      "time_secs": 1.8403575,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi13",
+      "accuracy": 46.0,
+      "num_correct": 46,
+      "total": 100,
+      "avg_confidence": 0.6862708,
+      "time_secs": 1.8905631999999999,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi14",
+      "accuracy": 47.0,
+      "num_correct": 47,
+      "total": 100,
+      "avg_confidence": 0.904783,
+      "time_secs": 1.8688649000000002,
       "wrong_samples": []
     },
     {
       "task": "babi15",
-      "accuracy": 78.0,
-      "num_correct": 78,
+      "accuracy": 100.0,
+      "num_correct": 100,
       "total": 100,
-      "avg_confidence": 0.9786173,
-      "time_secs": 1.4123929,
+      "avg_confidence": 0.9997755,
+      "time_secs": 1.7964099,
       "wrong_samples": []
     },
     {
@@ -126,14 +225,68 @@
       "num_correct": 100,
       "total": 100,
       "avg_confidence": 1.0,
-      "time_secs": 2.0949562999999998,
+      "time_secs": 2.5532011,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi17",
+      "accuracy": 19.0,
+      "num_correct": 19,
+      "total": 100,
+      "avg_confidence": 0.7185745,
+      "time_secs": 2.1048417,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi18",
+      "accuracy": 45.0,
+      "num_correct": 45,
+      "total": 100,
+      "avg_confidence": 0.53567153,
+      "time_secs": 2.5821988,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi19",
+      "accuracy": 0.0,
+      "num_correct": 0,
+      "total": 100,
+      "avg_confidence": 0.9645842,
+      "time_secs": 2.5033689,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi20",
+      "accuracy": 64.0,
+      "num_correct": 64,
+      "total": 100,
+      "avg_confidence": 0.8943612,
+      "time_secs": 2.2846285,
+      "wrong_samples": []
+    },
+    {
+      "task": "winogrande",
+      "accuracy": 30.0,
+      "num_correct": 30,
+      "total": 100,
+      "avg_confidence": 0.8513801,
+      "time_secs": 2.5594842,
+      "wrong_samples": []
+    },
+    {
+      "task": "piqa",
+      "accuracy": 30.0,
+      "num_correct": 30,
+      "total": 100,
+      "avg_confidence": 0.85126007,
+      "time_secs": 2.4940189999999998,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 656,
-    "total_questions": 1300,
-    "overall_accuracy": 50.46153846153846,
-    "total_time_secs": 21.2592379
+    "total_correct": 1086,
+    "total_questions": 3000,
+    "overall_accuracy": 36.199999999999996,
+    "total_time_secs": 125.9008788
   }
 }

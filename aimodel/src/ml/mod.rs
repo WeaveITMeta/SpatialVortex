@@ -25,6 +25,10 @@ pub mod jepa;
 pub mod neuro_symbolic;
 pub mod sacred_moe;
 pub mod sacred_swarm;
+pub mod generative_arch;
+pub mod transitive_flux;
+pub mod flux_object_macro;
+pub mod flux_compression_sota;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
@@ -45,8 +49,9 @@ pub use continuous_learning::{
 pub use jepa::{
     JEPAConfig, JEPAPredictor, JEPATrainer, JEPAStats,
     HierarchicalDeductionEngine, DeductionRules, DeductionStep,
-    jepa_mse_loss, jepa_infonce_loss,
+    jepa_mse_loss, jepa_infonce_loss, QuantumJEPAOptimizer,
 };
+pub use transitive_flux::TransitiveFluxReasoner;
 pub use neuro_symbolic::{
     LogicTensorNetwork, RuleEmbedding,
     NeuralTheoremProver, ProofResult, ProofStep,
@@ -66,4 +71,35 @@ pub use sacred_swarm::{
     AgentSpecialization as SwarmAgentSpecialization, AgentState, TaskState,
     SwarmStepResult, SwarmRunResult, SwarmStats,
     GeometricOptimizer,
+};
+pub use generative_arch::{
+    SubwordTokenizer, SubwordToken,
+    SacredDynamicAttention, SacredAttentionConfig,
+    FewShotContext, FewShotExample,
+    GenerationHead,
+    GenerativeVortexEngine, GenerativeConfig,
+    SymbolicMathExecutor, MathResult,
+    KnowledgeBase, KnowledgeTriple,
+    DynamicMoERouter, ExpertType,
+    AttributeFocusedAttention, AttributeImplication, ImplicationType,
+    TrackedObject, ObjectPattern,
+};
+pub use flux_object_macro::{
+    SubjectFluxFlow, GenericFluxEngine, PhysicsFluxEngine,
+    FLUX_VORTEX_CYCLE, FLUX_SACRED_POSITIONS,
+    next_vortex_position, is_sacred_position, sacred_magnification,
+    run_vortex_flow,
+    extract_confidence, pack_confidence,
+    extract_ethos, pack_ethos,
+    extract_logos, pack_logos,
+    extract_pathos, pack_pathos,
+    extract_entropy, pack_entropy,
+    extract_flow_step, pack_flow_step,
+    extract_position, pack_position,
+    extract_sacred_boost, pack_sacred_boost,
+    extract_subject_id, pack_subject_id,
+    extract_flags, pack_flags,
+    has_cross_ref, set_cross_ref,
+    has_reversal_flag, set_reversal_flag,
+    extract_elp_component, pack_adjusted_confidence,
 };

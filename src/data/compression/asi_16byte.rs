@@ -1,5 +1,11 @@
 //! ASI Compression Algorithms (12-byte and 16-byte)
 //! 
+//! **DEPRECATED**: These formats are superseded by `aimodel::ml::flux_compression_sota`
+//! which provides a unified 24-byte format combining 6W + ELP + inference capabilities.
+//! 
+//! Use `FluxCompression24` from `aimodel::ml::flux_compression_sota` for new code.
+//! This module is retained for backward compatibility.
+//!
 //! Revolutionary semantic compression using sacred geometry and vortex math.
 //! Achieves 200-250× compression ratio while maintaining semantic fidelity.
 //! 
@@ -9,9 +15,9 @@
 //! - ±13 scale enables precise quantization
 //! - Differential encoding stores offsets from anchors
 //! 
-//! ## Compression Formats
+//! ## Compression Formats (LEGACY)
 //! 
-//! ### 12-Byte Format (Original)
+//! ### 12-Byte Format (Original) - DEPRECATED
 //! ```text
 //! BYTE 0-1: Position encoding (position in 0-9 space + phase)
 //! BYTE 2-7: ELP deltas from nearest sacred anchor (i16 × 3)
@@ -19,7 +25,7 @@
 //! BYTE 10-11: Cycle count + metadata
 //! ```
 //! 
-//! ### 16-Byte Format (Extended with 6W Framework)
+//! ### 16-Byte Format (Extended with 6W Framework) - DEPRECATED
 //! ```text
 //! BYTE 0-1: WHO (Entity/Actor) - 12-bit hash + 3-bit type + 1-bit plural
 //! BYTE 2-5: WHAT (Action/Concept) - 24-bit hash + action/tense/flags
