@@ -32,6 +32,7 @@ use crate::ml::transitive_flux::TransitiveFluxReasoner;
 use crate::ml::recursive_chains::ChainPathwayReasoner;
 use crate::ml::conceptual_agglomeration::ConceptualReasoner;
 use crate::ml::geometric_world_model::GeometricWorldModel;
+use crate::ml::world_knowledge::WorldKnowledgeGraph;
 use std::collections::HashMap;
 
 // =============================================================================
@@ -106,6 +107,8 @@ pub struct ReasoningLayer {
     pub math_engine: SymbolicMathEngine,
     /// Geometric world model (learned spatial/relational reasoning)
     pub world_model: GeometricWorldModel,
+    /// World knowledge graph (commonsense reasoning)
+    pub world_knowledge: WorldKnowledgeGraph,
     /// Embedding dimension
     pub embed_dim: usize,
 }
@@ -115,11 +118,12 @@ impl ReasoningLayer {
         Self {
             temporal: TemporalStateTracker::new(),
             transitive: TransitiveFluxReasoner::new(embed_dim),
-            multi_hop: MultiHopReasoner::new(5),
+            multi_hop: MultiHopReasoner::new(9), // Increased from 5 to 9 for deeper reasoning
             chain_reasoner: ChainPathwayReasoner::new(embed_dim),
             conceptual: ConceptualReasoner::new(),
             math_engine: SymbolicMathEngine::new(),
             world_model: GeometricWorldModel::new(embed_dim),
+            world_knowledge: WorldKnowledgeGraph::new(embed_dim),
             embed_dim,
         }
     }
@@ -136,12 +140,30 @@ impl ReasoningLayer {
         
         // Find potential entity names (words that appear before "went", "picked", etc.)
         let mut entities: Vec<String> = Vec::new();
+        let mut objects: Vec<String> = Vec::new();
+        
         for (i, word) in words.iter().enumerate() {
-            if ["went", "picked", "dropped", "got", "took", "is", "moved"].contains(word) {
+            // Extract subjects (people)
+            if ["went", "picked", "dropped", "got", "took", "is", "moved", "grabbed", "journeyed", "travelled", "received", "discarded", "left"].contains(word) {
                 if i > 0 {
                     let entity = words[i - 1].trim_matches(|c: char| !c.is_alphanumeric()).to_string();
                     if !entity.is_empty() && entity.len() > 1 {
                         entities.push(entity);
+                    }
+                }
+            }
+            // Extract objects (things being picked up/dropped)
+            if ["picked", "got", "took", "grabbed", "dropped", "discarded", "left"].contains(word) {
+                // Object is usually after "the" following the verb
+                if i + 2 < words.len() && words[i + 1] == "the" {
+                    let obj = words[i + 2].trim_matches(|c: char| !c.is_alphanumeric()).to_string();
+                    if !obj.is_empty() && obj.len() > 1 {
+                        objects.push(obj);
+                    }
+                } else if i + 1 < words.len() {
+                    let obj = words[i + 1].trim_matches(|c: char| !c.is_alphanumeric()).to_string();
+                    if !obj.is_empty() && obj.len() > 1 && obj != "up" && obj != "the" {
+                        objects.push(obj);
                     }
                 }
             }
@@ -172,12 +194,24 @@ impl ReasoningLayer {
             }
         }
         
+        // Also get location history for objects (bAbI Task 3: "Where was the apple before the bathroom?")
+        for obj in &objects {
+            let history = self.temporal.get_location_history(obj);
+            if !history.is_empty() {
+                let locations: Vec<String> = history.into_iter().map(|(loc, _ts)| loc).collect();
+                latent.location_history.insert(obj.clone(), locations);
+            }
+        }
+        
         // Extract transitive relations using public API
         self.transitive.extract_relations(context);
         // Note: Relations are stored internally, we query them via scoring methods
         
         // Process with SNOAT chain reasoner for depth-9 multi-hop
         self.chain_reasoner.process_context(context);
+        
+        // Extract room connections for bAbI 19 (path finding)
+        self.extract_room_connections(context, latent);
         
         // Process with conceptual agglomeration for language-independent reasoning
         self.conceptual.process_context(context);
@@ -404,21 +438,22 @@ impl ReasoningLayer {
             for (dir, opposite) in &directions {
                 let pattern = format!(" is {} of ", dir);
                 if let Some(pos) = sentence.find(&pattern) {
-                    let room_a = sentence[..pos].trim();
-                    let room_b = sentence[pos + pattern.len()..].trim();
+                    // Strip "the " prefix from room names
+                    let room_a = sentence[..pos].trim().trim_start_matches("the ").to_string();
+                    let room_b = sentence[pos + pattern.len()..].trim().trim_start_matches("the ").to_string();
                     
                     if !room_a.is_empty() && !room_b.is_empty() {
                         // room_a is NORTH of room_b means: from room_b go NORTH to reach room_a
                         latent.room_connections
-                            .entry(room_b.to_string())
+                            .entry(room_b.clone())
                             .or_insert_with(Vec::new)
-                            .push((dir.to_string(), room_a.to_string()));
+                            .push((dir.to_string(), room_a.clone()));
                         
                         // And from room_a go SOUTH to reach room_b
                         latent.room_connections
-                            .entry(room_a.to_string())
+                            .entry(room_a)
                             .or_insert_with(Vec::new)
-                            .push((opposite.to_string(), room_b.to_string()));
+                            .push((opposite.to_string(), room_b));
                     }
                 }
             }
@@ -606,10 +641,22 @@ impl ReasoningLayer {
            (question_lower.contains("what") && question_lower.contains("have")) {
             let entity = self.extract_entity(&question_lower, &["is ", "does ", "did "]);
             if let Some(ent) = entity {
+                // First try latent state
                 if let Some(possessions) = latent.entity_possessions.get(&ent) {
                     if !possessions.is_empty() {
-                        return Some((possessions.join(", "), latent.confidence));
+                        // bAbI8 format: comma-separated, no spaces
+                        return Some((possessions.join(","), latent.confidence));
+                    } else {
+                        return Some(("nothing".to_string(), latent.confidence));
                     }
+                }
+                
+                // Fallback: query temporal tracker directly
+                let possessions = self.temporal.query_possessions(&ent);
+                if !possessions.is_empty() {
+                    return Some((possessions.join(","), latent.confidence));
+                } else {
+                    return Some(("nothing".to_string(), latent.confidence * 0.9));
                 }
             }
         }
@@ -626,6 +673,11 @@ impl ReasoningLayer {
         }
         
         None
+    }
+    
+    /// Score choices using world knowledge for commonsense reasoning
+    pub fn score_with_world_knowledge(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+        self.world_knowledge.answer_question(question, choices)
     }
     
     fn extract_entity(&self, question: &str, patterns: &[&str]) -> Option<String> {
@@ -1076,6 +1128,14 @@ impl UnifiedInferenceEngine {
                 if choice_lower == answer || choice_lower.contains(&answer) || answer.contains(&choice_lower) {
                     return (idx, conf);
                 }
+            }
+        }
+        
+        // Step 3b: Try world knowledge for commonsense questions
+        // This handles PIQA, WinoGrande, CommonsenseQA, ARC
+        if let Some((idx, conf)) = self.reasoning.score_with_world_knowledge(question, choices) {
+            if conf > 0.6 {
+                return (idx, conf);
             }
         }
         

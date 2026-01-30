@@ -91,7 +91,7 @@ pub struct TransitiveFluxReasoner {
     /// Counting mode (exponential vs sequential)
     counting_mode: CountingMode,
     /// Adjacency list for graph traversal
-    adjacency: HashMap<String, Vec<(String, String, f32)>>, // node -> [(target, relation, weight)]
+    pub adjacency: HashMap<String, Vec<(String, String, f32)>>, // node -> [(target, relation, weight)]
     /// Calibration factor (adjusts confidence based on evidence)
     calibration_factor: f32,
     /// Entity counts for counting tasks
@@ -582,21 +582,26 @@ impl TransitiveFluxReasoner {
             }
             
             // Parse connection patterns (bidirectional graph edges)
+            // "A is west of B" means: A is located west of B
+            // So to go FROM B TO A, you go west
+            // Edge: B -> A with direction "west_of"
             for (pattern, rel_type) in &connection_patterns {
                 if let Some((source, target)) = self.parse_relation_pattern(sentence, pattern) {
-                    // Add edge source -> target
-                    self.adjacency.entry(source.clone())
+                    // "source is west_of target" means: from target, go west to reach source
+                    // So edge is: target -> source with rel_type
+                    self.adjacency.entry(target.clone())
                         .or_insert_with(Vec::new)
-                        .push((target.clone(), rel_type.to_string(), 1.0));
+                        .push((source.clone(), rel_type.to_string(), 1.0));
                     
                     // Add reverse edge for bidirectional connections
                     if *rel_type == "connected_to" {
-                        self.adjacency.entry(target.clone())
+                        self.adjacency.entry(source.clone())
                             .or_insert_with(Vec::new)
-                            .push((source.clone(), rel_type.to_string(), 1.0));
+                            .push((target.clone(), rel_type.to_string(), 1.0));
                     }
                     
                     // Add inverse relations for directional connections
+                    // From source, go opposite direction to reach target
                     let inverse = match *rel_type {
                         "north_of" => Some("south_of"),
                         "south_of" => Some("north_of"),
@@ -605,9 +610,9 @@ impl TransitiveFluxReasoner {
                         _ => None,
                     };
                     if let Some(inv) = inverse {
-                        self.adjacency.entry(target)
+                        self.adjacency.entry(source)
                             .or_insert_with(Vec::new)
-                            .push((source, inv.to_string(), 1.0));
+                            .push((target, inv.to_string(), 1.0));
                     }
                 }
             }
@@ -773,8 +778,18 @@ impl TransitiveFluxReasoner {
                     .to_string();
                 
                 if let Some(path) = self.find_path(&start, &end) {
-                    // Format path as answer
-                    let answer = path.relations.join(", ");
+                    // Format path as bAbI 19 answer (e.g., "s,s" for south,south)
+                    let directions: Vec<&str> = path.relations.iter()
+                        .map(|r| match r.as_str() {
+                            "north_of" => "n",
+                            "south_of" => "s",
+                            "east_of" => "e",
+                            "west_of" => "w",
+                            "connected_to" => "c",
+                            _ => "?",
+                        })
+                        .collect();
+                    let answer = directions.join(",");
                     return Some((answer, path.confidence));
                 }
             }
@@ -1211,6 +1226,62 @@ mod tests {
         let path = path.unwrap();
         assert_eq!(path.length, 3); // kitchen -> hallway -> garden -> bedroom
         assert!(path.confidence > 0.5);
+    }
+    
+    #[test]
+    fn test_babi19_directional_path() {
+        let mut reasoner = TransitiveFluxReasoner::new(64);
+        
+        // bAbI 19 format: "The garden is west of the bathroom"
+        // means: garden is located west of bathroom
+        // so from bathroom, go west to reach garden
+        let context = "The garden is west of the bathroom.\nThe bedroom is north of the hallway.\nThe office is south of the hallway.\nThe bathroom is north of the bedroom.\nThe kitchen is east of the bedroom.";
+        reasoner.extract_locations(context);
+        
+        // Question: How do you go from the bathroom to the hallway?
+        // bathroom -> bedroom (south) -> hallway (south) = s,s
+        let path = reasoner.find_path("bathroom", "hallway");
+        assert!(path.is_some(), "Should find path from bathroom to hallway");
+        let path = path.unwrap();
+        
+        // Check the answer format matches bAbI 19
+        let answer = reasoner.answer_path_question("How do you go from the bathroom to the hallway?");
+        assert!(answer.is_some(), "Should answer path question");
+        let (directions, _conf) = answer.unwrap();
+        
+        // Should be direction abbreviations like "s,s"
+        assert!(directions.contains(',') || directions.len() == 1, 
+            "Answer should be comma-separated directions, got: {}", directions);
+        assert!(directions.chars().all(|c| c == 'n' || c == 's' || c == 'e' || c == 'w' || c == ','),
+            "Answer should only contain n,s,e,w and commas, got: {}", directions);
+    }
+    
+    #[test]
+    fn test_babi19_full_format() {
+        // Test with exact bAbI format: context + question in one string
+        let mut reasoner = TransitiveFluxReasoner::new(64);
+        
+        // This is how bAbI questions are formatted in the evaluator
+        let full_question = "The garden is west of the bathroom.
+The bedroom is north of the hallway.
+The office is south of the hallway.
+The bathroom is north of the bedroom.
+The kitchen is east of the bedroom.
+How do you go from the bathroom to the hallway?";
+        
+        // Extract locations from the full text
+        reasoner.extract_locations(full_question);
+        
+        // Check adjacency was built
+        assert!(!reasoner.adjacency.is_empty(), "Adjacency should not be empty after extraction");
+        
+        // Answer the path question
+        let answer = reasoner.answer_path_question(full_question);
+        assert!(answer.is_some(), "Should answer path question from full text");
+        let (directions, _conf) = answer.unwrap();
+        
+        // Should be s,s (bathroom -> bedroom (south) -> hallway (south))
+        assert_eq!(directions, "s,s", "Expected s,s but got {}", directions);
     }
     
     #[test]

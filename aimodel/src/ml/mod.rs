@@ -34,6 +34,7 @@ pub mod unified_inference;
 pub mod recursive_chains;
 pub mod conceptual_agglomeration;
 pub mod geometric_world_model;
+pub mod world_knowledge;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};

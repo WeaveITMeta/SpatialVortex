@@ -157,7 +157,22 @@ impl TemporalStateTracker {
         let words: Vec<&str> = sentence.split_whitespace().collect();
         if words.is_empty() { return None; }
         
-        // Check for pronouns
+        // Check for pronouns anywhere in the sentence (babi11 coreference)
+        // Patterns: "After that he journeyed", "Following that she moved", "Then he went"
+        let sentence_lower = sentence.to_lowercase();
+        for pronoun in &["he ", "she ", "it ", "they "] {
+            if sentence_lower.contains(pronoun) {
+                // Check if this is a coreference pattern (pronoun after connector)
+                if sentence_lower.starts_with("after that ") ||
+                   sentence_lower.starts_with("following that ") ||
+                   sentence_lower.starts_with("afterwards ") ||
+                   sentence_lower.starts_with("then ") {
+                    return self.last_entity.clone();
+                }
+            }
+        }
+        
+        // Check for pronouns at start
         let first_word = words[0].to_lowercase();
         if ["he", "she", "it", "they"].contains(&first_word.as_str()) {
             return self.last_entity.clone();
@@ -312,36 +327,67 @@ impl TemporalStateTracker {
     }
     
     /// Get the full location history for an entity/object
+    /// For bAbI Task 3: "Where was the apple before the bathroom?"
+    /// Need to track object location through all possession changes
     pub fn get_location_history(&self, subject: &str) -> Vec<(String, usize)> {
         let subject_lower = subject.to_lowercase();
         let mut history = Vec::new();
         
-        // Direct location facts
+        // Direct location facts (for people)
         if let Some(facts) = self.facts_by_subject.get(&subject_lower) {
             for fact in facts.iter().filter(|f| f.predicate == "is_at" && f.polarity == Polarity::Positive) {
                 history.push((fact.object.clone(), fact.timestamp));
             }
         }
         
-        // For objects, also track via possession
+        // For objects, track via possession - need to follow the holder's movements
         if let Some(facts) = self.facts_by_object.get(&subject_lower) {
-            for poss_fact in facts.iter().filter(|f| f.predicate == "has" && f.polarity == Polarity::Positive) {
+            // Get all possession events sorted by time
+            let mut poss_events: Vec<_> = facts.iter()
+                .filter(|f| f.predicate == "has" && f.polarity == Polarity::Positive)
+                .collect();
+            poss_events.sort_by_key(|f| f.timestamp);
+            
+            for poss_fact in &poss_events {
                 let holder = &poss_fact.subject;
                 if let Some(holder_facts) = self.facts_by_subject.get(holder) {
-                    // Find holder's location when they got the object
+                    // Find when this holder dropped the object (if they did)
+                    let drop_time = facts.iter()
+                        .filter(|f| f.subject == *holder && 
+                                   (f.predicate == "dropped" || f.predicate == "gave") && 
+                                   f.polarity == Polarity::Positive &&
+                                   f.timestamp > poss_fact.timestamp)
+                        .map(|f| f.timestamp)
+                        .min()
+                        .unwrap_or(usize::MAX);
+                    
+                    // Track all holder's locations while they had the object
                     let holder_locations: Vec<_> = holder_facts.iter()
+                        .filter(|f| f.predicate == "is_at" && f.polarity == Polarity::Positive)
+                        .filter(|f| f.timestamp >= poss_fact.timestamp && f.timestamp <= drop_time)
+                        .collect();
+                    
+                    // Add the location when they picked it up
+                    let pickup_loc: Vec<_> = holder_facts.iter()
                         .filter(|f| f.predicate == "is_at" && f.polarity == Polarity::Positive)
                         .filter(|f| f.timestamp <= poss_fact.timestamp)
                         .collect();
                     
-                    if let Some(loc_fact) = holder_locations.iter().max_by_key(|f| f.timestamp) {
+                    if let Some(loc_fact) = pickup_loc.iter().max_by_key(|f| f.timestamp) {
                         history.push((loc_fact.object.clone(), poss_fact.timestamp));
+                    }
+                    
+                    // Add all locations they moved to while holding the object
+                    for loc_fact in holder_locations {
+                        history.push((loc_fact.object.clone(), loc_fact.timestamp));
                     }
                 }
             }
         }
         
         history.sort_by_key(|(_, ts)| *ts);
+        // Deduplicate consecutive same locations
+        history.dedup_by(|a, b| a.0 == b.0);
         history
     }
     
