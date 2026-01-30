@@ -249,6 +249,102 @@ impl TemporalStateTracker {
         None
     }
     
+    /// Query the state of an entity BEFORE it was at a specific location (bAbI Task 3)
+    /// 
+    /// Example: "Where was the apple before the garden?"
+    /// Returns the location the entity was at immediately before reaching the target location
+    pub fn query_state_before(&self, subject: &str, predicate: &str, before_location: &str) -> Option<(String, f32)> {
+        let subject_lower = subject.to_lowercase();
+        let before_lower = before_location.to_lowercase();
+        
+        if let Some(facts) = self.facts_by_subject.get(&subject_lower) {
+            // Find all location facts for this subject, sorted by time
+            let mut location_facts: Vec<_> = facts.iter()
+                .filter(|f| f.predicate == predicate && f.polarity == Polarity::Positive)
+                .collect();
+            
+            location_facts.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            
+            // Find the index where the entity reached the "before" location
+            let target_idx = location_facts.iter()
+                .position(|f| f.object.to_lowercase() == before_lower);
+            
+            if let Some(idx) = target_idx {
+                // Return the location immediately before
+                if idx > 0 {
+                    let prev_fact = &location_facts[idx - 1];
+                    return Some((prev_fact.object.clone(), prev_fact.confidence * 0.95));
+                }
+            }
+        }
+        
+        // Also check if the subject is an object being carried
+        // In bAbI 3, we track where objects were, which depends on who had them
+        if let Some(facts) = self.facts_by_object.get(&subject_lower) {
+            // Find who had this object and where they were
+            let mut possession_facts: Vec<_> = facts.iter()
+                .filter(|f| f.predicate == "has" && f.polarity == Polarity::Positive)
+                .collect();
+            
+            possession_facts.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            
+            // For each person who had the object, find their location at that time
+            for poss_fact in &possession_facts {
+                let holder = &poss_fact.subject;
+                if let Some(holder_facts) = self.facts_by_subject.get(holder) {
+                    // Find holder's location at the time they had the object
+                    let holder_locations: Vec<_> = holder_facts.iter()
+                        .filter(|f| f.predicate == "is_at" && f.polarity == Polarity::Positive)
+                        .filter(|f| f.timestamp <= poss_fact.timestamp)
+                        .collect();
+                    
+                    if let Some(loc_fact) = holder_locations.iter().max_by_key(|f| f.timestamp) {
+                        // Check if this is before the target location
+                        if loc_fact.object.to_lowercase() != before_lower {
+                            return Some((loc_fact.object.clone(), 0.9));
+                        }
+                    }
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Get the full location history for an entity/object
+    pub fn get_location_history(&self, subject: &str) -> Vec<(String, usize)> {
+        let subject_lower = subject.to_lowercase();
+        let mut history = Vec::new();
+        
+        // Direct location facts
+        if let Some(facts) = self.facts_by_subject.get(&subject_lower) {
+            for fact in facts.iter().filter(|f| f.predicate == "is_at" && f.polarity == Polarity::Positive) {
+                history.push((fact.object.clone(), fact.timestamp));
+            }
+        }
+        
+        // For objects, also track via possession
+        if let Some(facts) = self.facts_by_object.get(&subject_lower) {
+            for poss_fact in facts.iter().filter(|f| f.predicate == "has" && f.polarity == Polarity::Positive) {
+                let holder = &poss_fact.subject;
+                if let Some(holder_facts) = self.facts_by_subject.get(holder) {
+                    // Find holder's location when they got the object
+                    let holder_locations: Vec<_> = holder_facts.iter()
+                        .filter(|f| f.predicate == "is_at" && f.polarity == Polarity::Positive)
+                        .filter(|f| f.timestamp <= poss_fact.timestamp)
+                        .collect();
+                    
+                    if let Some(loc_fact) = holder_locations.iter().max_by_key(|f| f.timestamp) {
+                        history.push((loc_fact.object.clone(), poss_fact.timestamp));
+                    }
+                }
+            }
+        }
+        
+        history.sort_by_key(|(_, ts)| *ts);
+        history
+    }
+    
     /// Query what an entity has (for counting)
     pub fn query_possessions(&self, subject: &str) -> Vec<String> {
         let subject_lower = subject.to_lowercase();
@@ -288,9 +384,25 @@ impl TemporalStateTracker {
     pub fn answer_question(&self, question: &str) -> Option<(String, f32)> {
         let question_lower = question.to_lowercase();
         
+        // "Where was X before Y?" pattern (bAbI Task 3)
+        if question_lower.contains("before") && (question_lower.contains("where was") || question_lower.contains("where is")) {
+            // Extract entity and "before" location
+            if let Some((entity, before_loc)) = self.extract_before_question(&question_lower) {
+                return self.query_state_before(&entity, "is_at", &before_loc);
+            }
+        }
+        
         // "Where is X?" pattern
         if question_lower.contains("where is ") || question_lower.contains("where's ") {
             let entity = self.extract_entity_from_question(&question_lower, &["where is ", "where's "]);
+            if let Some(ent) = entity {
+                return self.query_state(&ent, "is_at");
+            }
+        }
+        
+        // "Where was X?" pattern (current location, not historical)
+        if question_lower.contains("where was ") && !question_lower.contains("before") {
+            let entity = self.extract_entity_from_question(&question_lower, &["where was "]);
             if let Some(ent) = entity {
                 return self.query_state(&ent, "is_at");
             }
@@ -340,6 +452,42 @@ impl TemporalStateTracker {
             }
         }
         None
+    }
+    
+    /// Extract entity and "before" location from a temporal question
+    /// 
+    /// Example: "Where was the apple before the garden?" -> ("apple", "garden")
+    fn extract_before_question(&self, question: &str) -> Option<(String, String)> {
+        // Pattern: "where was/is the X before the Y"
+        let before_pos = question.find("before")?;
+        
+        // Extract entity (between "was/is the" and "before")
+        let entity_part = &question[..before_pos];
+        let entity = if let Some(pos) = entity_part.rfind("the ") {
+            entity_part[pos + 4..].trim().to_string()
+        } else if let Some(pos) = entity_part.rfind("was ") {
+            entity_part[pos + 4..].trim().to_string()
+        } else if let Some(pos) = entity_part.rfind("is ") {
+            entity_part[pos + 3..].trim().to_string()
+        } else {
+            return None;
+        };
+        
+        // Extract "before" location
+        let after_before = &question[before_pos + 6..]; // Skip "before"
+        let before_loc = after_before.trim()
+            .trim_start_matches("the ")
+            .split(|c: char| c == '?' || c == '.' || c.is_whitespace())
+            .next()
+            .unwrap_or("")
+            .trim_matches(|c: char| !c.is_alphanumeric())
+            .to_string();
+        
+        if !entity.is_empty() && !before_loc.is_empty() {
+            Some((entity, before_loc))
+        } else {
+            None
+        }
     }
 }
 
@@ -760,9 +908,32 @@ impl SymbolicMathEngine {
         }
         
         // Sum all variables if asking for total
-        if question_lower.contains("total") || question_lower.contains("altogether") {
+        if question_lower.contains("total") || question_lower.contains("altogether") 
+           || question_lower.contains("together") {
             let total: f64 = self.variables.values().sum();
-            return Some((total, 0.8));
+            if total > 0.0 {
+                return Some((total, 0.8));
+            }
+        }
+        
+        // "How much" questions - look for price/cost calculations
+        if question_lower.contains("how much") {
+            // Check for price-related variables
+            let mut total = 0.0;
+            for (var, val) in &self.variables {
+                if var.contains("price") || var.contains("cost") || var.contains("dollar") {
+                    total += val;
+                }
+            }
+            if total > 0.0 {
+                return Some((total, 0.7));
+            }
+            
+            // Fall back to sum of all values
+            let total: f64 = self.variables.values().sum();
+            if total > 0.0 {
+                return Some((total, 0.5));
+            }
         }
         
         None

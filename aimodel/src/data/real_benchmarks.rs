@@ -2497,8 +2497,24 @@ impl RealBenchmarkEvaluator {
             
             // ----- EXPERT 1: ENTITY-ATTRIBUTE (Critical for bAbI) -----
             let entity_score = self.score_entity_attribute(&question_lower, &choice_lower);
-            let entity_weight = if primary_expert == ExpertType::EntityAttribute { 1.5 } else { 0.5 };
+            // High weight when entity-attribute finds a match (45+ score means inductive/deductive match)
+            // This is critical for bAbI 15/16 (deductive/inductive reasoning)
+            let has_strong_entity_match = entity_score >= 40.0;
+            let entity_weight = if has_strong_entity_match { 
+                5.0  // Strong match - must dominate other experts
+            } else if primary_expert == ExpertType::EntityAttribute { 
+                2.0 
+            } else { 
+                1.0 
+            };
             score += entity_score * entity_weight;
+            
+            // If we have a strong entity-attribute match, skip noisy experts
+            // This prevents location words from RAG/embeddings from overriding correct answers
+            if has_strong_entity_match {
+                logits.push(score);
+                continue;
+            }
             
             // ----- EXPERT 2: SEMANTIC EMBEDDING SIMILARITY -----
             let embed_sim = self.cosine_similarity(&question_embedding, &choice_embedding);
@@ -3222,7 +3238,11 @@ impl RealBenchmarkEvaluator {
         }
         
         // Extract the entity being asked about from the question
-        let asked_entity = self.extract_asked_entity(&context_lower);
+        // The question is typically the last sentence (after the last newline or period before ?)
+        let question_part = context_lower.split('\n')
+            .last()
+            .unwrap_or(&context_lower);
+        let asked_entity = self.extract_asked_entity(question_part);
         
         // DIRECT MATCH: Choice appears directly as entity attribute
         if let Some(attrs) = entity_attributes.get(&asked_entity) {
@@ -4586,6 +4606,64 @@ mod tests {
         assert_eq!(eval.training_iterations, 0);
         assert_eq!(eval.samples_seen, 0);
     }
+    
+    #[test]
+    fn test_entity_attribute_inductive() {
+        let eval = RealBenchmarkEvaluator::new("./test_data");
+        
+        // bAbI Task 16 style: inductive reasoning
+        // Brian is a lion, Bernhard is a lion and white, therefore Brian is white
+        let context = "lily is a swan.\nbernhard is a lion.\ngreg is a swan.\nbernhard is white.\nbrian is a lion.\nlily is gray.\njulius is a rhino.\njulius is gray.\ngreg is gray.\nwhat color is brian?";
+        
+        let score_white = eval.score_entity_attribute(context, "white");
+        let score_garden = eval.score_entity_attribute(context, "garden");
+        let score_kitchen = eval.score_entity_attribute(context, "kitchen");
+        
+        println!("Score for 'white': {}", score_white);
+        println!("Score for 'garden': {}", score_garden);
+        println!("Score for 'kitchen': {}", score_kitchen);
+        
+        // White should score highest (inductive: brian is lion, bernhard is lion+white, so lions are white)
+        assert!(score_white > score_garden, "white ({}) should score higher than garden ({})", score_white, score_garden);
+        assert!(score_white > score_kitchen, "white ({}) should score higher than kitchen ({})", score_white, score_kitchen);
+        assert!(score_white >= 40.0, "white should get inductive match score (>=40), got {}", score_white);
+    }
+    
+    #[test]
+    fn test_entity_attribute_with_capitalization() {
+        let eval = RealBenchmarkEvaluator::new("./test_data");
+        
+        // Test with capitalized names like actual bAbI data
+        let context = "Lily is a swan.\nBernhard is a lion.\nGreg is a swan.\nBernhard is white.\nBrian is a lion.\nLily is gray.\nJulius is a rhino.\nJulius is gray.\nGreg is gray.\nWhat color is Brian?";
+        
+        let score_white = eval.score_entity_attribute(context, "white");
+        let score_garden = eval.score_entity_attribute(context, "garden");
+        
+        println!("Capitalized - Score for 'white': {}", score_white);
+        println!("Capitalized - Score for 'garden': {}", score_garden);
+        
+        assert!(score_white >= 40.0, "white should get inductive match score (>=40), got {}", score_white);
+    }
+    
+    #[test]
+    fn test_entity_attribute_exact_babi_format() {
+        let eval = RealBenchmarkEvaluator::new("./test_data");
+        
+        // Exact format from bAbI loader - story + newline + question
+        let context = "Lily is a swan.Bernhard is a lion.Greg is a swan.Bernhard is white.Brian is a lion.Lily is gray.Julius is a rhino.Julius is gray.Greg is gray.\nWhat color is Brian?";
+        
+        let score_white = eval.score_entity_attribute(context, "white");
+        let score_garden = eval.score_entity_attribute(context, "garden");
+        let score_kitchen = eval.score_entity_attribute(context, "kitchen");
+        
+        println!("Exact bAbI format - Score for 'white': {}", score_white);
+        println!("Exact bAbI format - Score for 'garden': {}", score_garden);
+        println!("Exact bAbI format - Score for 'kitchen': {}", score_kitchen);
+        
+        // The loader concatenates without newlines between story sentences
+        assert!(score_white >= 40.0, "white should get inductive match score (>=40), got {}", score_white);
+    }
+    
     
     #[test]
     #[ignore] // Run with: cargo test test_generative_benchmark --lib -- --ignored --nocapture

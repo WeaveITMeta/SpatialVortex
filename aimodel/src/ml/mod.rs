@@ -33,6 +33,7 @@ pub mod reasoning_engine;
 pub mod unified_inference;
 pub mod recursive_chains;
 pub mod conceptual_agglomeration;
+pub mod geometric_world_model;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
@@ -123,4 +124,9 @@ pub use conceptual_agglomeration::{
     ConceptRef, ConceptRelation, ConceptRelationType,
     ResolvedAttributes, ResolvedValue,
     SACRED_DEPTH, CONFIDENCE_DECAY, CONCEPT_LATENT_DIM,
+};
+pub use geometric_world_model::{
+    GeometricWorldModel, WorldStateTensor, WorldEncoder,
+    GeometricRelationPredictor, WorldConsistencyObjective,
+    CoordinateSpace, EMBEDVEC_THRESHOLD,
 };
