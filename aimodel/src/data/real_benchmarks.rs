@@ -976,6 +976,10 @@ pub struct RealBenchmarkEvaluator {
     unified_engine: crate::ml::unified_inference::UnifiedInferenceEngine,
     /// Whether to use unified inference (true) or multi-expert voting (false)
     use_unified_inference: bool,
+    /// Consciousness Learner for self-improving commonsense reasoning
+    consciousness_learner: crate::ml::consciousness_learner::ConsciousnessLearner,
+    /// Whether consciousness learning is enabled
+    use_consciousness_learning: bool,
 }
 
 impl RealBenchmarkEvaluator {
@@ -1045,16 +1049,26 @@ impl RealBenchmarkEvaluator {
                 crate::ml::unified_inference::UnifiedConfig::default()
             ),
             use_unified_inference: true, // Use unified inference by default
+            consciousness_learner: crate::ml::consciousness_learner::ConsciousnessLearner::new(
+                crate::ml::consciousness_learner::ConsciousnessConfig::default()
+            ),
+            use_consciousness_learning: true, // Enable consciousness learning by default
         };
         
-        // Load all HuggingFace datasets to bootstrap knowledge
+        // STEP 1: Load all HuggingFace datasets to bootstrap knowledge
         evaluator.load_all_hf_datasets();
         
-        // Also sync hardcoded commonsense knowledge to RAG engine
+        // STEP 2: Sync hardcoded commonsense knowledge to RAG engine
         evaluator.sync_commonsense_to_rag();
         
-        // CRITICAL: Pretrain CALM weights before benchmarking
-        // This trains the encoder/decoder weights on the loaded knowledge
+        // STEP 3: Web learning AFTER HF data - uses knowledge gaps to guide queries
+        // This ensures web learning knows what's missing from HF data
+        println!("\n[PHASE 3] Web Learning - Learning from web to fill knowledge gaps...");
+        let web_categories = vec!["commonsense", "piqa", "winogrande"];
+        evaluator.consciousness_learn_for_benchmarks(&web_categories);
+        
+        // STEP 4: Pretrain CALM weights on ALL knowledge (HF + hardcoded + web)
+        // This trains the encoder/decoder weights on the complete loaded knowledge
         evaluator.pretrain_calm_weights();
         
         evaluator
@@ -1121,6 +1135,116 @@ impl RealBenchmarkEvaluator {
         
         println!("[CALM] Pretraining complete in {:.2}s on {} texts", 
                  start.elapsed().as_secs_f32(), training_texts.len());
+    }
+    
+    /// Pre-benchmark consciousness learning phase
+    /// Learns commonsense knowledge for specific benchmark categories
+    /// Now with REAL web learning from DuckDuckGo with critical thinking
+    pub fn consciousness_learn_for_benchmarks(&mut self, categories: &[&str]) {
+        if !self.use_consciousness_learning {
+            println!("[Consciousness] Learning disabled, skipping");
+            return;
+        }
+        
+        println!("╔═══════════════════════════════════════════════════════════════════════╗");
+        println!("║        CONSCIOUSNESS WEB LEARNING PHASE - Pre-Benchmark               ║");
+        println!("║   Learning from the web with critical thinking before benchmarks      ║");
+        println!("╠═══════════════════════════════════════════════════════════════════════╣");
+        
+        let start = std::time::Instant::now();
+        
+        // Run pre-benchmark learning with web search
+        let stats = self.consciousness_learner.learn_before_benchmark(categories);
+        
+        // Calculate rates
+        let elapsed_secs = stats.learning_time_ms as f64 / 1000.0;
+        let websites_per_sec = if elapsed_secs > 0.0 { 
+            stats.websites_referenced as f64 / elapsed_secs 
+        } else { 0.0 };
+        
+        println!("╠═══════════════════════════════════════════════════════════════════════╣");
+        println!("║  📊 WEB LEARNING STATISTICS                                           ║");
+        println!("╠═══════════════════════════════════════════════════════════════════════╣");
+        println!("║  🔍 Queries Generated:    {:>6}                                       ║", stats.queries_generated);
+        println!("║  🌐 Web Searches:         {:>6}                                       ║", stats.web_searches);
+        println!("║  📄 Websites Referenced:  {:>6}  ({:.1}/sec)                          ║", 
+                 stats.websites_referenced, websites_per_sec);
+        println!("║  🏠 Unique Domains:       {:>6}                                       ║", stats.unique_domains);
+        println!("╠═══════════════════════════════════════════════════════════════════════╣");
+        println!("║  📚 KNOWLEDGE EXTRACTION                                              ║");
+        println!("╠═══════════════════════════════════════════════════════════════════════╣");
+        println!("║  📝 Facts Extracted:      {:>6}                                       ║", stats.facts_extracted);
+        println!("║  ✅ Facts Verified:       {:>6}                                       ║", stats.facts_verified);
+        println!("║  💾 Facts Integrated:     {:>6}                                       ║", stats.facts_integrated);
+        println!("║  📦 Subjects Created:     {:>6}                                       ║", stats.subjects_created);
+        if stats.search_errors > 0 {
+            println!("║  ⚠️  Search Errors:       {:>6}                                       ║", stats.search_errors);
+        }
+        println!("╠═══════════════════════════════════════════════════════════════════════╣");
+        println!("║  ⏱️  Total Learning Time:  {:>6}ms ({:.2}s)                            ║", 
+                 stats.learning_time_ms, elapsed_secs);
+        println!("╚═══════════════════════════════════════════════════════════════════════╝");
+        
+        // Sync learned knowledge to RAG engine
+        self.sync_consciousness_to_rag();
+        
+        // Print knowledge gap analysis
+        let gap_analysis = self.consciousness_learner.analyze_knowledge_gaps();
+        println!("\n[Consciousness] Knowledge Health Score: {:.1}%", gap_analysis.health_score() * 100.0);
+        if !gap_analysis.priority_areas().is_empty() {
+            println!("[Consciousness] Priority areas for improvement: {:?}", gap_analysis.priority_areas());
+        }
+        
+        println!("[Consciousness] Learning complete in {:.2}s - {} websites referenced from {} unique domains", 
+                 start.elapsed().as_secs_f32(), stats.websites_referenced, stats.unique_domains);
+    }
+    
+    /// Sync consciousness-learned knowledge to RAG engine
+    fn sync_consciousness_to_rag(&mut self) {
+        let vortex_stats = self.consciousness_learner.vortex.stats();
+        
+        // Sync subjects and their attributes to RAG
+        for (subject, node) in &self.consciousness_learner.vortex.subjects {
+            // Add attributes as facts
+            for (attr, attr_val) in &node.attributes {
+                let fact = format!("{} {} {}", subject, attr, attr_val.value);
+                self.rag_engine.add_knowledge_entry(subject, &fact);
+            }
+            
+            // Add relations as facts
+            for (rel_type, target, _conf) in &node.relations {
+                let fact = format!("{} {} {}", subject, rel_type, target);
+                self.rag_engine.add_knowledge_entry(subject, &fact);
+            }
+        }
+        
+        println!("[Consciousness] Synced {} subjects to RAG engine", vortex_stats.subject_count);
+    }
+    
+    /// Log a failed question for consciousness learning
+    pub fn log_consciousness_failure(&mut self, question: &str, expected: &str, predicted: &str, category: &str) {
+        if self.use_consciousness_learning {
+            self.consciousness_learner.log_failure(question, expected, predicted, category);
+        }
+    }
+    
+    /// Score a choice using consciousness-learned knowledge
+    pub fn score_with_consciousness(&mut self, question: &str, choice: &str) -> f32 {
+        if !self.use_consciousness_learning {
+            return 0.0;
+        }
+        self.consciousness_learner.score_choice(question, choice)
+    }
+    
+    /// Enable or disable consciousness learning
+    pub fn set_consciousness_learning(&mut self, enabled: bool) {
+        self.use_consciousness_learning = enabled;
+        println!("[Consciousness] Learning {}", if enabled { "enabled" } else { "disabled" });
+    }
+    
+    /// Get consciousness learning statistics
+    pub fn get_consciousness_stats(&self) -> (crate::ml::consciousness_learner::LearningStats, crate::ml::consciousness_learner::VortexStats) {
+        self.consciousness_learner.get_stats()
     }
     
     /// Train the standalone CALM engine on text data

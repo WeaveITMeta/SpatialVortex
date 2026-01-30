@@ -35,6 +35,9 @@ pub mod recursive_chains;
 pub mod conceptual_agglomeration;
 pub mod geometric_world_model;
 pub mod world_knowledge;
+pub mod consciousness_learner;
+pub mod web_knowledge;
+pub mod sacred_attention;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
@@ -130,4 +133,26 @@ pub use geometric_world_model::{
     GeometricWorldModel, WorldStateTensor, WorldEncoder,
     GeometricRelationPredictor, WorldConsistencyObjective,
     CoordinateSpace, EMBEDVEC_THRESHOLD,
+};
+pub use consciousness_learner::{
+    ConsciousnessLearner, ConsciousnessConfig,
+    SubjectNode, DynamicVortex, VortexStats,
+    LearningStats, FailedQuestion, KnowledgeGapAnalysis,
+    AttributeValue, OperationLog, OperationType,
+    ExtractedFact,
+};
+pub use web_knowledge::{
+    DuckDuckGoScraper, WebScraperConfig, SearchResult, ScraperStats,
+    WebKnowledgeExtractor, WebKnowledge,
+    BatchWebLearner, BatchLearnerStats,
+};
+pub use sacred_attention::{
+    SacredAttentionPipeline, PipelineStats,
+    KeywordExtractionHeader, Position3Output,
+    RelationVerificationHeader, Position6Output,
+    KnowledgeIntegrationHeader, Position9Output,
+    ExtractedEntity, EntityType, ExtractedRelation,
+    VerifiedFact, VerificationResult, IntegratedEmbedding, IntegrationStats,
+    SACRED_POSITION_3, SACRED_POSITION_6, SACRED_POSITION_9,
+    VORTEX_CYCLE as SACRED_VORTEX_CYCLE,
 };

@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/WeaveITMeta/aimodel"
 
 [features]
-default = ["onnx", "burn-cpu"]
+default = ["onnx", "burn-cpu", "web-learning"]
 onnx = ["ort", "tokenizers"]
 burn-cpu = ["burn", "burn-ndarray", "burn-autodiff"]
 burn-gpu = ["burn", "burn-tch", "burn-autodiff"]
@@ -20,6 +20,8 @@ embeddings = ["embedvec"]
 gpu = ["burn-wgpu"]
 # Web server for chat
 web = ["actix-web", "actix-cors", "actix-files"]
+# Web learning with DuckDuckGo scraping
+web-learning = ["dep:reqwest", "dep:urlencoding"]
 
 [dependencies]
 # Core
@@ -73,7 +75,8 @@ csv = "1.3"
 
 # HuggingFace Hub for dataset downloading
 hf-hub = "0.3"
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", features = ["blocking", "json"], optional = true }
+urlencoding = { version = "2.1", optional = true }
 
 # RSI Macros (local proc-macro crate)
 rsi_macros = { path = "rsi_macros" }

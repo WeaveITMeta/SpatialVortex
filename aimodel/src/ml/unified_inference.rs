@@ -213,6 +213,9 @@ impl ReasoningLayer {
         // Extract room connections for bAbI 19 (path finding)
         self.extract_room_connections(context, latent);
         
+        // Extract size relations for bAbI 18 (size reasoning)
+        self.extract_size_relations(context, latent);
+        
         // Process with conceptual agglomeration for language-independent reasoning
         self.conceptual.process_context(context);
         
@@ -566,6 +569,23 @@ impl ReasoningLayer {
                     let answer = if matches { "yes" } else { "no" };
                     return Some((answer.to_string(), 0.95));
                 }
+                // Fallback: use transitive flux reasoner
+                let (holds, conf) = self.transitive.query_relation(&subject, "bigger_than", &object);
+                if conf > 0.3 {
+                    let answer = if holds { "yes" } else { "no" };
+                    return Some((answer.to_string(), conf));
+                }
+                // Check inverse: if object is bigger than subject, answer is "no"
+                let (inv_holds, inv_conf) = self.transitive.query_relation(&object, "bigger_than", &subject);
+                if inv_holds && inv_conf > 0.3 {
+                    return Some(("no".to_string(), inv_conf));
+                }
+                // If we have any size info about these entities, default to "no"
+                let has_subject_info = latent.size_relations.keys().any(|(a, _)| a == &subject);
+                let has_object_info = latent.size_relations.keys().any(|(a, _)| a == &object);
+                if has_subject_info || has_object_info {
+                    return Some(("no".to_string(), 0.6));
+                }
             }
         }
         
@@ -576,6 +596,23 @@ impl ReasoningLayer {
                     let matches = actual_rel == "smaller";
                     let answer = if matches { "yes" } else { "no" };
                     return Some((answer.to_string(), 0.95));
+                }
+                // Fallback: use transitive flux reasoner - fits_inside means smaller
+                let (holds, conf) = self.transitive.query_relation(&subject, "fits_inside", &object);
+                if conf > 0.3 {
+                    let answer = if holds { "yes" } else { "no" };
+                    return Some((answer.to_string(), conf));
+                }
+                // Check if subject is bigger than object (then it can't fit)
+                let (bigger, bigger_conf) = self.transitive.query_relation(&subject, "bigger_than", &object);
+                if bigger && bigger_conf > 0.3 {
+                    return Some(("no".to_string(), bigger_conf));
+                }
+                // If we have any size info about these entities, default to "no"
+                let has_subject_info = latent.size_relations.keys().any(|(a, _)| a == &subject);
+                let has_object_info = latent.size_relations.keys().any(|(a, _)| a == &object);
+                if has_subject_info || has_object_info {
+                    return Some(("no".to_string(), 0.6));
                 }
             }
         }
@@ -636,27 +673,33 @@ impl ReasoningLayer {
             }
         }
         
-        // "What is X carrying?" or "What does X have?"
+        // "What is X carrying?" or "What does X have?" (bAbI Task 8)
         if question_lower.contains("carrying") || 
            (question_lower.contains("what") && question_lower.contains("have")) {
             let entity = self.extract_entity(&question_lower, &["is ", "does ", "did "]);
             if let Some(ent) = entity {
-                // First try latent state
-                if let Some(possessions) = latent.entity_possessions.get(&ent) {
-                    if !possessions.is_empty() {
+                let ent_lower = ent.to_lowercase();
+                
+                // First try latent state (check both original and lowercase)
+                let possessions = latent.entity_possessions.get(&ent)
+                    .or_else(|| latent.entity_possessions.get(&ent_lower));
+                    
+                if let Some(poss) = possessions {
+                    if !poss.is_empty() {
                         // bAbI8 format: comma-separated, no spaces
-                        return Some((possessions.join(","), latent.confidence));
+                        return Some((poss.join(","), latent.confidence));
                     } else {
                         return Some(("nothing".to_string(), latent.confidence));
                     }
                 }
                 
                 // Fallback: query temporal tracker directly
-                let possessions = self.temporal.query_possessions(&ent);
-                if !possessions.is_empty() {
-                    return Some((possessions.join(","), latent.confidence));
+                let poss = self.temporal.query_possessions(&ent_lower);
+                if !poss.is_empty() {
+                    return Some((poss.join(","), latent.confidence));
                 } else {
-                    return Some(("nothing".to_string(), latent.confidence * 0.9));
+                    // Entity exists in context but has nothing - return "nothing" with high confidence
+                    return Some(("nothing".to_string(), 0.95));
                 }
             }
         }
@@ -1122,11 +1165,27 @@ impl UnifiedInferenceEngine {
         
         // Step 3: Try to answer directly from reasoning
         if let Some((answer, conf)) = self.reasoning.answer_question(question, &latent) {
+            let answer_lower = answer.to_lowercase();
             // Find matching choice
             for (idx, choice) in choices.iter().enumerate() {
                 let choice_lower = choice.to_lowercase();
-                if choice_lower == answer || choice_lower.contains(&answer) || answer.contains(&choice_lower) {
+                // Exact match or containment (handle comma-separated lists for bAbI8)
+                if choice_lower == answer_lower || 
+                   choice_lower.contains(&answer_lower) || 
+                   answer_lower.contains(&choice_lower) ||
+                   // Handle comma-separated lists: "football,apple" matches "football,apple"
+                   (answer_lower.contains(',') && choice_lower.contains(',') && 
+                    answer_lower.split(',').collect::<Vec<_>>() == choice_lower.split(',').collect::<Vec<_>>()) {
                     return (idx, conf);
+                }
+            }
+            // If we have a high-confidence answer but no exact match, still use it
+            // This handles cases like "nothing" where the answer is definitive
+            if conf > 0.9 {
+                for (idx, choice) in choices.iter().enumerate() {
+                    if choice.to_lowercase().trim() == answer_lower.trim() {
+                        return (idx, conf);
+                    }
                 }
             }
         }

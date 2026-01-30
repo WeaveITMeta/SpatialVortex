@@ -165,9 +165,30 @@ fn main() -> Result<()> {
     // Enable generative mode with GPU-accelerated exhaustive pathway search
     evaluator.set_generative_mode(true);
 
-    // Optional: Run training before evaluation
+    // STEP 1: Consciousness Web Learning (BEFORE training)
+    // Learn from the web with critical thinking before any other training
+    println!("\n[PHASE 1] Consciousness Web Learning - Learning from the web...");
+    let learning_categories: Vec<&str> = tasks.iter()
+        .filter_map(|t| {
+            if t.contains("babi") { Some("commonsense") }
+            else if t.contains("csqa") || t.contains("commonsense") { Some("commonsense") }
+            else if t.contains("piqa") { Some("piqa") }
+            else if t.contains("winogrande") { Some("winogrande") }
+            else if t.contains("hellaswag") { Some("hellaswag") }
+            else { None }
+        })
+        .collect();
+    
+    if !learning_categories.is_empty() {
+        evaluator.consciousness_learn_for_benchmarks(&learning_categories);
+    } else {
+        // Default to general commonsense learning
+        evaluator.consciousness_learn_for_benchmarks(&["commonsense"]);
+    }
+
+    // STEP 2: Optional training (AFTER consciousness learning)
     if !args.eval_only && args.train_epochs > 0 {
-        println!("\n[TRAINING] Running {} epochs of GPU training...", args.train_epochs);
+        println!("\n[PHASE 2] GPU Training - Running {} epochs...", args.train_epochs);
         run_training(&mut evaluator, args.train_epochs)?;
     }
 

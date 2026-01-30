@@ -84,7 +84,8 @@ impl TemporalStateTracker {
             ("went back to", "is_at"),
         ];
         
-        // Possession patterns (bAbI 4, 6, 7)
+        // Possession patterns (bAbI 4, 6, 7, 8)
+        // Note: "left" alone is too broad - conflicts with "to the left of" in babi17
         let possession_patterns = [
             ("picked up the", "has"),
             ("picked up", "has"),
@@ -93,8 +94,13 @@ impl TemporalStateTracker {
             ("took the", "has"),
             ("received the", "has"),
             ("dropped the", "dropped"),
+            ("dropped", "dropped"),
             ("put down the", "dropped"),
+            ("put down", "dropped"),
             ("discarded the", "dropped"),
+            ("discarded", "dropped"),
+            ("left the", "dropped"),
+            // Don't use bare "left" - conflicts with positional "left of"
             ("gave the", "gave"),
             ("handed the", "gave"),
             ("passed the", "gave"),
