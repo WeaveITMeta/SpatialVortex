@@ -563,70 +563,11 @@ impl ConsciousnessLearner {
         });
     }
 
-    /// Analyze knowledge gaps and generate improvement queries dynamically
-    /// This is truly autoregressive - the model prompts itself based on what it DOESN'T know
-    /// rather than what it got wrong on benchmarks
-    pub fn generate_improvement_queries(&self) -> Vec<String> {
-        let mut queries = Vec::new();
-        let mut seen_topics = std::collections::HashSet::new();
-        
-        // 1. Find subjects with low confidence (need verification)
-        let low_confidence_subjects = self.find_low_confidence_subjects(0.5);
-        for subject in low_confidence_subjects {
-            if seen_topics.insert(subject.clone()) {
-                queries.push(format!("facts about {}", subject));
-                queries.push(format!("{} properties and characteristics", subject));
-            }
-        }
-        
-        // 2. Find subjects with few relations (isolated nodes)
-        let isolated_subjects = self.find_isolated_subjects(2);
-        for subject in isolated_subjects {
-            if seen_topics.insert(subject.clone()) {
-                queries.push(format!("what is {} related to", subject));
-                queries.push(format!("{} connections and associations", subject));
-            }
-        }
-        
-        // 3. Find subjects missing common attributes
-        let incomplete_subjects = self.find_incomplete_subjects();
-        for (subject, missing_attrs) in incomplete_subjects {
-            if seen_topics.insert(subject.clone()) {
-                for attr in missing_attrs.iter().take(2) {
-                    queries.push(format!("{} {}", subject, attr));
-                }
-            }
-        }
-        
-        // 4. Find sparse embedding regions (knowledge gaps)
-        let sparse_regions = self.find_sparse_embedding_regions();
-        for region_query in sparse_regions {
-            if seen_topics.insert(region_query.clone()) {
-                queries.push(region_query);
-            }
-        }
-        
-        // 5. Generate queries from keyword index gaps
-        let keyword_gaps = self.find_keyword_gaps();
-        for keyword in keyword_gaps {
-            if seen_topics.insert(keyword.clone()) {
-                queries.push(format!("what is {} and where is it found", keyword));
-            }
-        }
-        
-        // 6. Also include failure-based queries if any exist (backward compatible)
-        for failure in &self.failure_log {
-            let concepts = extract_key_concepts(&failure.question);
-            for concept in concepts {
-                if seen_topics.insert(concept.clone()) {
-                    queries.push(format!("facts about {}", concept));
-                }
-            }
-        }
-        
-        // Limit queries
-        queries.truncate(self.config.max_queries_per_session);
-        queries
+    /// Generate improvement queries based on knowledge gap analysis
+    /// DEPRECATED: No longer used - we rely on dynamic test-time learning only
+    fn generate_improvement_queries(&self) -> Vec<String> {
+        // Return empty - all learning happens dynamically at test time
+        Vec::new()
     }
     
     /// Find subjects with confidence below threshold
@@ -940,37 +881,10 @@ impl ConsciousnessLearner {
     }
 
     /// Generate queries for a specific benchmark category
-    fn generate_category_queries(&self, category: &str) -> Vec<String> {
-        match category {
-            "piqa" => vec![
-                "physical properties of common objects".to_string(),
-                "how to use household tools".to_string(),
-                "material properties and behavior".to_string(),
-                "cause and effect in physical world".to_string(),
-            ],
-            "winogrande" => vec![
-                "pronoun resolution context clues".to_string(),
-                "common activities and their participants".to_string(),
-                "gender and role associations".to_string(),
-            ],
-            "commonsenseqa" | "csqa" => vec![
-                "where to find common objects".to_string(),
-                "typical locations for activities".to_string(),
-                "common knowledge about places".to_string(),
-                "everyday object purposes".to_string(),
-            ],
-            "hellaswag" => vec![
-                "common activity sequences".to_string(),
-                "what happens next scenarios".to_string(),
-                "typical event progressions".to_string(),
-            ],
-            "arc" => vec![
-                "basic science facts".to_string(),
-                "elementary physics concepts".to_string(),
-                "biology fundamentals".to_string(),
-            ],
-            _ => vec![format!("facts about {}", category)],
-        }
+    /// DEPRECATED: No longer used - we rely on dynamic test-time learning only
+    fn generate_category_queries(&self, _category: &str) -> Vec<String> {
+        // Return empty - all learning happens dynamically at test time
+        Vec::new()
     }
 
     /// Learn from web searches - PARALLEL HIGH-THROUGHPUT version
@@ -1012,14 +926,15 @@ impl ConsciousnessLearner {
                 let mut scraper = crate::ml::web_knowledge::DuckDuckGoScraper::new(web_config.clone());
                 let extractor = crate::ml::web_knowledge::WebKnowledgeExtractor::new();
                 
+                println!("   [Web Learning] Searching: {}", query);
                 match scraper.search_sync(query) {
                     Ok(results) => {
-                        if !results.is_empty() {
-                            println!("   [Web Learning] ✓ Query '{}' returned {} results", query, results.len());
-                        } else if batch_idx == 0 {
+                        println!("   [Web Learning] ✓ Query '{}' returned {} results", query, results.len());
+                        if results.is_empty() {
                             eprintln!("   [Web Learning] Warning: Query '{}' returned 0 results", query);
                         }
                         let knowledge = extractor.extract_from_results(&results, query);
+                        println!("   [Web Learning] Extracted {} facts from query '{}'", knowledge.len(), query);
                         Some((results, knowledge))
                     }
                     Err(e) => {

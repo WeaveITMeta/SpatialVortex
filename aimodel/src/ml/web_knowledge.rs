@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
 
 // =============================================================================
 // DUCKDUCKGO SCRAPER
@@ -71,6 +72,12 @@ pub struct DuckDuckGoScraper {
     /// Reusable HTTP client with connection pooling
     #[cfg(feature = "web-learning")]
     client: Option<reqwest::Client>,
+    /// List of proxy servers to rotate through
+    #[cfg(feature = "web-learning")]
+    proxy_list: Arc<Mutex<Vec<String>>>,
+    /// Current proxy index
+    #[cfg(feature = "web-learning")]
+    proxy_index: Arc<Mutex<usize>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -84,17 +91,35 @@ pub struct ScraperStats {
 impl DuckDuckGoScraper {
     pub fn new(config: WebScraperConfig) -> Self {
         #[cfg(feature = "web-learning")]
-        let client = Some(
-            reqwest::Client::builder()
+        let (client, proxy_list, proxy_index) = {
+            // Don't fetch proxies in constructor to avoid nested runtime issues
+            // Wikipedia API doesn't need proxies anyway
+            let proxy_list = Arc::new(Mutex::new(Vec::new()));
+            let proxy_index = Arc::new(Mutex::new(0));
+            
+            let mut builder = reqwest::Client::builder()
                 .timeout(Duration::from_secs(config.timeout_secs))
                 .user_agent(&config.user_agent())
-                .pool_max_idle_per_host(100) // Massive connection pool
+                .pool_max_idle_per_host(100)
                 .pool_idle_timeout(Duration::from_secs(90))
-                .http1_only() // Use HTTP/1.1 - DuckDuckGo doesn't support HTTP/2 properly
-                .tcp_keepalive(Duration::from_secs(60))
-                .build()
-                .expect("Failed to create HTTP client")
-        );
+                .http1_only()
+                .tcp_keepalive(Duration::from_secs(60));
+            
+            // Check for manual proxy from environment
+            if let Ok(proxy_url) = std::env::var("HTTPS_PROXY")
+                .or_else(|_| std::env::var("HTTP_PROXY"))
+                .or_else(|_| std::env::var("https_proxy"))
+                .or_else(|_| std::env::var("http_proxy"))
+            {
+                if let Ok(proxy) = reqwest::Proxy::all(&proxy_url) {
+                    println!("[WebScraper] Using manual proxy: {}", proxy_url);
+                    builder = builder.proxy(proxy);
+                }
+            }
+            
+            let client = builder.build().expect("Failed to create HTTP client");
+            (Some(client), proxy_list, proxy_index)
+        };
         
         Self {
             config,
@@ -102,11 +127,130 @@ impl DuckDuckGoScraper {
             stats: ScraperStats::default(),
             #[cfg(feature = "web-learning")]
             client,
+            #[cfg(feature = "web-learning")]
+            proxy_list,
+            #[cfg(feature = "web-learning")]
+            proxy_index,
         }
     }
+    
+    /// Fetch proxy list from free-proxy-list.net API
+    #[cfg(feature = "web-learning")]
+    fn fetch_proxy_list() -> Vec<String> {
+        println!("[WebScraper] Fetching proxy list from free-proxy-list.net...");
+        
+        // Try to fetch proxy list
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let proxies = rt.block_on(async {
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(10))
+                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .build()
+                .ok()?;
+            
+            // Fetch the proxy list page
+            let response = client
+                .get("https://free-proxy-list.net/")
+                .send()
+                .await
+                .ok()?;
+            
+            let html = response.text().await.ok()?;
+            
+            // Parse HTML to extract proxies from table
+            // The table has structure: <tbody><tr><td>IP</td><td>PORT</td>...
+            let mut proxies = Vec::new();
+            let mut in_tbody = false;
+            let mut current_ip = String::new();
+            let mut td_count = 0;
+            
+            for line in html.lines() {
+                let trimmed = line.trim();
+                
+                if trimmed.contains("<tbody>") {
+                    in_tbody = true;
+                    continue;
+                }
+                if trimmed.contains("</tbody>") {
+                    break;
+                }
+                
+                if in_tbody {
+                    if trimmed.starts_with("<tr") {
+                        current_ip.clear();
+                        td_count = 0;
+                    } else if trimmed.starts_with("<td") {
+                        // Extract content between <td> and </td>
+                        if let Some(start) = trimmed.find('>') {
+                            if let Some(end) = trimmed.find("</td>") {
+                                let content = trimmed[start + 1..end].trim();
+                                
+                                if td_count == 0 {
+                                    // First column is IP
+                                    if content.split('.').count() == 4 {
+                                        current_ip = content.to_string();
+                                    }
+                                } else if td_count == 1 && !current_ip.is_empty() {
+                                    // Second column is PORT
+                                    if let Ok(_) = content.parse::<u16>() {
+                                        proxies.push(format!("http://{}:{}", current_ip, content));
+                                        current_ip.clear();
+                                    }
+                                }
+                                td_count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Some(proxies)
+        });
+        
+        match proxies {
+            Some(list) if !list.is_empty() => {
+                println!("[WebScraper] Fetched {} proxies", list.len());
+                // Limit to first 50 proxies to avoid too many retries
+                list.into_iter().take(50).collect()
+            }
+            _ => {
+                println!("[WebScraper] Failed to fetch proxies, will try direct connection");
+                Vec::new()
+            }
+        }
+    }
+    
+    /// Get next proxy from the rotation list
+    #[cfg(feature = "web-learning")]
+    fn get_next_proxy(&self) -> Option<String> {
+        let proxies = self.proxy_list.lock().unwrap();
+        if proxies.is_empty() {
+            return None;
+        }
+        
+        let mut index = self.proxy_index.lock().unwrap();
+        let proxy = proxies[*index % proxies.len()].clone();
+        *index += 1;
+        
+        Some(proxy)
+    }
+    
+    /// Create a new client with the next proxy
+    #[cfg(feature = "web-learning")]
+    fn create_client_with_proxy(&self, proxy_url: &str) -> Option<reqwest::Client> {
+        let proxy = reqwest::Proxy::all(proxy_url).ok()?;
+        
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(self.config.timeout_secs))
+            .user_agent(&self.config.user_agent())
+            .proxy(proxy)
+            .http1_only()
+            .build()
+            .ok()
+    }
 
-    /// Search DuckDuckGo and return results
-    /// Uses HTML endpoint: https://html.duckduckgo.com/html/?q={query}
+    /// Search Wikipedia and return results
+    /// Uses Wikipedia API: https://en.wikipedia.org/w/api.php
     #[cfg(feature = "web-learning")]
     pub async fn search(&mut self, query: &str) -> Result<Vec<SearchResult>, String> {
         // Check cache first
@@ -117,34 +261,156 @@ impl DuckDuckGoScraper {
 
         self.stats.total_searches += 1;
 
-        // Build URL
-        let encoded_query = urlencoding::encode(query);
-        let url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
+        // Rate limiting: 200ms delay between requests to avoid 429 errors
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
-        // Use reusable client for connection pooling
         let client = self.client.as_ref().unwrap();
+        let encoded_query = urlencoding::encode(query);
+        
+        // Wikipedia API search endpoint
+        let search_url = format!(
+            "https://en.wikipedia.org/w/api.php?action=opensearch&search={}&limit=5&format=json",
+            encoded_query
+        );
 
-        let response = client.get(&url)
+        println!("[Wikipedia] Searching for: {}", query);
+        println!("[Wikipedia] URL: {}", search_url);
+
+        // Get search results
+        let response = client.get(&search_url)
             .send()
             .await
             .map_err(|e| {
                 self.stats.errors += 1;
-                e.to_string()
+                let err_msg = format!("Wikipedia search failed: {}", e);
+                println!("[Wikipedia] ✗ {}", err_msg);
+                err_msg
             })?;
 
-        let html = response.text().await.map_err(|e| {
+        println!("[Wikipedia] Response status: {}", response.status());
+
+        let json_text = response.text().await.map_err(|e| {
             self.stats.errors += 1;
-            e.to_string()
+            let err_msg = format!("Failed to read Wikipedia response: {}", e);
+            println!("[Wikipedia] ✗ {}", err_msg);
+            err_msg
         })?;
 
-        // Parse HTML results
-        let results = self.parse_html_results(&html);
+        println!("[Wikipedia] Response length: {} bytes", json_text.len());
+
+        // Parse JSON response: [query, [titles], [descriptions], [urls]]
+        let json: serde_json::Value = serde_json::from_str(&json_text)
+            .map_err(|e| {
+                let err_msg = format!("Failed to parse Wikipedia JSON: {}", e);
+                println!("[Wikipedia] ✗ {}", err_msg);
+                err_msg
+            })?;
+
+        let mut results = Vec::new();
+
+        if let Some(arr) = json.as_array() {
+            println!("[Wikipedia] JSON array length: {}", arr.len());
+            if arr.len() >= 4 {
+                let titles = arr[1].as_array();
+                let descriptions = arr[2].as_array();
+                let urls = arr[3].as_array();
+
+                if let (Some(titles), Some(descriptions), Some(urls)) = (titles, descriptions, urls) {
+                    println!("[Wikipedia] Found {} titles", titles.len());
+                    for i in 0..titles.len().min(self.config.max_results) {
+                        if let (Some(title), Some(desc), Some(url)) = (
+                            titles[i].as_str(),
+                            descriptions[i].as_str(),
+                            urls[i].as_str(),
+                        ) {
+                            println!("[Wikipedia] Processing: {}", title);
+                            // Fetch article content for better facts
+                            let content = self.fetch_wikipedia_content(url).await
+                                .unwrap_or_else(|e| {
+                                    println!("[Wikipedia] Content fetch failed: {}", e);
+                                    desc.to_string()
+                                });
+
+                            results.push(SearchResult {
+                                title: title.to_string(),
+                                url: url.to_string(),
+                                snippet: content,
+                                keywords: Self::extract_keywords(title),
+                            });
+                        }
+                    }
+                } else {
+                    println!("[Wikipedia] Failed to extract titles/descriptions/urls from JSON");
+                }
+            } else {
+                println!("[Wikipedia] JSON array too short (expected 4, got {})", arr.len());
+            }
+        } else {
+            println!("[Wikipedia] Response is not a JSON array");
+        }
+
+        println!("[Wikipedia] ✓ Returning {} results for query: {}", results.len(), query);
         self.stats.total_results += results.len();
-
-        // Cache results
         self.cache.insert(query.to_string(), results.clone());
-
         Ok(results)
+    }
+    
+    /// Fetch Wikipedia article content
+    #[cfg(feature = "web-learning")]
+    async fn fetch_wikipedia_content(&self, url: &str) -> Result<String, String> {
+        // Extract article title from URL
+        let title = url.split("/wiki/").last()
+            .ok_or("Invalid Wikipedia URL")?;
+        
+        // Rate limiting: 200ms delay for content fetch too
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        
+        let client = self.client.as_ref().unwrap();
+        
+        // Use Wikipedia API to get extract
+        let api_url = format!(
+            "https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles={}&format=json",
+            title
+        );
+        
+        let response = client.get(&api_url).send().await
+            .map_err(|e| format!("Failed to fetch content: {}", e))?;
+        
+        // Check for rate limiting
+        if response.status().as_u16() == 429 {
+            return Err("Rate limited".to_string());
+        }
+        
+        let json_text = response.text().await
+            .map_err(|e| format!("Failed to read content: {}", e))?;
+        
+        // Check if response is HTML error page (rate limit page)
+        if json_text.contains("<html") || json_text.contains("<!DOCTYPE") {
+            return Err("Rate limited (HTML response)".to_string());
+        }
+        
+        let json: serde_json::Value = serde_json::from_str(&json_text)
+            .map_err(|e| format!("Failed to parse content JSON: {}", e))?;
+        
+        // Extract the intro text
+        if let Some(pages) = json["query"]["pages"].as_object() {
+            for (_, page) in pages {
+                if let Some(extract) = page["extract"].as_str() {
+                    // Return first 500 chars of intro
+                    return Ok(extract.chars().take(500).collect());
+                }
+            }
+        }
+        
+        Err("No content found".to_string())
+    }
+    
+    /// Extract keywords from text
+    fn extract_keywords(text: &str) -> Vec<String> {
+        text.split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.len() > 3)
+            .map(|w| w.to_lowercase())
+            .collect()
     }
 
     /// Fallback search when web-learning is not available
@@ -168,19 +434,27 @@ impl DuckDuckGoScraper {
         #[cfg(feature = "web-learning")]
         {
             use tokio::runtime::Runtime;
-            if let Ok(rt) = Runtime::new() {
-                return rt.block_on(self.search_async_internal(query));
+            println!("[search_sync] Creating runtime for query: {}", query);
+            match Runtime::new() {
+                Ok(rt) => {
+                    println!("[search_sync] Runtime created, calling search()");
+                    return rt.block_on(self.search(query));
+                }
+                Err(e) => {
+                    eprintln!("[search_sync] Failed to create runtime: {}", e);
+                }
             }
         }
 
         // Fallback: return empty
+        println!("[search_sync] Returning empty results (no runtime)");
         Ok(Vec::new())
     }
 
     #[cfg(feature = "web-learning")]
     async fn search_async_internal(&self, query: &str) -> Result<Vec<SearchResult>, String> {
+        // This method is deprecated - use search() instead which has Wikipedia API
         let encoded_query = urlencoding::encode(query);
-        // Use the HTML endpoint as recommended by Stack Overflow
         let url = format!("https://duckduckgo.com/html/?q={}", encoded_query);
 
         // Use reusable client for connection pooling

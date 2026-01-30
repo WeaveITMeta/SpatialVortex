@@ -980,6 +980,10 @@ pub struct RealBenchmarkEvaluator {
     consciousness_learner: crate::ml::consciousness_learner::ConsciousnessLearner,
     /// Whether consciousness learning is enabled
     use_consciousness_learning: bool,
+    /// Web scraper for test-time learning
+    web_scraper: crate::ml::web_knowledge::DuckDuckGoScraper,
+    /// Web knowledge extractor
+    web_extractor: crate::ml::web_knowledge::WebKnowledgeExtractor,
 }
 
 impl RealBenchmarkEvaluator {
@@ -1053,6 +1057,14 @@ impl RealBenchmarkEvaluator {
                 crate::ml::consciousness_learner::ConsciousnessConfig::default()
             ),
             use_consciousness_learning: true, // Enable consciousness learning by default
+            web_scraper: crate::ml::web_knowledge::DuckDuckGoScraper::new(
+                crate::ml::web_knowledge::WebScraperConfig {
+                    timeout_secs: 10,
+                    max_results: 3,
+                    request_delay_ms: 0,
+                }
+            ),
+            web_extractor: crate::ml::web_knowledge::WebKnowledgeExtractor::new(),
         };
         
         // STEP 1: Load all HuggingFace datasets to bootstrap knowledge
@@ -1135,6 +1147,88 @@ impl RealBenchmarkEvaluator {
         
         println!("[CALM] Pretraining complete in {:.2}s on {} texts", 
                  start.elapsed().as_secs_f32(), training_texts.len());
+    }
+    
+    /// Test-time web learning: Query Wikipedia for question-specific knowledge
+    /// Extracts key concepts from question and choices, searches Wikipedia,
+    /// and integrates learned facts into RAG engine for immediate use
+    fn test_time_web_learning(&mut self, question: &RealBenchmarkQuestion) {
+        // Extract key concepts from question and choices
+        let mut concepts = Vec::new();
+        
+        // Extract nouns and important words from question
+        let question_words: Vec<&str> = question.question
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.len() > 3)
+            .collect();
+        
+        // Take top 2-3 most important words from question
+        for word in question_words.iter().take(3) {
+            let word_lower = word.to_lowercase();
+            // Skip common question words
+            if !["what", "where", "when", "which", "would", "could", "should", "that", "this", "from", "with", "about"].contains(&word_lower.as_str()) {
+                concepts.push(word_lower);
+            }
+        }
+        
+        // Also extract key concepts from choices (they often contain the answer domain)
+        for choice in &question.choices {
+            let choice_words: Vec<&str> = choice
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|w| w.len() > 4)
+                .collect();
+            
+            // Take first significant word from each choice
+            if let Some(word) = choice_words.first() {
+                let word_lower = word.to_lowercase();
+                if !concepts.contains(&word_lower) {
+                    concepts.push(word_lower);
+                }
+            }
+        }
+        
+        // Limit to top 5 concepts to avoid too many queries
+        concepts.truncate(5);
+        
+        if concepts.is_empty() {
+            return;
+        }
+        
+        // Search Wikipedia for each concept
+        for concept in &concepts {
+            match self.web_scraper.search_sync(concept) {
+                Ok(results) => {
+                    if !results.is_empty() {
+                        // Extract knowledge from results
+                        let knowledge = self.web_extractor.extract_from_results(&results, concept);
+                        
+                        // Integrate knowledge into RAG engine immediately
+                        for k in knowledge {
+                            // Add to RAG as a fact (subject + attribute + value)
+                            let fact = format!("{} {} {}", k.subject, k.attribute, k.value);
+                            self.rag_engine.add_knowledge_entry(&k.subject, &fact);
+                            
+                            // Also add to learned entity attributes
+                            self.learned_entity_attrs
+                                .entry(k.subject.clone())
+                                .or_insert_with(HashMap::new)
+                                .insert(k.attribute.clone(), k.confidence);
+                            
+                            // Add keywords as attributes too
+                            for keyword in &k.keywords {
+                                self.learned_entity_attrs
+                                    .entry(k.subject.clone())
+                                    .or_insert_with(HashMap::new)
+                                    .insert(keyword.clone(), k.confidence);
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    // Silent failure - don't slow down inference with error messages
+                }
+            }
+        }
     }
     
     /// Pre-benchmark consciousness learning phase
@@ -1303,84 +1397,17 @@ impl RealBenchmarkEvaluator {
         beam
     }
     
-    /// Sync the hardcoded commonsense knowledge to RAG engine
+    /// Sync knowledge to RAG engine from learned sources only
+    /// No hardcoded facts - all knowledge from HuggingFace datasets and web learning
     fn sync_commonsense_to_rag(&mut self) {
-        // Location knowledge
-        let location_facts = [
-            ("penguin", "Penguins are found in Antarctica and zoos."),
-            ("bank", "Banks are financial institutions found in cities."),
-            ("river", "Rivers have banks on their sides."),
-            ("library", "Libraries are places where books are kept."),
-            ("hospital", "Hospitals are places for medical treatment."),
-            ("school", "Schools are places for education."),
-            ("restaurant", "Restaurants are places to eat food."),
-            ("kitchen", "Kitchens are rooms for cooking food."),
-            ("bedroom", "Bedrooms are rooms for sleeping."),
-            ("bathroom", "Bathrooms are rooms for washing."),
-            ("garage", "Garages are places for storing cars."),
-            ("office", "Offices are places for work."),
-            ("park", "Parks are outdoor areas for recreation."),
-            ("store", "Stores are places to buy things."),
-            ("refrigerator", "Refrigerators are found in kitchens."),
-        ];
-        
-        // UsedFor knowledge
-        let usedfor_facts = [
-            ("scissors", "Scissors are used for cutting."),
-            ("knife", "Knives are used for cutting."),
-            ("pen", "Pens are used for writing."),
-            ("hammer", "Hammers are used for hitting nails."),
-            ("umbrella", "Umbrellas are used for protection from rain."),
-            ("glasses", "Glasses are used for seeing better."),
-            ("phone", "Phones are used for communication."),
-            ("computer", "Computers are used for computing and work."),
-            ("car", "Cars are used for transportation."),
-            ("bed", "Beds are used for sleeping."),
-            ("chair", "Chairs are used for sitting."),
-            ("book", "Books are used for reading and learning."),
-            ("key", "Keys are used for opening locks."),
-            ("lock", "Locks are used for security."),
-        ];
-        
-        // CapableOf knowledge
-        let capableof_facts = [
-            ("bird", "Birds are capable of flying."),
-            ("fish", "Fish are capable of swimming."),
-            ("dog", "Dogs are capable of barking."),
-            ("cat", "Cats are capable of meowing."),
-            ("human", "Humans are capable of thinking and speaking."),
-            ("car", "Cars are capable of driving."),
-            ("plane", "Planes are capable of flying."),
-            ("boat", "Boats are capable of floating."),
-            ("phone", "Phones are capable of calling."),
-        ];
-        
-        // HasProperty knowledge
-        let property_facts = [
-            ("ice", "Ice has the property of being cold."),
-            ("fire", "Fire has the property of being hot."),
-            ("sun", "The sun has the property of being bright."),
-            ("night", "Night has the property of being dark."),
-            ("water", "Water has the property of being wet."),
-            ("rock", "Rocks have the property of being hard."),
-            ("cotton", "Cotton has the property of being soft."),
-            ("elephant", "Elephants have the property of being large."),
-            ("ant", "Ants have the property of being small."),
-            ("cheetah", "Cheetahs have the property of being fast."),
-            ("snail", "Snails have the property of being slow."),
-        ];
-        
-        // Add all facts to RAG engine
-        for (topic, fact) in location_facts.iter()
-            .chain(usedfor_facts.iter())
-            .chain(capableof_facts.iter())
-            .chain(property_facts.iter())
-        {
-            self.rag_engine.add_knowledge_entry(topic, fact);
-        }
+        // Knowledge comes purely from:
+        // 1. HuggingFace datasets (already loaded in load_all_hf_datasets)
+        // 2. Web learning (when search API is available)
+        // 3. Extracted from training data
+        // No hardcoded facts allowed to avoid benchmark rigging
         
         let (topics, facts) = self.rag_engine.knowledge_size();
-        println!("   RAG engine initialized: {} topics, {} facts", topics, facts);
+        println!("   RAG engine knowledge from datasets: {} topics, {} facts", topics, facts);
     }
     
     /// Load all 125 HuggingFace datasets to bootstrap knowledge before benchmarks
@@ -1616,101 +1643,14 @@ impl RealBenchmarkEvaluator {
     }
     
     /// Initialize commonsense knowledge for CommonsenseQA-style questions
-    /// This provides world knowledge that the model needs for reasoning
-    fn init_commonsense_knowledge(engine: &mut HierarchicalDeductionEngine) {
-        // Location knowledge - where things are found
-        let location_knowledge = [
-            ("penguin", "AtLocation", "antarctica"),
-            ("penguin", "AtLocation", "zoo"),
-            ("bank", "AtLocation", "city"),
-            ("bank", "AtLocation", "street"),
-            ("tree", "AtLocation", "forest"),
-            ("tree", "AtLocation", "park"),
-            ("fish", "AtLocation", "ocean"),
-            ("fish", "AtLocation", "river"),
-            ("book", "AtLocation", "library"),
-            ("book", "AtLocation", "bookstore"),
-            ("car", "AtLocation", "garage"),
-            ("car", "AtLocation", "road"),
-            ("plane", "AtLocation", "airport"),
-            ("doctor", "AtLocation", "hospital"),
-            ("teacher", "AtLocation", "school"),
-            ("chef", "AtLocation", "kitchen"),
-            ("farmer", "AtLocation", "farm"),
-            ("athlete", "AtLocation", "stadium"),
-            ("money", "AtLocation", "bank"),
-            ("food", "AtLocation", "kitchen"),
-            ("clothes", "AtLocation", "closet"),
-            ("bed", "AtLocation", "bedroom"),
-            ("toilet", "AtLocation", "bathroom"),
-            ("stove", "AtLocation", "kitchen"),
-            ("refrigerator", "AtLocation", "kitchen"),
-        ];
-        
-        // UsedFor knowledge - what things are used for
-        let usedfor_knowledge = [
-            ("scissors", "UsedFor", "cutting"),
-            ("knife", "UsedFor", "cutting"),
-            ("pen", "UsedFor", "writing"),
-            ("pencil", "UsedFor", "writing"),
-            ("hammer", "UsedFor", "building"),
-            ("saw", "UsedFor", "cutting"),
-            ("car", "UsedFor", "transportation"),
-            ("plane", "UsedFor", "travel"),
-            ("phone", "UsedFor", "communication"),
-            ("computer", "UsedFor", "work"),
-            ("bed", "UsedFor", "sleeping"),
-            ("chair", "UsedFor", "sitting"),
-            ("table", "UsedFor", "eating"),
-            ("oven", "UsedFor", "cooking"),
-            ("refrigerator", "UsedFor", "storing food"),
-            ("umbrella", "UsedFor", "protection from rain"),
-            ("glasses", "UsedFor", "seeing"),
-            ("shoes", "UsedFor", "walking"),
-            ("key", "UsedFor", "opening"),
-            ("lock", "UsedFor", "security"),
-        ];
-        
-        // CapableOf knowledge - what things can do
-        let capableof_knowledge = [
-            ("bird", "CapableOf", "flying"),
-            ("fish", "CapableOf", "swimming"),
-            ("dog", "CapableOf", "barking"),
-            ("cat", "CapableOf", "meowing"),
-            ("human", "CapableOf", "thinking"),
-            ("human", "CapableOf", "speaking"),
-            ("car", "CapableOf", "moving"),
-            ("plane", "CapableOf", "flying"),
-            ("computer", "CapableOf", "computing"),
-            ("phone", "CapableOf", "calling"),
-        ];
-        
-        // HasProperty knowledge - properties of things
-        let hasproperty_knowledge = [
-            ("ice", "HasProperty", "cold"),
-            ("fire", "HasProperty", "hot"),
-            ("sun", "HasProperty", "bright"),
-            ("night", "HasProperty", "dark"),
-            ("water", "HasProperty", "wet"),
-            ("rock", "HasProperty", "hard"),
-            ("cotton", "HasProperty", "soft"),
-            ("elephant", "HasProperty", "large"),
-            ("ant", "HasProperty", "small"),
-            ("cheetah", "HasProperty", "fast"),
-            ("snail", "HasProperty", "slow"),
-        ];
-        
-        // Create simple embeddings and add to engine
-        for (head, relation, tail) in location_knowledge.iter()
-            .chain(usedfor_knowledge.iter())
-            .chain(capableof_knowledge.iter())
-            .chain(hasproperty_knowledge.iter())
-        {
-            // Create a simple hash-based embedding for the head concept
-            let embed = Self::simple_concept_embedding(head);
-            let level = head.len() % 9; // Distribute across ladder levels
-            engine.learn_commonsense(&embed, relation, tail, level);
-        }
+    /// Knowledge comes purely from HuggingFace datasets and web learning
+    /// No hardcoded facts to avoid benchmark rigging
+    fn init_commonsense_knowledge(_engine: &mut HierarchicalDeductionEngine) {
+        // All commonsense knowledge must be learned from:
+        // 1. HuggingFace datasets (ConceptNet5, ATOMIC, etc.)
+        // 2. Web learning (when search API is available)
+        // 3. Training data extraction
+        // No hardcoded facts allowed
     }
     
     /// Create a simple embedding for a concept (hash-based)
@@ -2512,6 +2452,11 @@ impl RealBenchmarkEvaluator {
     /// 18. Energy-Based Selection - Quantum interference
     fn generative_inference(&mut self, question: &RealBenchmarkQuestion) -> (usize, f32) {
         use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig};
+        
+        // =================================================================
+        // TEST-TIME WEB LEARNING: Query Wikipedia for question-specific knowledge
+        // =================================================================
+        self.test_time_web_learning(question);
         
         // =================================================================
         // UNIFIED INFERENCE: Single forward pass through reasoning layer

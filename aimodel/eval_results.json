@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-30T05:32:27.747612100+00:00",
+  "timestamp": "2026-01-30T21:15:40.648598500+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 100,
@@ -13,280 +13,37 @@
   },
   "task_results": [
     {
-      "task": "mmlu",
-      "accuracy": 56.99999999999999,
-      "num_correct": 57,
-      "total": 100,
-      "avg_confidence": 0.13432239,
-      "time_secs": 0.3803092,
-      "wrong_samples": []
-    },
-    {
-      "task": "gsm8k",
-      "accuracy": 84.0,
-      "num_correct": 84,
-      "total": 100,
-      "avg_confidence": 0.14706974,
-      "time_secs": 0.3523259,
-      "wrong_samples": []
-    },
-    {
-      "task": "arc",
-      "accuracy": 30.0,
-      "num_correct": 30,
-      "total": 100,
-      "avg_confidence": 0.1050507,
-      "time_secs": 0.3473017,
-      "wrong_samples": []
-    },
-    {
-      "task": "hellaswag",
-      "accuracy": 27.0,
-      "num_correct": 27,
-      "total": 100,
-      "avg_confidence": 0.111500084,
-      "time_secs": 0.399388,
-      "wrong_samples": []
-    },
-    {
-      "task": "truthfulqa",
-      "accuracy": 32.0,
-      "num_correct": 32,
-      "total": 100,
-      "avg_confidence": 0.10127371,
-      "time_secs": 0.3409672,
-      "wrong_samples": []
-    },
-    {
-      "task": "humaneval",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 1.0,
-      "time_secs": 2.3021027,
-      "wrong_samples": []
-    },
-    {
       "task": "commonsenseqa",
-      "accuracy": 15.0,
-      "num_correct": 15,
-      "total": 100,
-      "avg_confidence": 0.10000002,
-      "time_secs": 0.3805173,
-      "wrong_samples": []
-    },
-    {
-      "task": "squad",
-      "accuracy": 37.0,
-      "num_correct": 37,
-      "total": 100,
-      "avg_confidence": 0.12676303,
-      "time_secs": 0.3595972,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi1",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 0.653446,
-      "time_secs": 0.0565646,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi2",
-      "accuracy": 91.0,
-      "num_correct": 91,
-      "total": 100,
-      "avg_confidence": 0.60866374,
-      "time_secs": 0.1793801,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi3",
-      "accuracy": 68.0,
-      "num_correct": 68,
-      "total": 100,
-      "avg_confidence": 0.58640057,
-      "time_secs": 0.5166381,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi4",
-      "accuracy": 84.0,
-      "num_correct": 84,
-      "total": 100,
-      "avg_confidence": 0.49316418,
-      "time_secs": 0.3494102,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi5",
-      "accuracy": 73.0,
-      "num_correct": 73,
-      "total": 100,
-      "avg_confidence": 0.562854,
-      "time_secs": 0.4216314,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi6",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 0.65459967,
-      "time_secs": 0.0862181,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi7",
-      "accuracy": 77.0,
-      "num_correct": 77,
-      "total": 100,
-      "avg_confidence": 0.5472131,
-      "time_secs": 0.1952093,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi8",
-      "accuracy": 53.0,
-      "num_correct": 53,
-      "total": 100,
-      "avg_confidence": 0.63201356,
-      "time_secs": 0.2531377,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi9",
-      "accuracy": 80.0,
-      "num_correct": 80,
-      "total": 100,
-      "avg_confidence": 0.63841623,
-      "time_secs": 0.140145,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi10",
-      "accuracy": 85.0,
-      "num_correct": 85,
-      "total": 100,
-      "avg_confidence": 0.6054729,
-      "time_secs": 0.1820812,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi11",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 0.65459955,
-      "time_secs": 0.0691785,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi12",
-      "accuracy": 72.0,
-      "num_correct": 72,
-      "total": 100,
-      "avg_confidence": 0.58721334,
-      "time_secs": 0.1985456,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi13",
-      "accuracy": 71.0,
-      "num_correct": 71,
-      "total": 100,
-      "avg_confidence": 0.47458908,
-      "time_secs": 0.2652961,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi14",
-      "accuracy": 94.0,
-      "num_correct": 94,
-      "total": 100,
-      "avg_confidence": 0.26201653,
-      "time_secs": 0.4131917,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi15",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 0.68614405,
-      "time_secs": 0.347331,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi16",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 0.6888813,
-      "time_secs": 0.3483002,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi17",
-      "accuracy": 86.0,
-      "num_correct": 86,
-      "total": 100,
-      "avg_confidence": 0.1003435,
-      "time_secs": 0.3579913,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi18",
-      "accuracy": 73.0,
-      "num_correct": 73,
-      "total": 100,
-      "avg_confidence": 0.7160002,
-      "time_secs": 0.0730203,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi19",
-      "accuracy": 100.0,
-      "num_correct": 100,
-      "total": 100,
-      "avg_confidence": 0.9499994,
-      "time_secs": 0.0498971,
-      "wrong_samples": []
-    },
-    {
-      "task": "babi20",
-      "accuracy": 86.0,
-      "num_correct": 86,
-      "total": 100,
-      "avg_confidence": 0.35664997,
-      "time_secs": 0.3921884,
-      "wrong_samples": []
-    },
-    {
-      "task": "winogrande",
-      "accuracy": 16.0,
-      "num_correct": 16,
-      "total": 100,
-      "avg_confidence": 0.10000002,
-      "time_secs": 0.3745922,
+      "accuracy": 20.0,
+      "num_correct": 4,
+      "total": 20,
+      "avg_confidence": 0.10000001,
+      "time_secs": 31.9571142,
       "wrong_samples": []
     },
     {
       "task": "piqa",
-      "accuracy": 16.0,
-      "num_correct": 16,
-      "total": 100,
-      "avg_confidence": 0.10000002,
-      "time_secs": 0.3759359,
+      "accuracy": 20.0,
+      "num_correct": 4,
+      "total": 20,
+      "avg_confidence": 0.10000001,
+      "time_secs": 7.9808672000000005,
+      "wrong_samples": []
+    },
+    {
+      "task": "winogrande",
+      "accuracy": 20.0,
+      "num_correct": 4,
+      "total": 20,
+      "avg_confidence": 0.10000001,
+      "time_secs": 5.5738258,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 2107,
-    "total_questions": 3000,
-    "overall_accuracy": 70.23333333333333,
-    "total_time_secs": 23.1575119
+    "total_correct": 12,
+    "total_questions": 60,
+    "overall_accuracy": 20.0,
+    "total_time_secs": 109.6852951
   }
 }

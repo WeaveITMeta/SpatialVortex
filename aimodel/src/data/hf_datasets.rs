@@ -116,7 +116,7 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         DatasetInfo { hf_path: "allenai/sciq".to_string(), name: "SciQ".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 13_679, license: "CC-BY".to_string(), priority: 56 },
         DatasetInfo { hf_path: "allenai/ai2_arc".to_string(), name: "ARC".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 7_800, license: "Apache-2.0".to_string(), priority: 57 },
         DatasetInfo { hf_path: "allenai/openbookqa".to_string(), name: "OpenBookQA".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 5_957, license: "Apache-2.0".to_string(), priority: 58 },
-        DatasetInfo { hf_path: "EleutherAI/proof-pile-2".to_string(), name: "Proof-Pile-2".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 55_000_000_000, license: "Apache-2.0".to_string(), priority: 59 },
+        DatasetInfo { hf_path: "EleutherAI/proof-pile-2".to_string(), name: "Proof-Pile-2".to_string(), category: DatasetCategory::Math, split: "default".to_string(), estimated_tokens: 55_000_000_000, license: "Apache-2.0".to_string(), priority: 59 },
         DatasetInfo { hf_path: "wenhu/theoremqa".to_string(), name: "TheoremQA".to_string(), category: DatasetCategory::Math, split: "test".to_string(), estimated_tokens: 800, license: "MIT".to_string(), priority: 60 },
 
         // =============================================================================
@@ -131,9 +131,10 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         DatasetInfo { hf_path: "truthful_qa".to_string(), name: "TruthfulQA".to_string(), category: DatasetCategory::Benchmark, split: "validation".to_string(), estimated_tokens: 817, license: "Apache-2.0".to_string(), priority: 66 },
         DatasetInfo { hf_path: "Rowan/hellaswag".to_string(), name: "HellaSwag".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 70_000, license: "MIT".to_string(), priority: 67 },
         DatasetInfo { hf_path: "ybisk/piqa".to_string(), name: "PIQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 16_113, license: "AFL-3.0".to_string(), priority: 68 },
+        DatasetInfo { hf_path: "piqa".to_string(), name: "PIQA-alt".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 16_113, license: "AFL-3.0".to_string(), priority: 168 },
         DatasetInfo { hf_path: "sap2019/socialiqa".to_string(), name: "SocialIQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 33_410, license: "CC-BY".to_string(), priority: 69 },
         DatasetInfo { hf_path: "allenai/cosmosqa".to_string(), name: "CosmosQA".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 25_262, license: "CC-BY".to_string(), priority: 70 },
-        DatasetInfo { hf_path: "quac".to_string(), name: "QuAC".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 83_568, license: "CC-BY-SA".to_string(), priority: 171 },
+        DatasetInfo { hf_path: "quac".to_string(), name: "QuAC".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 83_568, license: "CC-BY-SA".to_string(), priority: 71 },
         DatasetInfo { hf_path: "stanfordnlp/coqa".to_string(), name: "CoQA".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 108_647, license: "Various".to_string(), priority: 72 },
         DatasetInfo { hf_path: "allenai/drop".to_string(), name: "DROP".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 77_409, license: "Apache-2.0".to_string(), priority: 73 },
         DatasetInfo { hf_path: "google/boolq".to_string(), name: "BoolQ".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 9_427, license: "CC-BY-SA".to_string(), priority: 74 },
@@ -419,21 +420,30 @@ impl HFDatasetLoader {
             "qiaojin/PubMedQA" => vec!["pqa_labeled", "pqa_unlabeled", "pqa_artificial"],
             // MedQA (replacement for BioASQ)
             "bigbio/med_qa" => vec!["med_qa_en_source", "med_qa_en_bigbio_qa"],
-            // SocialIQA - gated
+            // SocialIQA
+            "allenai/social_i_qa" => vec!["default"],
             "sap2019/socialiqa" => vec!["default"],
-            // CosmosQA - gated
+            // PIQA
+            "piqa" => vec!["plain_text"],
+            "ybisk/piqa" => vec!["plain_text", "default"],
+            // CosmosQA
             "allenai/cosmosqa" => vec!["default"],
-            // DROP - gated
+            // DROP
+            "drop" => vec!["default"],
             "allenai/drop" => vec!["default"],
             // XNLI - needs language config
-            "ynie/xnli" => vec!["en"],
+            "facebook/xnli" => vec!["en", "all_languages"],
             // CoQA
             "stanfordnlp/coqa" => vec!["default"],
             // MultiRC
+            "aps/super_glue" => vec!["multirc"],
+            "super_glue" => vec!["multirc"],
             "multi_rc" => vec!["default"],
             // MATH
-            "hendrycks/math" => vec!["algebra", "counting_and_probability", "geometry", "intermediate_algebra", "number_theory", "prealgebra", "precalculus"],
+            "lighteval/MATH" => vec!["default", "all"],
+            "hendrycks/math" => vec!["default"],
             // TheoremQA
+            "TIGER-Lab/TheoremQA" => vec!["default"],
             "wenhu/theoremqa" => vec!["default"],
             // SciTail
             "allenai/scitail" => vec!["snli_format", "tsv_format"],
