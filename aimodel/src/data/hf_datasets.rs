@@ -388,11 +388,14 @@ impl HFDatasetLoader {
             {
                 if response.status().is_success() {
                     return self.parse_hf_api_response(response, info);
+                } else {
+                    // Log the actual error for debugging
+                    eprintln!("      ⚠ HF API error for {} with config '{}': HTTP {}", info.name, config, response.status());
                 }
             }
         }
         
-        Err(format!("No valid config found for {}", info.name))
+        Err(format!("No valid config found for {} (tried: {:?})", info.name, configs))
     }
     
     /// Get dataset-specific config names to try
@@ -449,6 +452,28 @@ impl HFDatasetLoader {
             "allenai/scitail" => vec!["snli_format", "tsv_format"],
             // ConceptNet5 (replacement for LAMA)
             "conceptnet5/conceptnet5" => vec!["conceptnet5"],
+            // CommonsenseQA
+            "tau/commonsense_qa" => vec!["default"],
+            // SciQ
+            "allenai/sciq" => vec!["default"],
+            // SNLI
+            "stanfordnlp/snli" => vec!["plain_text", "default"],
+            "snli" => vec!["plain_text", "default"],
+            // MultiNLI
+            "nyu-mll/multi_nli" => vec!["default"],
+            "multi_nli" => vec!["default"],
+            // SICK
+            "sick" => vec!["default"],
+            // Ethics
+            "hendrycks_ethics" => vec!["commonsense", "deontology", "justice", "utilitarianism", "virtue"],
+            // PIQA alternatives
+            "baber/piqa" => vec!["plain_text", "default"],
+            // WinoGrande variants
+            "allenai/winogrande" => vec!["winogrande_xl", "winogrande_l", "winogrande_m", "winogrande_s", "winogrande_xs"],
+            // ARC variants
+            "allenai/ai2_arc" => vec!["ARC-Easy", "ARC-Challenge"],
+            // HellaSwag variants
+            "Rowan/hellaswag" => vec!["default", "full"],
             // OpenWebMath (replacement for ProofPile)
             "open-web-math/open-web-math" => vec!["default"],
             // Default fallback configs
@@ -801,6 +826,13 @@ impl HFDatasetLoader {
         self.loaded_examples.values()
             .flat_map(|examples| examples.iter())
             .filter(|e| e.category == category)
+            .collect()
+    }
+
+    /// Get all loaded examples across all categories
+    pub fn get_all_examples(&self) -> Vec<&TrainingExample> {
+        self.loaded_examples.values()
+            .flat_map(|examples| examples.iter())
             .collect()
     }
 

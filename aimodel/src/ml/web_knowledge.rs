@@ -727,7 +727,7 @@ impl WebKnowledgeExtractor {
     }
 
     /// Extract knowledge from a single text
-    fn extract_from_text(&self, text: &str, query_concepts: &[String], source: &str) -> Option<WebKnowledge> {
+    pub fn extract_from_text(&self, text: &str, query_concepts: &[String], source: &str) -> Option<WebKnowledge> {
         if text.len() < 10 {
             return None;
         }

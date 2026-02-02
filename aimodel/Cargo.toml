@@ -20,8 +20,8 @@ embeddings = ["embedvec"]
 gpu = ["burn-wgpu"]
 # Web server for chat
 web = ["actix-web", "actix-cors", "actix-files"]
-# Web learning with DuckDuckGo scraping
-web-learning = ["dep:reqwest", "dep:urlencoding"]
+# Web learning with high-throughput crawler
+web-learning = ["dep:reqwest", "dep:urlencoding", "dep:scraper", "dep:html2md", "dep:dashmap", "dep:governor", "dep:flume"]
 
 [dependencies]
 # Core
@@ -75,8 +75,17 @@ csv = "1.3"
 
 # HuggingFace Hub for dataset downloading
 hf-hub = "0.3"
-reqwest = { version = "0.11", features = ["blocking", "json"], optional = true }
+reqwest = { version = "0.12", features = ["blocking", "json", "http2"], optional = true }
 urlencoding = { version = "2.1", optional = true }
+
+# High-throughput web crawler
+scraper = { version = "0.20", optional = true }
+html2md = { version = "0.2", optional = true }
+dashmap = { version = "6.1", optional = true }
+governor = { version = "0.6", optional = true }
+flume = { version = "0.11", optional = true }
+futures = "0.3"
+url = "2.5"
 
 # RSI Macros (local proc-macro crate)
 rsi_macros = { path = "rsi_macros" }
@@ -87,3 +96,7 @@ tokio-test = "0.4"
 [[bin]]
 name = "spatialvortex-eval"
 path = "src/bin/eval_harness.rs"
+
+[[bin]]
+name = "benchmark_crawler"
+path = "src/bin/benchmark_crawler.rs"

@@ -564,10 +564,33 @@ impl ConsciousnessLearner {
     }
 
     /// Generate improvement queries based on knowledge gap analysis
-    /// DEPRECATED: No longer used - we rely on dynamic test-time learning only
+    /// Uses sparse region detection and keyword gap analysis
     fn generate_improvement_queries(&self) -> Vec<String> {
-        // Return empty - all learning happens dynamically at test time
-        Vec::new()
+        let mut queries = Vec::new();
+        
+        // Get queries from sparse embedding regions
+        queries.extend(self.find_sparse_embedding_regions());
+        
+        // Get queries from keyword gaps
+        queries.extend(self.find_keyword_gaps());
+        
+        // If still empty, generate foundational queries
+        if queries.is_empty() {
+            queries = vec![
+                "common household objects and their locations".to_string(),
+                "physical properties of everyday materials".to_string(),
+                "typical activities and where they happen".to_string(),
+                "tools and their functions".to_string(),
+                "food items and where to find them".to_string(),
+                "animals and their habitats".to_string(),
+                "transportation methods and locations".to_string(),
+                "human emotions and behaviors".to_string(),
+                "weather phenomena and locations".to_string(),
+                "common social situations".to_string(),
+            ];
+        }
+        
+        queries
     }
     
     /// Find subjects with confidence below threshold
@@ -845,14 +868,20 @@ impl ConsciousnessLearner {
         self.stats = LearningStats::default();
         self.seen_domains.clear();
         
+        println!("   [DEBUG] Categories: {:?}", categories);
+        
         // Generate queries based on categories
         let mut queries = Vec::new();
         for category in categories {
-            queries.extend(self.generate_category_queries(category));
+            let cat_queries = self.generate_category_queries(category);
+            println!("   [DEBUG] Category '{}' generated {} queries", category, cat_queries.len());
+            queries.extend(cat_queries);
         }
         
         // Also add queries from dynamic knowledge gap analysis
-        queries.extend(self.generate_improvement_queries());
+        let improvement_queries = self.generate_improvement_queries();
+        println!("   [DEBUG] Improvement queries generated: {}", improvement_queries.len());
+        queries.extend(improvement_queries);
         
         // Deduplicate
         queries.sort();
@@ -881,120 +910,168 @@ impl ConsciousnessLearner {
     }
 
     /// Generate queries for a specific benchmark category
-    /// DEPRECATED: No longer used - we rely on dynamic test-time learning only
-    fn generate_category_queries(&self, _category: &str) -> Vec<String> {
-        // Return empty - all learning happens dynamically at test time
-        Vec::new()
+    fn generate_category_queries(&self, category: &str) -> Vec<String> {
+        match category {
+            "commonsenseqa" | "commonsense" => vec![
+                "common sense knowledge about everyday objects".to_string(),
+                "typical locations of household items".to_string(),
+                "where to find common objects".to_string(),
+                "everyday reasoning and logic".to_string(),
+            ],
+            "arc" | "science" => vec![
+                "elementary science facts".to_string(),
+                "basic physics concepts".to_string(),
+                "simple biology knowledge".to_string(),
+            ],
+            "winogrande" | "coreference" => vec![
+                "pronoun resolution examples".to_string(),
+                "common sense reasoning examples".to_string(),
+            ],
+            "piqa" | "physical" => vec![
+                "physical reasoning tasks".to_string(),
+                "how objects interact physically".to_string(),
+            ],
+            "hellaswag" | "sentence" => vec![
+                "sentence completion examples".to_string(),
+                "context understanding examples".to_string(),
+            ],
+            "squad" | "reading" => vec![
+                "reading comprehension facts".to_string(),
+                "common knowledge questions".to_string(),
+            ],
+            "truthfulqa" | "truthful" => vec![
+                "factual knowledge questions".to_string(),
+                "common misconceptions facts".to_string(),
+            ],
+            _ => vec![
+                format!("{} general knowledge", category),
+            ],
+        }
     }
 
-    /// Learn from web searches - PARALLEL HIGH-THROUGHPUT version
+    /// Learn from web using custom WebCrawler - converts queries to Wikipedia URLs
     fn learn_from_web(&mut self, queries: &[String]) {
-        use crate::ml::web_knowledge::WebKnowledge;
-        use rayon::prelude::*;
-        use std::sync::{Arc, Mutex};
+        use crate::ml::web_crawler::{WebCrawler, CrawlerConfig};
         
         let batch_start = Instant::now();
-        let batch_size = self.config.query_batch_size;
         
-        println!("   [Web Learning] PARALLEL MODE: {} queries in batches of {}", 
-                 queries.len(), batch_size);
+        println!("   [Web Learning] Using custom WebCrawler for {} queries", queries.len());
         
-        // Process queries in parallel batches
-        let total_websites = Arc::new(Mutex::new(0usize));
-        let total_facts = Arc::new(Mutex::new(0usize));
-        let all_domains = Arc::new(Mutex::new(std::collections::HashSet::new()));
-        let all_knowledge = Arc::new(Mutex::new(Vec::new()));
-        let search_count = Arc::new(Mutex::new(0usize));
-        let error_count = Arc::new(Mutex::new(0usize));
+        // Convert queries to Wikipedia URLs (our custom crawler works with direct URLs)
+        let mut seed_urls = Vec::new();
+        for query in queries {
+            // Convert query to a Wikipedia search URL
+            // Use Wikipedia's direct article URL format
+            let query_clean = query.replace(" ", "_").replace("&", "%26");
+            let url = format!("https://en.wikipedia.org/wiki/{}", query_clean);
+            seed_urls.push(url);
+            
+            // Also add a search URL as fallback
+            let search_url = format!("https://en.wikipedia.org/w/index.php?search={}&title=Special:Search", 
+                urlencoding::encode(query));
+            seed_urls.push(search_url);
+        }
         
-        // Process in parallel batches
-        let config = self.config.clone();
-        queries.par_chunks(batch_size).enumerate().for_each(|(batch_idx, batch)| {
-            let web_config = crate::ml::web_knowledge::WebScraperConfig {
-                timeout_secs: config.request_timeout_secs,
-                max_results: 30,
-                request_delay_ms: 0, // Zero delay for maximum throughput
-            };
+        println!("   [Web Learning] Crawling {} seed URLs...", seed_urls.len());
+        
+        // Create crawler config optimized for knowledge acquisition
+        let crawler_config = CrawlerConfig {
+            max_concurrent_fetches: 50,
+            max_per_domain_rps: 10,
+            max_depth: 1,  // Only crawl the seed pages, don't follow links
+            timeout_secs: 30,
+            max_pages: seed_urls.len(),
+            ..Default::default()
+        };
+        
+        // Create crawler and run
+        let crawler = match WebCrawler::new(crawler_config) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("   [Web Learning] Failed to create crawler: {}", e);
+                return;
+            }
+        };
+        
+        // Run crawler in blocking mode
+        use tokio::runtime::Runtime;
+        let pages = match Runtime::new() {
+            Ok(rt) => rt.block_on(async {
+                crawler.crawl_batch(seed_urls).await
+            }),
+            Err(e) => {
+                eprintln!("   [Web Learning] Failed to create runtime: {}", e);
+                return;
+            }
+        };
+        
+        println!("   [Web Learning] Crawled {} pages", pages.len());
+        
+        // Process crawled pages and extract knowledge
+        let mut total_facts = 0;
+        let mut domains = std::collections::HashSet::new();
+        
+        for page in &pages {
+            // Extract domain for stats
+            if let Some(domain) = Self::extract_domain(&page.url) {
+                domains.insert(domain);
+            }
             
-            let mut batch_websites = 0;
-            let mut batch_facts = 0;
-            let mut batch_domains = std::collections::HashSet::new();
-            let mut batch_knowledge = Vec::new();
+            // Extract facts from markdown content using sacred attention pipeline
+            let facts = self.sacred_processors.position_3_extract_keywords(&page.markdown);
             
-            // Process queries in this batch in parallel - each gets its own scraper
-            let results: Vec<_> = batch.par_iter().map(|query| {
-                let mut scraper = crate::ml::web_knowledge::DuckDuckGoScraper::new(web_config.clone());
-                let extractor = crate::ml::web_knowledge::WebKnowledgeExtractor::new();
-                
-                println!("   [Web Learning] Searching: {}", query);
-                match scraper.search_sync(query) {
-                    Ok(results) => {
-                        println!("   [Web Learning] ✓ Query '{}' returned {} results", query, results.len());
-                        if results.is_empty() {
-                            eprintln!("   [Web Learning] Warning: Query '{}' returned 0 results", query);
-                        }
-                        let knowledge = extractor.extract_from_results(&results, query);
-                        println!("   [Web Learning] Extracted {} facts from query '{}'", knowledge.len(), query);
-                        Some((results, knowledge))
-                    }
-                    Err(e) => {
-                        eprintln!("   [Web Learning] ✗ Error for query '{}': {}", query, e);
-                        None
-                    }
-                }
-            }).collect();
+            // Verify facts
+            let verified = self.sacred_processors.position_6_verify_relations(
+                &facts,
+                &self.world_model,
+            );
             
-            // Aggregate results
-            for result in results {
-                if let Some((search_results, knowledge)) = result {
-                    *search_count.lock().unwrap() += 1;
+            // Integrate verified facts
+            for fact in verified {
+                if fact.confidence >= self.config.min_confidence {
+                    self.vortex.add_knowledge(
+                        &fact.subject,
+                        &fact.attribute,
+                        &fact.value,
+                        fact.confidence,
+                        &page.url,
+                    );
                     
-                    for result in &search_results {
-                        batch_websites += 1;
-                        if let Some(domain) = Self::extract_domain(&result.url) {
-                            batch_domains.insert(domain);
-                        }
+                    if let Some(ref related) = fact.related_subject {
+                        self.vortex.add_relation(
+                            &fact.subject,
+                            &fact.relation_type,
+                            related,
+                            fact.confidence * 0.8,
+                        );
                     }
                     
-                    batch_facts += knowledge.len();
-                    batch_knowledge.extend(knowledge);
+                    total_facts += 1;
+                    self.stats.facts_integrated += 1;
                 } else {
-                    *error_count.lock().unwrap() += 1;
+                    self.stats.facts_verified += 1;
                 }
             }
             
-            // Update global stats
-            *total_websites.lock().unwrap() += batch_websites;
-            *total_facts.lock().unwrap() += batch_facts;
-            all_domains.lock().unwrap().extend(batch_domains);
-            all_knowledge.lock().unwrap().extend(batch_knowledge);
-            
-            // Progress update
-            let elapsed = batch_start.elapsed().as_secs_f32();
-            let rate = *total_websites.lock().unwrap() as f32 / elapsed.max(0.001);
-            println!("   [Batch {}] {} websites, {} facts ({:.1} websites/sec)", 
-                     batch_idx + 1, batch_websites, batch_facts, rate);
-        });
-        
-        // Integrate all knowledge sequentially (vortex not thread-safe)
-        let knowledge_vec = Arc::try_unwrap(all_knowledge).unwrap().into_inner().unwrap();
-        for k in knowledge_vec {
-            self.integrate_web_knowledge(&k);
+            self.stats.facts_extracted += facts.len();
         }
         
         // Update stats
-        self.stats.web_searches = *search_count.lock().unwrap();
-        self.stats.websites_referenced = *total_websites.lock().unwrap();
-        self.stats.facts_extracted = *total_facts.lock().unwrap();
-        self.stats.search_errors = *error_count.lock().unwrap();
-        self.seen_domains = Arc::try_unwrap(all_domains).unwrap().into_inner().unwrap();
+        self.stats.web_searches = queries.len();
+        self.stats.websites_referenced = pages.len();
+        self.stats.unique_domains = domains.len();
         
         let total_time = batch_start.elapsed();
-        let throughput = self.stats.websites_referenced as f32 / total_time.as_secs_f32();
-        println!("   [Web Learning] 🚀 COMPLETED: {} websites from {} searches in {:.2}s",
-                 self.stats.websites_referenced, self.stats.web_searches, total_time.as_secs_f32());
-        println!("   [Web Learning] 📊 THROUGHPUT: {:.1} websites/sec | {} facts from {} domains",
-                 throughput, self.stats.facts_extracted, self.seen_domains.len());
+        let throughput = if total_time.as_secs_f32() > 0.0 {
+            pages.len() as f32 / total_time.as_secs_f32()
+        } else {
+            0.0
+        };
+        
+        println!("   [Web Learning] 🚀 COMPLETED: {} pages from {} queries in {:.2}s",
+                 pages.len(), queries.len(), total_time.as_secs_f32());
+        println!("   [Web Learning] 📊 THROUGHPUT: {:.1} pages/sec | {} facts from {} domains",
+                 throughput, total_facts, domains.len());
     }
     
     /// Extract domain from URL
@@ -1006,6 +1083,204 @@ impl ConsciousnessLearner {
         
         url.split('/').next()
            .map(|s| s.to_lowercase())
+    }
+    
+    /// TEST-TIME WEB LEARNING: Search for any query and learn in real-time
+    /// This is called during inference when the model encounters an unknown question
+    pub fn test_time_web_search(&mut self, query: &str) -> Vec<(String, f32)> {
+        use crate::ml::web_crawler::{WebCrawler, CrawlerConfig};
+        
+        println!("   [Test-Time Web] Searching for: '{}'", query);
+        
+        // Generate multiple search URLs from the query
+        let mut seed_urls = Vec::new();
+        
+        // Wikipedia direct article
+        let wiki_query = query.replace(" ", "_").replace("&", "%26");
+        seed_urls.push(format!("https://en.wikipedia.org/wiki/{}", wiki_query));
+        
+        // Wikipedia search
+        seed_urls.push(format!("https://en.wikipedia.org/w/index.php?search={}&title=Special:Search", 
+            urlencoding::encode(query)));
+        
+        // DuckDuckGo HTML (no JS required)
+        seed_urls.push(format!("https://html.duckduckgo.com/html/?q={}", 
+            urlencoding::encode(query)));
+        
+        // Brave search
+        seed_urls.push(format!("https://search.brave.com/search?q={}", 
+            urlencoding::encode(query)));
+        
+        // Bing
+        seed_urls.push(format!("https://www.bing.com/search?q={}", 
+            urlencoding::encode(query)));
+        
+        // Create crawler with deeper config for test-time
+        let crawler_config = CrawlerConfig {
+            max_concurrent_fetches: 30,
+            max_per_domain_rps: 5,
+            max_depth: 2,  // Follow links one level deep
+            timeout_secs: 20,
+            max_pages: 20, // Get multiple pages
+            ..Default::default()
+        };
+        
+        let crawler = match WebCrawler::new(crawler_config) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("   [Test-Time Web] Failed to create crawler: {}", e);
+                return Vec::new();
+            }
+        };
+        
+        // Run crawler
+        use tokio::runtime::Runtime;
+        let pages = match Runtime::new() {
+            Ok(rt) => rt.block_on(async {
+                crawler.crawl_batch(seed_urls).await
+            }),
+            Err(e) => {
+                eprintln!("   [Test-Time Web] Failed to create runtime: {}", e);
+                return Vec::new();
+            }
+        };
+        
+        println!("   [Test-Time Web] Crawled {} pages", pages.len());
+        
+        // Extract and integrate knowledge
+        let mut extracted_facts: Vec<(String, f32)> = Vec::new();
+        
+        for page in &pages {
+            // Extract facts using sacred attention pipeline
+            let facts = self.sacred_processors.position_3_extract_keywords(&page.markdown);
+            
+            for fact in &facts {
+                // Quick verification
+                let confidence = if fact.confidence > 0.5 { fact.confidence } else { 0.5 };
+                
+                // Add to vortex
+                self.vortex.add_knowledge(
+                    &fact.subject,
+                    &fact.attribute,
+                    &fact.value,
+                    confidence,
+                    &page.url,
+                );
+                
+                extracted_facts.push((
+                    format!("{} {} {}", fact.subject, fact.attribute, fact.value),
+                    confidence
+                ));
+            }
+        }
+        
+        // Sort by confidence
+        extracted_facts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        extracted_facts.truncate(10);
+        
+        println!("   [Test-Time Web] Extracted {} facts", extracted_facts.len());
+        
+        extracted_facts
+    }
+    
+    /// Enhanced web learning with deeper crawling and more seed URLs
+    pub fn enhanced_web_learning(&mut self, queries: &[String]) {
+        use crate::ml::web_crawler::{WebCrawler, CrawlerConfig};
+        
+        println!("   [Enhanced Web Learning] Starting with {} queries...", queries.len());
+        
+        // Generate comprehensive seed URLs
+        let mut seed_urls: Vec<String> = Vec::new();
+        
+        // Common knowledge domains to seed
+        let base_urls: Vec<String> = vec![
+            "https://en.wikipedia.org/wiki/Commonsense_knowledge".to_string(),
+            "https://en.wikipedia.org/wiki/Physical_object".to_string(),
+            "https://en.wikipedia.org/wiki/Human_activities".to_string(),
+            "https://en.wikipedia.org/wiki/Everyday_life".to_string(),
+            "https://en.wikipedia.org/wiki/Household".to_string(),
+            "https://en.wikipedia.org/wiki/Food_preparation".to_string(),
+            "https://en.wikipedia.org/wiki/Tool".to_string(),
+            "https://en.wikipedia.org/wiki/Animal".to_string(),
+            "https://en.wikipedia.org/wiki/Plant".to_string(),
+            "https://en.wikipedia.org/wiki/Weather".to_string(),
+            "https://en.wikipedia.org/wiki/Transportation".to_string(),
+            "https://en.wikipedia.org/wiki/Communication".to_string(),
+            "https://en.wikipedia.org/wiki/Emotion".to_string(),
+            "https://en.wikipedia.org/wiki/Social_behavior".to_string(),
+            "https://en.wikipedia.org/wiki/Science".to_string(),
+            "https://en.wikipedia.org/wiki/Mathematics".to_string(),
+            "https://en.wikipedia.org/wiki/Geography".to_string(),
+            "https://en.wikipedia.org/wiki/History".to_string(),
+            "https://en.wikipedia.org/wiki/Technology".to_string(),
+            "https://en.wikipedia.org/wiki/Medicine".to_string(),
+        ];
+        seed_urls.extend(base_urls);
+        
+        // Add query-based URLs
+        for query in queries {
+            let wiki_query = query.replace(" ", "_").replace("&", "%26");
+            seed_urls.push(format!("https://en.wikipedia.org/wiki/{}", wiki_query));
+            seed_urls.push(format!("https://en.wikipedia.org/w/index.php?search={}", 
+                urlencoding::encode(query)));
+        }
+        
+        // Deduplicate
+        seed_urls.sort();
+        seed_urls.dedup();
+        seed_urls.truncate(100); // Limit to 100 seed URLs
+        
+        // Create enhanced crawler config
+        let crawler_config = CrawlerConfig {
+            max_concurrent_fetches: 50,
+            max_per_domain_rps: 8,
+            max_depth: 2,  // Follow links for richer knowledge
+            timeout_secs: 25,
+            max_pages: 200, // Get many pages
+            ..Default::default()
+        };
+        
+        let crawler = match WebCrawler::new(crawler_config) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("   [Enhanced Web] Failed to create crawler: {}", e);
+                return;
+            }
+        };
+        
+        use tokio::runtime::Runtime;
+        let pages = match Runtime::new() {
+            Ok(rt) => rt.block_on(async {
+                crawler.crawl_batch(seed_urls).await
+            }),
+            Err(e) => {
+                eprintln!("   [Enhanced Web] Failed to create runtime: {}", e);
+                return;
+            }
+        };
+        
+        println!("   [Enhanced Web] Crawled {} pages", pages.len());
+        
+        // Process pages and extract knowledge
+        let mut total_facts = 0;
+        for page in &pages {
+            let facts = self.sacred_processors.position_3_extract_keywords(&page.markdown);
+            
+            for fact in &facts {
+                if fact.confidence >= 0.4 {
+                    self.vortex.add_knowledge(
+                        &fact.subject,
+                        &fact.attribute,
+                        &fact.value,
+                        fact.confidence,
+                        &page.url,
+                    );
+                    total_facts += 1;
+                }
+            }
+        }
+        
+        println!("   [Enhanced Web] Integrated {} facts into knowledge base", total_facts);
     }
     
     /// Integrate web knowledge into the vortex with critical thinking

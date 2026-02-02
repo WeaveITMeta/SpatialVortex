@@ -37,6 +37,9 @@ pub mod geometric_world_model;
 pub mod world_knowledge;
 pub mod consciousness_learner;
 pub mod web_knowledge;
+pub mod web_crawler;
+pub mod fast_knowledge_acquisition;
+pub mod unified_knowledge_pipeline;
 pub mod sacred_attention;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
@@ -146,8 +149,14 @@ pub use web_knowledge::{
     WebKnowledgeExtractor, WebKnowledge,
     BatchWebLearner, BatchLearnerStats,
 };
+pub use web_crawler::{
+    WebCrawler, CrawlerConfig, CrawledPage, CrawlerStats,
+};
+pub use fast_knowledge_acquisition::{
+    FastKnowledgeAcquisition, FastKnowledgeConfig, AcquisitionStats,
+};
 pub use sacred_attention::{
-    SacredAttentionPipeline, PipelineStats,
+    SacredAttentionPipeline, PipelineStats as SacredPipelineStats,
     KeywordExtractionHeader, Position3Output,
     RelationVerificationHeader, Position6Output,
     KnowledgeIntegrationHeader, Position9Output,
@@ -155,4 +164,8 @@ pub use sacred_attention::{
     VerifiedFact, VerificationResult, IntegratedEmbedding, IntegrationStats,
     SACRED_POSITION_3, SACRED_POSITION_6, SACRED_POSITION_9,
     VORTEX_CYCLE as SACRED_VORTEX_CYCLE,
+};
+pub use unified_knowledge_pipeline::{
+    UnifiedKnowledgePipeline, PipelineConfig, PipelineStats,
+    ExtractedFact as PipelineFact, RetrievalResult, SemanticEmbedding,
 };
