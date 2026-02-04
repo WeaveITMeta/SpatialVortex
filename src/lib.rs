@@ -10,6 +10,11 @@ pub mod visualization;
 pub mod text_formatting;
 pub mod embodiment;
 pub mod optimization;
+pub mod cache;
+pub mod subject_generator;
+pub mod visual_subject_generator;
+pub mod generators;
+pub mod inference_engine;
 
 // AI & API integration
 pub mod ai;
@@ -44,8 +49,6 @@ pub use data::compression;
 pub use core::sacred_geometry::flux_matrix;
 pub use core::sacred_geometry::change_dot;
 pub use core::sacred_geometry::angle;
-// Backward compatibility - inference_engine is now ml::inference
-pub use ml::inference as inference_engine;
 // Backward compatibility - now in core::sacred_geometry
 pub use core::sacred_geometry::geometric_inference;
 

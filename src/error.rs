@@ -83,9 +83,8 @@ pub enum SpatialVortexError {
     #[error("Database error: {0}")]
     Database(String),
 
-    // REMOVED: Redis superseded by RocksDB
-    // #[error("Redis error: {0}")]
-    // Redis(#[from] redis::RedisError),
+    #[error("Redis error: {0}")]
+    Redis(String),
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
@@ -292,5 +291,12 @@ impl From<tract_onnx::prelude::TractError> for SpatialVortexError {
 impl From<ndarray::ShapeError> for SpatialVortexError {
     fn from(err: ndarray::ShapeError) -> Self {
         SpatialVortexError::NdarrayShapeError(err.to_string())
+    }
+}
+
+// anyhow error conversion
+impl From<anyhow::Error> for SpatialVortexError {
+    fn from(err: anyhow::Error) -> Self {
+        SpatialVortexError::Processing(err.to_string())
     }
 }

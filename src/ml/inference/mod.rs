@@ -12,6 +12,11 @@ pub mod optimized_ops;
 pub mod production_engine;
 pub mod rope;
 pub mod gqa;
+pub mod color_inference;
+pub mod flux_inference;
+
+// Re-export InferenceEngine from root for backward compatibility
+pub use crate::inference_engine::{InferenceEngine, OnnxSessionPool};
 
 // Re-export tokenizer
 pub use tokenizer::{TokenizerWrapper, TokenizedInput};

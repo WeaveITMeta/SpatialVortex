@@ -14,7 +14,8 @@
 //! - **Fact extraction**: Subject-attribute-value triples
 //! - **Keyword indexing**: Fast lookup by keyword
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use crate::ml::web_quality_filter::{BluWerpFilter, FilterResult};
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
 
@@ -677,17 +678,20 @@ pub struct WebKnowledge {
     pub related: Vec<String>,
 }
 
-/// Web knowledge extractor
+/// Web knowledge extractor with Blu-WERP quality filtering
+#[derive(Debug, Clone)]
 pub struct WebKnowledgeExtractor {
     /// Minimum word length for keywords
     min_keyword_len: usize,
     /// Stopwords to filter
-    stopwords: std::collections::HashSet<String>,
+    stopwords: HashSet<String>,
+    /// Blu-WERP quality filter
+    quality_filter: BluWerpFilter,
 }
 
 impl WebKnowledgeExtractor {
     pub fn new() -> Self {
-        let stopwords: std::collections::HashSet<String> = [
+        let stopwords: HashSet<String> = [
             "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
             "have", "has", "had", "do", "does", "did", "will", "would", "could",
             "should", "may", "might", "must", "shall", "can", "need", "to", "of",
@@ -700,24 +704,44 @@ impl WebKnowledgeExtractor {
         Self {
             min_keyword_len: 3,
             stopwords,
+            quality_filter: BluWerpFilter::default(),
         }
     }
 
-    /// Extract knowledge from search results
+    /// Extract knowledge from search results with Blu-WERP quality filtering
     pub fn extract_from_results(&self, results: &[SearchResult], query: &str) -> Vec<WebKnowledge> {
         let mut knowledge = Vec::new();
         let query_concepts = extract_keywords(query);
 
         for result in results {
-            // Extract from title
-            if let Some(k) = self.extract_from_text(&result.title, &query_concepts, &result.url) {
-                knowledge.push(k);
+            // Apply quality filter to title
+            let title_result = self.quality_filter.filter(&result.title);
+            if title_result.passed {
+                if let Some(k) = self.extract_from_text(
+                    &result.title, 
+                    &query_concepts, 
+                    &result.url,
+                    title_result.quality_score
+                ) {
+                    knowledge.push(k);
+                }
             }
 
-            // Extract from snippet
+            // Apply quality filter to snippet (sentence by sentence)
             for sentence in result.snippet.split(|c| c == '.' || c == '!' || c == '?') {
-                if let Some(k) = self.extract_from_text(sentence.trim(), &query_concepts, &result.url) {
-                    knowledge.push(k);
+                let sentence = sentence.trim();
+                if sentence.len() < 10 { continue; }
+                
+                let sentence_result = self.quality_filter.filter(sentence);
+                if sentence_result.passed {
+                    if let Some(k) = self.extract_from_text(
+                        sentence,
+                        &query_concepts,
+                        &result.url,
+                        sentence_result.quality_score
+                    ) {
+                        knowledge.push(k);
+                    }
                 }
             }
         }
@@ -726,8 +750,13 @@ impl WebKnowledgeExtractor {
         self.deduplicate_knowledge(knowledge)
     }
 
-    /// Extract knowledge from a single text
-    pub fn extract_from_text(&self, text: &str, query_concepts: &[String], source: &str) -> Option<WebKnowledge> {
+    /// Score content quality without filtering (for ranking results)
+    pub fn score_content_quality(&self, text: &str) -> f32 {
+        self.quality_filter.score_quality(text)
+    }
+
+    /// Extract knowledge from a single text with quality score
+    pub fn extract_from_text(&self, text: &str, query_concepts: &[String], source: &str, quality_score: f32) -> Option<WebKnowledge> {
         if text.len() < 10 {
             return None;
         }
@@ -749,11 +778,14 @@ impl WebKnowledgeExtractor {
                 .cloned()
                 .collect();
 
+            // Confidence based on quality score and pattern match
+            let confidence = (0.6 + quality_score * 0.3).clamp(0.5, 1.0);
+
             return Some(WebKnowledge {
                 subject,
                 attribute: attr,
                 value,
-                confidence: 0.6,
+                confidence,
                 source: source.to_string(),
                 keywords,
                 related,

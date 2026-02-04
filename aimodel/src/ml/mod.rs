@@ -9,6 +9,7 @@
 //! - **backends** - GPU acceleration (tch/wgpu)
 
 pub mod hallucinations;
+pub mod ebrm_alignment;
 pub mod ebrm;
 pub mod training;
 pub mod calm;
@@ -19,10 +20,11 @@ pub mod pathway;
 pub mod huggingface;
 pub mod continuous_learning;
 pub mod gpu_trainer;
-pub mod rag_search;
+pub mod betr_selector;
 pub mod integration_test;
 pub mod jepa;
 pub mod neuro_symbolic;
+pub mod task_specific_moe;
 pub mod sacred_moe;
 pub mod sacred_swarm;
 pub mod generative_arch;
@@ -37,12 +39,29 @@ pub mod geometric_world_model;
 pub mod world_knowledge;
 pub mod consciousness_learner;
 pub mod web_knowledge;
+pub mod web_quality_filter;
 pub mod web_crawler;
-pub mod fast_knowledge_acquisition;
+pub mod calm_web_integration;
+pub mod benchmark_weighted_retrieval;
+pub mod rag_search;
+pub mod test_time_compute;
+pub use betr_selector::{
+    BETRConfig, BenchmarkEmbeddingStore, BETRDocumentScorer, BETRDataSelector,
+    BenchmarkEmbedding, ScoredDocument, create_betr_selector,
+};
+pub use task_specific_moe::{
+    TaskSpecificSacredMoE, TaskSpecificMoEConfig, TaskExpertCluster,
+    TaskCategory, ClusterTrainingStats, BenchmarkRouter,
+};
+pub use test_time_compute::{TTCWrapper, TTCConfig};
 pub mod unified_knowledge_pipeline;
 pub mod sacred_attention;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
+pub use ebrm_alignment::{
+    AlignedEBRM, EnergyAlignmentConfig, GoldenPath, ContrastivePair,
+    AlignmentStats, BenchmarkQA, AlignedTraceEnergy,
+};
 pub use ebrm::{EnergyBasedReasoningModel, TraceEnergy};
 pub use training::{SpectralSphereOptimizer, SSOConfig, SpectralScaler, BurnSSO, SSOState, AdaptiveSSO};
 pub use calm::{CALMEngine, CALMConfig};
@@ -95,7 +114,6 @@ pub use generative_arch::{
     GenerativeVortexEngine, GenerativeConfig,
     SymbolicMathExecutor, MathResult,
     KnowledgeBase, KnowledgeTriple,
-    DynamicMoERouter, ExpertType,
     AttributeFocusedAttention, AttributeImplication, ImplicationType,
     TrackedObject, ObjectPattern,
 };
@@ -149,12 +167,25 @@ pub use web_knowledge::{
     WebKnowledgeExtractor, WebKnowledge,
     BatchWebLearner, BatchLearnerStats,
 };
+pub use web_quality_filter::{
+    BluWerpFilter, GopherQualityFilter, RepetitionFilter, SemanticQualityScorer,
+    QualityFilterConfig, FilterResult, FilterFailure,
+};
 pub use web_crawler::{
     WebCrawler, CrawlerConfig, CrawledPage, CrawlerStats,
 };
-pub use fast_knowledge_acquisition::{
-    FastKnowledgeAcquisition, FastKnowledgeConfig, AcquisitionStats,
+pub use benchmark_weighted_retrieval::{
+    BenchmarkWeightedRetriever, BenchmarkWeightedRetrievalConfig, BenchmarkWeightedDocument,
+    BenchmarkContext, RetrievalStats, BenchmarkAwareRAG,
 };
+pub use calm_web_integration::{
+    CALMSemanticStore, SemanticFact, CALMWebConfig, SemanticStoreStats,
+    CALMWebLearner, CALMWebLearnerStats,
+};
+// TODO: Re-enable when fast_knowledge_acquisition module is ready
+// pub use fast_knowledge_acquisition::{
+//     FastKnowledgeAcquisition, FastKnowledgeConfig, AcquisitionStats,
+// };
 pub use sacred_attention::{
     SacredAttentionPipeline, PipelineStats as SacredPipelineStats,
     KeywordExtractionHeader, Position3Output,

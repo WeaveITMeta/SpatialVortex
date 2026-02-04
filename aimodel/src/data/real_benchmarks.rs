@@ -985,6 +985,8 @@ pub struct RealBenchmarkEvaluator {
     web_scraper: crate::ml::web_knowledge::DuckDuckGoScraper,
     /// Web knowledge extractor
     web_extractor: crate::ml::web_knowledge::WebKnowledgeExtractor,
+    /// CALM-enhanced web learner for semantic fact retrieval
+    calm_web_learner: crate::ml::calm_web_integration::CALMWebLearner,
     /// Unified Knowledge Pipeline - replaces fragmented 18-expert architecture
     /// Order of operations: RETRIEVE → EXTRACT → EMBED → REASON → SCORE
     knowledge_pipeline: crate::ml::unified_knowledge_pipeline::UnifiedKnowledgePipeline,
@@ -1071,6 +1073,9 @@ impl RealBenchmarkEvaluator {
                 }
             ),
             web_extractor: crate::ml::web_knowledge::WebKnowledgeExtractor::new(),
+            calm_web_learner: crate::ml::calm_web_integration::CALMWebLearner::new(
+                crate::ml::calm_web_integration::CALMWebConfig::default()
+            ),
             knowledge_pipeline: crate::ml::unified_knowledge_pipeline::UnifiedKnowledgePipeline::new(
                 crate::ml::unified_knowledge_pipeline::PipelineConfig::default()
             ),
@@ -1280,7 +1285,7 @@ impl RealBenchmarkEvaluator {
                         let knowledge = self.web_extractor.extract_from_results(&results, concept);
                         
                         // Integrate knowledge into RAG engine immediately
-                        for k in knowledge {
+                        for k in &knowledge {
                             // Add to RAG as a fact (subject + attribute + value)
                             let fact = format!("{} {} {}", k.subject, k.attribute, k.value);
                             self.rag_engine.add_knowledge_entry(&k.subject, &fact);
@@ -1299,16 +1304,20 @@ impl RealBenchmarkEvaluator {
                                     .insert(keyword.clone(), k.confidence);
                             }
                         }
+                        
+                        // Also add to CALM-web learner for semantic retrieval
+                        self.calm_web_learner.learn_from_results(&results, concept);
+                        
+                        println!("   [Test-Time Web] Learned {} facts for: {}", knowledge.len(), concept);
                     }
                 }
-                Err(_) => {
-                    // Silent failure - don't slow down inference with error messages
+                Err(e) => {
+                    // Silently ignore web search errors to not disrupt benchmark flow
+                    eprintln!("   [Test-Time Web] Search failed for '{}': {}", concept, e);
                 }
             }
         }
     }
-    
-    /// Pre-benchmark consciousness learning phase
     /// Learns commonsense knowledge for specific benchmark categories
     /// Now with REAL web learning from DuckDuckGo with critical thinking
     pub fn consciousness_learn_for_benchmarks(&mut self, categories: &[&str]) {
@@ -3199,54 +3208,48 @@ impl RealBenchmarkEvaluator {
                 || question_lower.contains("below")
                 || question_lower.contains("bigger than")
                 || question_lower.contains("smaller than")
-                || question_lower.contains("fits in");
+                || question_lower.contains("fits inside");
             
             if is_spatial_question {
-                let question_line = question_lower.lines()
-                    .find(|l| l.contains('?'))
-                    .unwrap_or(&question_lower);
-                let transitive_score = self.transitive_reasoner.score_yes_no(
+                let flux_score = self.transitive_reasoner.score_answer_comprehensive(
                     &question_lower,
-                    question_line,
+                    &question_lower,
                     &choice_lower,
                 );
-                score += transitive_score;
+                score += flux_score;
             }
             
-            // ----- LEARNED PATTERN MATCHING (ULTRA-AGGRESSIVE) -----
-            // 1. Exact pattern match from learned Q&A patterns
-            if let Some(learned_answers) = self.qa_patterns.get(&self.extract_pattern(&question_lower)) {
-                if learned_answers.iter().any(|a| a == &choice_lower) {
-                    score += 100.0; // Massive boost for exact pattern match
-                }
-            }
-            
-            // 2. Direct fact lookup from web-learned knowledge
-            // Check if this exact question+choice combination was learned
+            // ----- EXPERT 18: WEB-LEARNED KNOWLEDGE PATTERNS -----
+            // Direct pattern matching with web-learned knowledge
+            // 1. Check for exact Q&A pattern match from consciousness learning
             let combined_key = format!("{}|||{}", &question_lower, &choice_lower);
             if self.learned_embeddings.contains_key(&combined_key) {
                 score += 150.0; // Ultra-high boost for exact Q&A match from web
             }
             
-            // 3. Semantic match with web-learned facts
+            // 2. Semantic match with web-learned facts
             let fact_score = self.score_with_consciousness_facts(&question_lower, &choice_lower);
             if fact_score > 0.0 {
                 score += fact_score * 25.0; // High weight for web-learned facts
             }
             
-            // 4. Keyword overlap with vortex knowledge
+            // 3. Keyword overlap with vortex knowledge
             let keyword_score = self.score_vortex_keyword_overlap(&question_lower, &choice_lower);
             if keyword_score > 0.0 {
                 score += keyword_score * 15.0;
             }
             
-            // ----- EXPERT 18: COMPREHENSIVE REASONING -----
+            // ----- EXPERT 19: COMPREHENSIVE REASONING -----
             // Temporal state tracking, multi-hop reasoning, span extraction, symbolic math
             let comprehensive_score = self.comprehensive_reasoner.score_answer(
                 question_text,
                 &choice_lower,
             );
             score += comprehensive_score;
+            
+            // ----- EXPERT 20: CALM-WEB SEMANTIC LEARNING -----
+            let calm_web_score = self.score_with_calm_web(&question_lower, &choice_lower);
+            score += calm_web_score;
             
             logits.push(score);
         }
@@ -4080,7 +4083,7 @@ impl RealBenchmarkEvaluator {
     }
     
     /// Score a choice using direct facts from consciousness learner's vortex
-    /// This taps into web-learned knowledge immediately after test-time search
+    /// Uses embedding-based similarity search to match semantically related subjects
     fn score_with_consciousness_facts(&self, question: &str, choice: &str) -> f32 {
         let choice_lower = choice.to_lowercase();
         let question_lower = question.to_lowercase();
@@ -4098,13 +4101,61 @@ impl RealBenchmarkEvaluator {
         
         let mut score = 0.0f32;
         
-        // Check each subject in vortex
+        // EMBEDDING-BASED SIMILARITY SEARCH
+        // Search for subjects semantically similar to the choice
+        let choice_query = choice_words.join(" ");
+        let similar_subjects = self.consciousness_learner.vortex.search_by_similarity(&choice_query, 10);
+        
+        for (node, similarity) in similar_subjects {
+            // High boost for semantically similar subjects
+            if similarity > 0.5 {
+                score += 20.0 * similarity;
+                
+                // Check if question words relate to this subject's attributes
+                for (attr_key, attr_val) in &node.attributes {
+                    let attr_text = format!("{} {}", attr_key, attr_val.value).to_lowercase();
+                    for qword in &question_words {
+                        if attr_text.contains(qword) {
+                            score += 15.0 * attr_val.confidence * similarity;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Also search by similarity for question words to find related subjects
+        let question_query = question_words.join(" ");
+        let question_matches = self.consciousness_learner.vortex.search_by_similarity(&question_query, 5);
+        
+        for (node, similarity) in question_matches {
+            if similarity > 0.6 {
+                // Check if this subject's attributes contain the choice
+                for (_, attr_val) in &node.attributes {
+                    let attr_lower = attr_val.value.to_lowercase();
+                    if choice_words.iter().any(|w| attr_lower.contains(w)) {
+                        score += 25.0 * similarity * attr_val.confidence;
+                    }
+                }
+                
+                // Check relations
+                for (_, target, conf) in &node.relations {
+                    let target_lower = target.to_lowercase();
+                    if choice_words.iter().any(|w| target_lower.contains(w)) {
+                        score += 20.0 * similarity * conf;
+                    }
+                }
+            }
+        }
+        
+        // FALLBACK: Direct keyword matching for exact matches
         for (subject_name, node) in &self.consciousness_learner.vortex.subjects {
             // Check if choice words match the subject
-            let subject_match = choice_words.iter().any(|w| subject_name.contains(w) || w.contains(subject_name));
+            let subject_match = choice_words.iter().any(|w| {
+                subject_name.contains(w) || w.contains(subject_name)
+            });
             
             if subject_match {
-                score += 10.0; // Found facts about this choice
+                score += 10.0;
                 
                 // Check attributes for question word matches
                 for (attr_key, attr_val) in &node.attributes {
@@ -4120,10 +4171,11 @@ impl RealBenchmarkEvaluator {
             // Check relations - if choice matches target, check if question matches source
             for (rel_type, target, conf) in &node.relations {
                 let target_lower = target.to_lowercase();
-                let choice_matches_target = choice_words.iter().any(|w| target_lower.contains(w) || w.contains(&target_lower));
+                let choice_matches_target = choice_words.iter().any(|w| {
+                    target_lower.contains(w) || w.contains(&target_lower)
+                });
                 
                 if choice_matches_target {
-                    // Choice is the target of a relation - check if subject matches question
                     for qword in &question_words {
                         if subject_name.contains(qword) || qword.contains(subject_name) {
                             score += 20.0 * conf;
@@ -4178,6 +4230,21 @@ impl RealBenchmarkEvaluator {
         
         score
     }
+    
+    /// Score using CALM-enhanced web learner for semantic fact retrieval
+    /// This leverages semantic embeddings of web-learned facts
+    fn score_with_calm_web(&mut self, question: &str, choice: &str) -> f32 {
+        if self.calm_web_learner.store.get_stats().total_facts == 0 {
+            return 0.0;
+        }
+        
+        // Use CALM-web learner to score the choice
+        let score = self.calm_web_learner.score_choice(choice, question);
+        
+        // Boost score to make it competitive with other experts
+        score * 25.0
+    }
+    
     /// Queries learned world knowledge for location, usage, capability, and property relations
     fn score_with_commonsense(&self, question: &str, choice: &str) -> f32 {
         let question_lower = question.to_lowercase();
@@ -4619,6 +4686,79 @@ impl RealBenchmarkEvaluator {
             total_time_secs: start.elapsed().as_secs_f64(),
             questions_loaded_from: self.data_dir.clone(),
         }
+    }
+
+    /// PARALLEL BATCH EVALUATION: Process questions in parallel for speed
+    pub fn evaluate_parallel(&mut self, name: &str, questions: &[RealBenchmarkQuestion], batch_size: usize) -> RealBenchmarkResult {
+        use rayon::prelude::*;
+        
+        let start = Instant::now();
+        let total = questions.len();
+        
+        println!("\n   [{} PARALLEL] {} questions, batch_size={}", name, total, batch_size);
+        
+        // Parallel processing - results collected first, then sequential test-time training
+        let results: Vec<(usize, f32, bool)> = (0..total).into_par_iter()
+            .map(|i| {
+                let q = &questions[i];
+                // Fast inference without web search for parallel safety
+                let (predicted, confidence) = self.score_question_fast(q);
+                let is_correct = predicted == q.correct_answer;
+                (predicted, confidence, is_correct)
+            })
+            .collect();
+        
+        // Sequential: apply test-time training and count results
+        let mut correct = 0;
+        let mut total_confidence = 0.0;
+        
+        for (i, (predicted, confidence, is_correct)) in results.iter().enumerate() {
+            if *is_correct { correct += 1; }
+            total_confidence += *confidence;
+            
+            // Test-time training (modifies state, must be sequential)
+            self.test_time_train(&questions[i], *predicted, *confidence);
+        }
+        
+        let accuracy = (correct as f64 / total as f64) * 100.0;
+        
+        RealBenchmarkResult {
+            benchmark_name: format!("{}_parallel", name),
+            source: questions.first().map(|q| q.source.clone()).unwrap_or_default(),
+            total_questions: total,
+            correct,
+            accuracy,
+            avg_confidence: total_confidence / total as f32,
+            total_time_secs: start.elapsed().as_secs_f64(),
+            questions_loaded_from: self.data_dir.clone(),
+        }
+    }
+
+    /// Fast scoring without web search (safe for parallel execution)
+    fn score_question_fast(&self, question: &RealBenchmarkQuestion) -> (usize, f32) {
+        let q_lower = question.question.to_lowercase();
+        let q_words: Vec<&str> = q_lower.split(|c: char| !c.is_alphanumeric()).filter(|w| w.len() > 1).collect();
+        let q_embed = self.get_text_embedding(&q_words);
+        
+        let mut best_idx = 0;
+        let mut best_score = f32::NEG_INFINITY;
+        
+        for (idx, choice) in question.choices.iter().enumerate() {
+            let c_lower = choice.to_lowercase();
+            let c_words: Vec<&str> = c_lower.split(|c: char| !c.is_alphanumeric()).filter(|w| w.len() > 1).collect();
+            
+            let mut score = 0.0f32;
+            score += self.cosine_similarity(&q_embed, &self.get_text_embedding(&c_words)) * 10.0;
+            score += self.score_entity_attribute(&q_lower, &c_lower);
+            // Note: RAG scoring omitted in parallel mode (requires &mut self)
+            
+            if score > best_score {
+                best_score = score;
+                best_idx = idx;
+            }
+        }
+        
+        (best_idx, (best_score / 100.0).clamp(0.1, 1.0))
     }
 
     /// Run all available real benchmarks

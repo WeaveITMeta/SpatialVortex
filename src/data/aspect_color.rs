@@ -35,6 +35,17 @@ pub struct AspectColor {
 }
 
 impl AspectColor {
+    /// Blue color constant
+    pub const Blue: Self = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 1.0,
+        a: 1.0,
+        luminance: 0.5,
+        hue: 240.0,
+        saturation: 1.0,
+    };
+
     /// Create new aspect color from RGB
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         let (h, s, l) = Self::rgb_to_hsl(r, g, b);

@@ -255,8 +255,24 @@ impl DynamicVortex {
             node.add_attribute(attribute, value, confidence, source);
         }
         
-        // Extract keywords from value
-        let keywords_to_add: Vec<String> = value.split_whitespace()
+        // Extract keywords from SUBJECT (for word-level indexing)
+        let subject_words: Vec<String> = subject.split_whitespace()
+            .map(|word| word.to_lowercase()
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_string())
+            .filter(|w| w.len() > 2)
+            .collect();
+        
+        // Index each word from the subject
+        for word in &subject_words {
+            self.keyword_index
+                .entry(word.clone())
+                .or_default()
+                .push(subject_lower.clone());
+        }
+        
+        // Extract keywords from VALUE
+        let value_keywords: Vec<String> = value.split_whitespace()
             .map(|word| word.to_lowercase()
                 .trim_matches(|c: char| !c.is_alphanumeric())
                 .to_string())
@@ -264,7 +280,7 @@ impl DynamicVortex {
             .collect();
         
         // Now add keywords separately to avoid borrow issues
-        for word_lower in keywords_to_add {
+        for word_lower in value_keywords {
             // Add to subject node
             if let Some(node) = self.subjects.get_mut(&subject_lower) {
                 node.add_keyword(&word_lower);

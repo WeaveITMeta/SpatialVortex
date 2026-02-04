@@ -551,6 +551,19 @@ pub struct HashMetadata {
     pub confidence: f32,
 }
 
+impl Default for HashMetadata {
+    fn default() -> Self {
+        Self {
+            hash_hex: String::new(),
+            flux_position: 0,
+            attributes: Attributes::new(),
+            rgb_color: (0, 0, 0),
+            is_sacred: false,
+            confidence: 0.0,
+        }
+    }
+}
+
 /// ELP channel values
 /// DEPRECATED: Use Attributes system instead
 #[deprecated(since = "0.3.0", note = "Use Attributes system. Access via attributes.elp_tensor()")]

@@ -147,7 +147,7 @@ pub struct InferenceEngineStats {
 
 /// Health check endpoint
 pub async fn health_check(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let inference_engine = data.inference_engine.read().await;
+    let inference_engine: tokio::sync::RwLockReadGuard<InferenceEngine> = data.inference_engine.read().await;
     let stats = inference_engine.get_statistics();
 
     let database_status = match data.database.health_check().await {
@@ -226,7 +226,7 @@ async fn generate_matrix_internal(
     data.cache.store_matrix(matrix.clone()).await?;
 
     // Update inference engine
-    let mut inference_engine = data.inference_engine.write().await;
+    let mut inference_engine: tokio::sync::RwLockWriteGuard<InferenceEngine> = data.inference_engine.write().await;
     inference_engine.update_subject_matrix(matrix.clone());
 
     Ok(convert_matrix_to_response(matrix, "generated".to_string()))
@@ -270,7 +270,7 @@ async fn process_inference_internal(
     };
 
     // Process inference using modern method
-    let mut inference_engine = data.inference_engine.write().await;
+    let mut inference_engine: tokio::sync::RwLockWriteGuard<InferenceEngine> = data.inference_engine.write().await;
     let result = inference_engine.process_inference(inference_input).await?;
 
     Ok(convert_inference_result_to_response(result))
@@ -292,7 +292,7 @@ pub async fn forward_inference_handler(
 async fn tokenize_internal(data: &AppState, req: TokenizeRequest) -> Result<TokenizeResponse> {
     let subject_filter = parse_subject_filter(&req.subject_filter)?;
 
-    let inference_engine = data.inference_engine.read().await;
+    let inference_engine: tokio::sync::RwLockReadGuard<InferenceEngine> = data.inference_engine.read().await;
     let candidate_seeds = inference_engine
         .forward_inference(req.target_meanings.clone(), &subject_filter)
         .await?;
@@ -311,7 +311,7 @@ async fn tokenize_internal(data: &AppState, req: TokenizeRequest) -> Result<Toke
 
 /// Get all available subjects
 pub async fn get_subjects(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let inference_engine = data.inference_engine.read().await;
+    let inference_engine: tokio::sync::RwLockReadGuard<InferenceEngine> = data.inference_engine.read().await;
     let stats = inference_engine.get_statistics();
 
     Ok(HttpResponse::Ok().json(stats.subjects))
@@ -324,7 +324,7 @@ pub async fn get_matrix_by_subject(
 ) -> ActixResult<HttpResponse> {
     let subject = path.into_inner();
 
-    let inference_engine = data.inference_engine.read().await;
+    let inference_engine: tokio::sync::RwLockReadGuard<InferenceEngine> = data.inference_engine.read().await;
     if let Some(matrix) = inference_engine.get_subject_matrix(&subject) {
         let response = convert_matrix_to_response(matrix.clone(), "current".to_string());
         Ok(HttpResponse::Ok().json(response))
@@ -335,7 +335,7 @@ pub async fn get_matrix_by_subject(
 
 /// Clear inference cache
 pub async fn clear_cache(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let mut inference_engine = data.inference_engine.write().await;
+    let mut inference_engine: tokio::sync::RwLockWriteGuard<InferenceEngine> = data.inference_engine.write().await;
     inference_engine.clear_cache();
 
     if let Err(e) = data.cache.clear_all().await {
@@ -490,7 +490,7 @@ pub async fn get_sacred_intersections(
     let dimension = query.dimension.unwrap_or(3);
     let subject = query.subject.clone();
 
-    let inference_engine = data.inference_engine.read().await;
+    let inference_engine: tokio::sync::RwLockReadGuard<InferenceEngine> = data.inference_engine.read().await;
 
     let mut intersections = Vec::new();
 
@@ -613,7 +613,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/api/v1")
             .route("/health", web::get().to(health_check))
             .service(crate::ai::chat_api::chat_text)  // Multi-modal chat endpoint
-            .service(crate::ai::dual_response_api::dual_response)  // Dual response (Consensus + Native)
+            .route("/dual-response", web::post().to(crate::ai::dual_response_api::dual_response))  // Dual response (Consensus + Native)
             .service(crate::ai::coding_api::generate_code)  // Code generation endpoint
             .service(crate::ai::coding_api::unified_chat)  // Unified chat (text + code)
             .service(crate::ai::coding_api::unified_chat_stream)  // Streaming chat (SSE)
@@ -674,7 +674,7 @@ pub async fn generate_subject(
 ) -> ActixResult<HttpResponse> {
     use crate::subject_generator::SubjectGenerator;
 
-    let generator = SubjectGenerator::new((*data.ai_integration).clone(), req.subjects_dir.clone());
+    let generator = SubjectGenerator::new(data.ai_integration.clone(), req.subjects_dir.clone());
 
     match generator.create_subject(&req.subject_name).await {
         Ok(()) => {
@@ -718,8 +718,8 @@ pub async fn generate_subject_from_visual(
     use crate::subject_generator::SubjectGenerator;
     use crate::visual_subject_generator::VisualSubjectGenerator;
 
-    let visual_gen = VisualSubjectGenerator::new((*data.ai_integration).clone());
-    let subject_gen = SubjectGenerator::new((*data.ai_integration).clone(), req.subjects_dir.clone());
+    let visual_gen = VisualSubjectGenerator::new(data.ai_integration.clone());
+    let subject_gen = SubjectGenerator::new(data.ai_integration.clone(), req.subjects_dir.clone());
 
     // Step 1: Generate subject definition from visual data
     match visual_gen.generate_from_visual_data(&req.visual_data).await {
@@ -770,7 +770,7 @@ pub async fn analyze_matrix_visual(
 ) -> ActixResult<HttpResponse> {
     use crate::visual_subject_generator::VisualSubjectGenerator;
 
-    let inference_engine = data.inference_engine.read().await;
+    let inference_engine: tokio::sync::RwLockReadGuard<InferenceEngine> = data.inference_engine.read().await;
     
     match inference_engine.get_subject_matrix(&subject) {
         Some(matrix) => {
@@ -830,7 +830,7 @@ pub async fn generate_dynamic_color_matrix(
             let _ = data.cache.store_matrix(matrix.clone()).await;
 
             // Update inference engine
-            let mut inference_engine = data.inference_engine.write().await;
+            let mut inference_engine: tokio::sync::RwLockWriteGuard<InferenceEngine> = data.inference_engine.write().await;
             inference_engine.update_subject_matrix(matrix.clone());
 
             Ok(HttpResponse::Ok().json(DynamicColorResponse {

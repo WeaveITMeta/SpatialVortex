@@ -1491,6 +1491,18 @@ impl ASIOrchestrator {
         let editor = LatentSpaceEditor::default();
         editor.refine_trace(trace)
     }
+
+    /// Detect output color if color engine is available
+    #[cfg(feature = "color_ml")]
+    fn detect_output_color(&self, output: &mut ASIOutput) {
+        if let Some(ref color_engine) = self.color_engine {
+            // Stub implementation - would use color_engine to detect color
+            output.semantic_color = Some(crate::data::AspectColor::Blue);
+            output.primary_meaning = Some("meaning".to_string());
+            output.related_meanings = Some(vec![]);
+            output.color_confidence = Some(0.5);
+        }
+    }
 }
 
 // Metrics Summary Struct

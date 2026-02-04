@@ -5,6 +5,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "postgres")]
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -62,10 +63,15 @@ pub struct SearchSessionsRequest {
 }
 
 /// Session Manager
+#[cfg(feature = "postgres")]
 pub struct SessionManager {
     pool: PgPool,
 }
 
+#[cfg(not(feature = "postgres"))]
+pub struct SessionManager;
+
+#[cfg(feature = "postgres")]
 impl SessionManager {
     /// Create new session manager
     pub fn new(pool: PgPool) -> Self {

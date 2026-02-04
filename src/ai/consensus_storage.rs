@@ -10,7 +10,7 @@
 //! 3. **BeadTensor**: Snapshot consensus moment with prosody-like metrics
 //! 4. **Metadata**: Rich tags including diversity, approach types, sacred resonance
 
-use crate::ai::vector_consensus::ConsensusVectorField;
+use crate::ai::vector_consensus::{ConsensusVectorField, ELPPoint};
 use crate::data::models::{StoredFluxMatrix, ELPTensor};
 use crate::data::attributes::Attributes;
 use uuid::Uuid;
@@ -34,8 +34,8 @@ impl ConsensusVectorField {
         );
         
         // Add consensus-specific attributes
-        attributes.set_confidence(self.field_confidence);
-        attributes.set_confidence(self.field_confidence); // Consensus confidence = signal strength
+        attributes.set_confidence(self.field_confidence as f32);
+        attributes.set_confidence(self.field_confidence as f32); // Consensus confidence = signal strength
         
         Ok(StoredFluxMatrix {
             id: Uuid::new_v4(),
@@ -87,7 +87,7 @@ impl ConsensusVectorField {
     /// Generic helper for building ELP channel distributions
     fn elp_distribution_by_position<F>(&self, extract: F) -> [f32; 9]
     where
-        F: Fn(&ELPTensor) -> f32,
+        F: Fn(&ELPPoint) -> f32,
     {
         let mut dist = [0.0; 9];
         
@@ -95,7 +95,7 @@ impl ConsensusVectorField {
             let pos = v.flux_position as usize;
             if pos > 0 && pos <= 9 {
                 let channel_value = extract(&v.elp);
-                let weight = v.trend_weight() * v.final_confidence();
+                let weight = (v.trend_weight() * v.final_confidence()) as f32;
                 dist[pos - 1] += channel_value * weight;
             }
         }
@@ -127,7 +127,7 @@ impl ConsensusVectorField {
             .max()
             .unwrap_or(1);
         
-        let mut aggregated = vec![0.0; max_len];
+        let mut aggregated = vec![0.0_f64; max_len];
         let mut counts = vec![0; max_len];
         
         // Sum all trajectories
@@ -142,11 +142,12 @@ impl ConsensusVectorField {
         // Average
         for i in 0..max_len {
             if counts[i] > 0 {
-                aggregated[i] /= counts[i] as f32;
+                aggregated[i] /= counts[i] as f64;
             }
         }
         
-        aggregated
+        // Convert to f32
+        aggregated.iter().map(|&v| v as f32).collect()
     }
     
     /// Convert consensus to BeadTensor snapshot
@@ -193,8 +194,8 @@ impl ConsensusVectorField {
         beam.set_ethos(self.consensus_center.ethos as f32);
         beam.set_logos(self.consensus_center.logos as f32);
         beam.set_pathos(self.consensus_center.pathos as f32);
-        beam.confidence = self.field_confidence;
-        beam.curviness_signed = self.sacred_resonance;
+        beam.confidence = self.field_confidence as f32;
+        beam.curviness_signed = self.sacred_resonance as f32;
         beam.timestamp = chrono::Utc::now().timestamp() as f64;
         
         Ok(beam)
@@ -208,8 +209,8 @@ impl ConsensusVectorField {
             self.consensus_center.ethos as f32,
             self.consensus_center.logos as f32,
             self.consensus_center.pathos as f32,
-            self.field_confidence,
-            self.diversity_score,
+            self.field_confidence as f32,
+            self.diversity_score as f32,
         ]
     }
     
@@ -281,7 +282,7 @@ impl ConsensusStoragePolicy {
         }
         
         // Check confidence threshold
-        if field.field_confidence < self.min_confidence {
+        if (field.field_confidence as f32) < self.min_confidence {
             tracing::debug!(
                 "📊 Consensus below confidence threshold: {:.2} < {:.2}",
                 field.field_confidence,
@@ -291,7 +292,7 @@ impl ConsensusStoragePolicy {
         }
         
         // Check diversity threshold
-        if field.diversity_score < self.min_diversity {
+        if (field.diversity_score as f32) < self.min_diversity {
             tracing::debug!(
                 "📊 Consensus below diversity threshold: {:.2} < {:.2}",
                 field.diversity_score,
@@ -302,7 +303,7 @@ impl ConsensusStoragePolicy {
         
         // Check sacred resonance if required
         if let Some(min_sacred) = self.min_sacred_resonance {
-            if field.sacred_resonance < min_sacred {
+            if (field.sacred_resonance as f32) < min_sacred {
                 tracing::debug!(
                     "📊 Consensus below sacred resonance threshold: {:.2} < {:.2}",
                     field.sacred_resonance,

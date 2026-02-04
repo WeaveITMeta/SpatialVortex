@@ -10,7 +10,9 @@ use super::meta_learning::{
     ReasoningPattern, QuerySignature, TransformationSnapshot, LearningMetrics, PatternStorage,
 };
 use anyhow::{Context, Result};
+#[cfg(feature = "postgres")]
 use sqlx::postgres::{PgPool, PgPoolOptions};
+#[cfg(feature = "postgres")]
 use sqlx::Row;
 use uuid::Uuid;
 

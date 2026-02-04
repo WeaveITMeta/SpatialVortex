@@ -24,14 +24,8 @@ pub struct FastKnowledgeConfig {
 impl Default for FastKnowledgeConfig {
     fn default() -> Self {
         Self {
-            crawler_config: CrawlerConfig {
-                max_concurrent_fetches: 2048,
-                max_per_domain_rps: 200, // Higher than Wikipedia API
-                max_depth: 2, // Shallow crawl for speed
-                timeout_secs: 5, // Fast timeout
-                max_pages: 1000,
-                user_agent: "SpatialVortex-FastKnowledge/1.0".to_string(),
-            },
+            // Use fast_eval preset to avoid runaway crawl at test time
+            crawler_config: CrawlerConfig::fast_eval(),
             max_knowledge_per_query: 50,
             parallel_extraction: true,
         }

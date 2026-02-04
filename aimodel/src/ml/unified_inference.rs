@@ -23,8 +23,10 @@ use crate::data::models::BeamTensor;
 use crate::ml::calm::{CALMEngine, CALMConfig, LatentState};
 use crate::ml::generative_arch::{
     SubwordTokenizer, SacredDynamicAttention, SacredAttentionConfig,
-    GenerationHead, DynamicMoERouter,
+    GenerationHead,
 };
+use crate::ml::sacred_moe::{SacredMoELayer, SacredMoEConfig};
+use crate::ml::test_time_compute::{TTCWrapper, TTCConfig};
 use crate::ml::reasoning_engine::{
     TemporalStateTracker, MultiHopReasoner, SymbolicMathEngine,
 };
@@ -985,12 +987,14 @@ pub struct UnifiedInferenceEngine {
     pub calm: CALMEngine,
     /// Sacred attention (3-6-9)
     pub sacred_attention: SacredDynamicAttention,
+    /// Sacred MoE router (single router)
+    pub sacred_moe: SacredMoELayer,
+    /// TTC wrapper for iterative refinement
+    pub ttc: TTCWrapper,
     /// Reasoning layer
     pub reasoning: ReasoningLayer,
     /// Generation head for answer selection
     pub generation_head: GenerationHead,
-    /// MoE router (for expert weighting, not voting)
-    pub moe_router: DynamicMoERouter,
     /// Word embeddings
     pub word_embeddings: HashMap<String, Vec<f32>>,
 }
@@ -1023,20 +1027,33 @@ impl UnifiedInferenceEngine {
         // Initialize reasoning layer
         let reasoning = ReasoningLayer::new(latent_dim);
         
+        // Initialize Sacred MoE (single router)
+        let moe_config = SacredMoEConfig {
+            num_experts: 256,
+            top_k: 8,
+            model_dim: latent_dim,
+            expert_dim: latent_dim * 2,
+            num_groups: 9,
+            ..Default::default()
+        };
+        let sacred_moe = SacredMoELayer::new(moe_config.clone());
+        
+        // Initialize TTC wrapper
+        let ttc_config = TTCConfig::default();
+        let ttc = TTCWrapper::new(ttc_config, SacredMoELayer::new(moe_config));
+        
         // Initialize generation head
         let generation_head = GenerationHead::new(latent_dim, vocab_size);
-        
-        // Initialize MoE router
-        let moe_router = DynamicMoERouter::new(latent_dim);
         
         Self {
             config,
             tokenizer,
             calm,
             sacred_attention,
+            sacred_moe,
+            ttc,
             reasoning,
             generation_head,
-            moe_router,
             word_embeddings: HashMap::new(),
         }
     }
@@ -1152,13 +1169,27 @@ impl UnifiedInferenceEngine {
         }
     }
     
+    /// Forward pass using SacredMoE as the single router (with embedvec routing)
+    pub fn forward(&mut self, input: &[f32], query_embedding: &[f32]) -> Vec<f32> {
+        // Use SacredMoE route_and_forward as the unified routing entrypoint
+        let moe_output = self.sacred_moe.route_and_forward(input, query_embedding);
+        moe_output.output
+    }
+
     /// Main inference: context + question → answer
     pub fn infer(&mut self, context: &str, question: &str, choices: &[String]) -> (usize, f32) {
         // Step 1: Encode context + question into unified latent
         let full_text = format!("{}\n{}", context, question);
         let mut latent = self.encode(&full_text);
-        
-        // Step 2: Apply reasoning layer to extract structured knowledge
+
+        // Get query embedding for routing
+        let query_embed = self.encode(&full_text).latent;
+
+        // Run through SacredMoE routing
+        let moe_out = self.sacred_moe.route_and_forward(&latent.latent, &query_embed);
+        latent.latent = moe_out.output;
+
+        // Process reasoning layer to extract structured knowledge
         if self.config.use_reasoning_layer {
             self.reasoning.process(context, &mut latent);
         }

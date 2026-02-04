@@ -6,11 +6,14 @@
 //! - **Distributed** - Multi-GPU training with ZeRO
 //! - **Pretraining** - MLM/CLM infrastructure
 
+pub mod two_stage_rl;
 pub mod loss_functions;
 pub mod distributed;
 pub mod burn_model;
 pub mod pretraining;
 pub mod gradient_checkpointing;
+
+pub use two_stage_rl::TwoStageRLTrainer;
 
 // Loss functions
 pub use loss_functions::*;

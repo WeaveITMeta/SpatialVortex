@@ -74,6 +74,10 @@ struct Args {
     /// Skip training and run evaluation only
     #[arg(long, default_value_t = false)]
     eval_only: bool,
+
+    /// Enable parallel processing for faster evaluation (disables web search)
+    #[arg(long, default_value_t = false)]
+    parallel: bool,
 }
 
 // =============================================================================
@@ -332,70 +336,111 @@ fn evaluate_mmlu(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<
     let questions = load_mmlu(&args.data_dir, None)
         .map_err(|e| anyhow::anyhow!("Failed to load MMLU: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
-    Ok(evaluator.evaluate("MMLU", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("MMLU", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("MMLU", &questions[..limit]))
+    }
 }
 
 fn evaluate_gsm8k(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_gsm8k(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load GSM8K: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
-    Ok(evaluator.evaluate("GSM8K", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("GSM8K", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("GSM8K", &questions[..limit]))
+    }
 }
 
 fn evaluate_arc(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_arc(&args.data_dir, true) // Challenge version
         .map_err(|e| anyhow::anyhow!("Failed to load ARC: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
-    Ok(evaluator.evaluate("ARC-Challenge", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("ARC-Challenge", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("ARC-Challenge", &questions[..limit]))
+    }
 }
 
 fn evaluate_hellaswag(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_hellaswag(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load HellaSwag: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
-    Ok(evaluator.evaluate("HellaSwag", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("HellaSwag", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("HellaSwag", &questions[..limit]))
+    }
 }
 
 fn evaluate_truthfulqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_truthfulqa(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load TruthfulQA: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
-    Ok(evaluator.evaluate("TruthfulQA", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("TruthfulQA", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("TruthfulQA", &questions[..limit]))
+    }
 }
 
 fn evaluate_humaneval(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_humaneval(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load HumanEval: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(164) };
-    Ok(evaluator.evaluate("HumanEval", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("HumanEval", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("HumanEval", &questions[..limit]))
+    }
 }
 
 fn evaluate_swebench(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_swebench(&args.data_dir, true) // Use Lite version by default
         .map_err(|e| anyhow::anyhow!("Failed to load SWE-Bench: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(300) };
-    Ok(evaluator.evaluate("SWE-Bench Lite", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("SWE-Bench Lite", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("SWE-Bench Lite", &questions[..limit]))
+    }
 }
 
 fn evaluate_commonsenseqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_commonsenseqa(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load CommonsenseQA: {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(500) };
-    Ok(evaluator.evaluate("CommonsenseQA", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("CommonsenseQA", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("CommonsenseQA", &questions[..limit]))
+    }
 }
 
 fn evaluate_squad(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
     let limit = if args.limit > 0 { args.limit } else { 500 };
     let questions = load_squad(&args.data_dir, limit)
         .map_err(|e| anyhow::anyhow!("Failed to load SQuAD: {}", e))?;
-    Ok(evaluator.evaluate("SQuAD 2.0", &questions))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("SQuAD 2.0", &questions, args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("SQuAD 2.0", &questions))
+    }
 }
 
 fn evaluate_babi(evaluator: &mut RealBenchmarkEvaluator, task_num: usize, args: &Args) -> Result<RealBenchmarkResult> {
     let questions = load_babi(&args.data_dir, task_num)
         .map_err(|e| anyhow::anyhow!("Failed to load bAbI task {}: {}", task_num, e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
-    Ok(evaluator.evaluate(&format!("bAbI Task {}", task_num), &questions[..limit]))
+    let name = format!("bAbI Task {}", task_num);
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel(&name, &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate(&name, &questions[..limit]))
+    }
 }
 
 fn evaluate_winogrande(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
@@ -403,7 +448,11 @@ fn evaluate_winogrande(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> R
     let questions = load_commonsenseqa(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load WinoGrande (using CommonsenseQA fallback): {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
-    Ok(evaluator.evaluate("WinoGrande", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("WinoGrande", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("WinoGrande", &questions[..limit]))
+    }
 }
 
 fn evaluate_piqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
@@ -411,7 +460,11 @@ fn evaluate_piqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<
     let questions = load_commonsenseqa(&args.data_dir)
         .map_err(|e| anyhow::anyhow!("Failed to load PIQA (using CommonsenseQA fallback): {}", e))?;
     let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
-    Ok(evaluator.evaluate("PIQA", &questions[..limit]))
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("PIQA", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("PIQA", &questions[..limit]))
+    }
 }
 
 // =============================================================================

@@ -194,6 +194,11 @@ impl SacredExpert {
         let scale = if self.is_sacred { 1.15 } else { 1.0 };
         input.iter().map(|x| x * scale).collect()
     }
+    
+    /// Get sacred boost factor for this expert
+    pub fn get_sacred_boost(&self) -> f32 {
+        if self.is_sacred { 1.15 } else { 1.0 }
+    }
 }
 
 // =============================================================================
@@ -569,6 +574,114 @@ impl SacredMoELayer {
             .filter(|e| e.is_sacred || e.is_shared)
             .map(|e| (e.id, e.activation_count, e.is_sacred))
             .collect()
+    }
+    
+    /// Route and forward using embedvec E8 distance for query-based expert selection
+    /// This is the unified routing entrypoint for the single-router architecture
+    pub fn route_and_forward(&mut self, input: &[f32], query_embedding: &[f32]) -> MoEOutput {
+        // Compute E8 distances to all expert centroids (simplified: use group_weights as centroids)
+        let mut expert_scores: Vec<(usize, f32)> = self.experts.iter()
+            .map(|expert| {
+                // Compute similarity between query and expert's effective centroid
+                // Use dot product as proxy for E8 distance in simplified form
+                let centroid = self.get_expert_centroid(expert.id);
+                let similarity = Self::cosine_similarity(query_embedding, &centroid);
+                (expert.id, similarity)
+            })
+            .collect();
+        
+        // Sort by similarity (descending) and take top-k
+        expert_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let selected: Vec<(usize, f32)> = expert_scores.into_iter()
+            .take(self.config.top_k)
+            .collect();
+        
+        // Run vortex cycle with sacred checkpoints
+        let mut output = vec![0.0f32; input.len()];
+        let mut position = 1usize;
+        
+        for &step in &VORTEX_CYCLE {
+            position += step;
+            
+            // Process through selected experts
+            for (expert_id, weight) in &selected {
+                if let Some(expert) = self.experts.get_mut(*expert_id) {
+                    let expert_out = expert.forward(input);
+                    for (i, &val) in expert_out.iter().enumerate() {
+                        if i < output.len() {
+                            output[i] += val * weight * expert.get_sacred_boost();
+                        }
+                    }
+                    *self.stats.expert_activations.entry(*expert_id).or_insert(0) += 1;
+                }
+            }
+            
+            // Sacred checkpoint at positions 3, 6, 9
+            if SACRED_POSITIONS.contains(&position) {
+                output = self.sacred_checkpoint(&output, position);
+            }
+        }
+        
+        self.stats.total_tokens += 1;
+        
+        // Build RouterOutput
+        let router_output = RouterOutput {
+            selected_experts: selected,
+            load_balance_loss: 0.0, // Simplified
+            z_loss: 0.0,
+            vortex_position: position,
+        };
+        
+        MoEOutput {
+            output,
+            router_output,
+            auxiliary_loss: 0.0,
+        }
+    }
+    
+    /// Get expert centroid (simplified: derived from expert's group and id)
+    fn get_expert_centroid(&self, expert_id: usize) -> Vec<f32> {
+        // Generate deterministic centroid based on expert characteristics
+        let dim = self.config.model_dim;
+        (0..dim)
+            .map(|i| {
+                let seed = expert_id.wrapping_mul(997).wrapping_add(i);
+                ((seed as f32 * 0.01).sin() * 0.5) + ((seed as f32 * 0.003).cos() * 0.5)
+            })
+            .collect()
+    }
+    
+    /// Cosine similarity between two vectors
+    fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+        let mut dot = 0.0f32;
+        let mut norm_a = 0.0f32;
+        let mut norm_b = 0.0f32;
+        
+        let len = a.len().min(b.len());
+        for i in 0..len {
+            dot += a[i] * b[i];
+            norm_a += a[i] * a[i];
+            norm_b += b[i] * b[i];
+        }
+        
+        if norm_a > 0.0 && norm_b > 0.0 {
+            dot / (norm_a.sqrt() * norm_b.sqrt())
+        } else {
+            0.0
+        }
+    }
+    
+    /// Sacred checkpoint for reflection/verification at positions 3, 6, 9
+    fn sacred_checkpoint(&self, state: &[f32], position: usize) -> Vec<f32> {
+        // Apply reflection/scaling based on sacred position
+        let boost = match position {
+            3 => 1.05,  // Light verification
+            6 => 1.10,  // Medium reflection
+            9 => 1.15,  // Strong verification
+            _ => 1.0,
+        };
+        
+        state.iter().map(|&x| x * boost).collect()
     }
 }
 

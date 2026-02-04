@@ -29,7 +29,7 @@ pub trait BatchHandler<T, R>: Send + Sync {
 
 impl<T, R> BatchProcessor<T, R>
 where
-    T: Send + 'static,
+    T: Send + Sync + Clone + 'static,
     R: Send + 'static,
 {
     pub fn new(
@@ -77,7 +77,7 @@ where
     }
     
     /// Submit request for batch processing
-    pub async fn submit(&self, request: T) -> Result<R, String> {
+    pub async fn submit(&self, request: T) -> crate::error::Result<R> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         
         let item = PendingItem {
@@ -103,7 +103,8 @@ where
         }
         
         // Wait for response
-        rx.await.map_err(|_| "Batch processor error".to_string())
+        let result = rx.await.map_err(|_| crate::error::SpatialVortexError::Processing("Batch processor error".to_string()))?;
+        result.map_err(|e| crate::error::SpatialVortexError::Processing(e))
     }
     
     fn process_batch_internal(

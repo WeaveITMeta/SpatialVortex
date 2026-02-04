@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "postgres")]
 use sqlx::{postgres::{PgPool, PgPoolOptions}, Row};
 
 #[cfg(feature = "lake")]

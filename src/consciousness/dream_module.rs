@@ -34,7 +34,7 @@ impl DreamModule {
         });
         
         Ok(Self {
-            meta_learning: MetaLearningEngine::new(db),
+            meta_learning: MetaLearningEngine::new(),
             internal_buffer: Arc::new(Mutex::new(Vec::new())),
             last_dream_time: Arc::new(Mutex::new(chrono::Utc::now())),
         })

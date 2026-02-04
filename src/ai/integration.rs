@@ -687,3 +687,9 @@ Respond with JSON format:
             .ok_or_else(|| SpatialVortexError::AIIntegration("No response content".to_string()))
     }
 }
+
+impl Default for AIModelIntegration {
+    fn default() -> Self {
+        Self::new(None, None)
+    }
+}

@@ -14,10 +14,10 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
 use crate::metrics::MetricsMiddleware;
-use crate::ml::inference::flux_inference::InferenceEngine;
+use crate::inference_engine::InferenceEngine;
 use crate::core::sacred_geometry::flux_matrix::FluxMatrixEngine;
 use crate::storage::spatial_database::SpatialDatabase;
-use crate::storage::cache::CacheManager;
+use crate::cache::CacheManager;
 use crate::ai::integration::AIModelIntegration;
 use crate::ai::orchestrator::ASIOrchestrator;
 use crate::consciousness::ConsciousnessSimulator;

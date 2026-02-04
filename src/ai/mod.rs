@@ -69,6 +69,8 @@ pub mod multi_source_search;
 pub mod task_api;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod response_processor;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod dual_response_api;
 #[cfg(all(not(target_arch = "wasm32"), feature = "agents"))]
 pub mod consciousness_api;
 pub mod consensus_storage;
@@ -91,6 +93,7 @@ pub mod goal_planner;
 pub mod causal_reasoning;
 pub mod self_improvement;
 pub mod curiosity_engine;
+pub mod vector_consensus;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod agi_core;
 

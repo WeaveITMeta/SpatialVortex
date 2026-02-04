@@ -78,3 +78,7 @@ pub use training::{
     GradScaler,
     PrecisionMode,
 };
+
+// Meta learning module
+pub mod meta_learning;
+pub use meta_learning::MetaLearner;

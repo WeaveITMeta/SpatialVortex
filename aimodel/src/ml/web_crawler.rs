@@ -52,6 +52,20 @@ impl Default for CrawlerConfig {
     }
 }
 
+impl CrawlerConfig {
+    /// Fast, low-footprint preset for test-time/eval runs
+    pub fn fast_eval() -> Self {
+        Self {
+            max_concurrent_fetches: 64,
+            max_per_domain_rps: 10,
+            max_depth: 1,
+            timeout_secs: 5,
+            max_pages: 50,
+            user_agent: "SpatialVortex-Crawler/1.0 (FastEval)".to_string(),
+        }
+    }
+}
+
 /// Crawled page result with markdown content
 #[derive(Debug, Clone)]
 pub struct CrawledPage {
@@ -143,8 +157,8 @@ impl WebCrawler {
         let mut results = Vec::new();
         let mut tasks = Vec::new();
 
-        // Spawn worker pool
-        for _ in 0..self.config.max_concurrent_fetches.min(1000) {
+        // Spawn worker pool (capped to avoid overwhelming test-time runs)
+        for _ in 0..self.config.max_concurrent_fetches.min(256) {
             let client = self.client.clone();
             let visited = self.visited.clone();
             let rate_limiter = self.rate_limiter.clone();
@@ -160,6 +174,9 @@ impl WebCrawler {
                 while let Ok((url_str, depth)) = rx.recv_async().await {
                     if depth > max_depth { continue; }
                     if visited.len() >= max_pages { break; }
+
+                    // Early dedupe before consuming permits
+                    if visited.contains(&url_str) { continue; }
 
                     // Rate limiting
                     rate_limiter.until_ready().await;

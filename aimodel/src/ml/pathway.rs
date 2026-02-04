@@ -35,6 +35,14 @@ pub struct PathwayConfig {
     pub initial_beta: f64,
     /// Target KL divergence bound
     pub kl_bound: f64,
+    /// Base beam width for adaptive search
+    pub beam_base: usize,
+    /// Maximum beam width when uncertainty is high
+    pub beam_max: usize,
+    /// Uncertainty threshold to trigger pruning
+    pub uncertainty_threshold: f64,
+    /// Enable sacred checkpoints at depths 3, 6, and 9
+    pub enable_sacred_checkpoints: bool,
 }
 
 impl Default for PathwayConfig {
@@ -47,6 +55,10 @@ impl Default for PathwayConfig {
             parallel: true,
             initial_beta: 1.0,
             kl_bound: 0.1,
+            beam_base: 4,
+            beam_max: 12,
+            uncertainty_threshold: 0.7,
+            enable_sacred_checkpoints: true,
         }
     }
 }
@@ -196,6 +208,27 @@ impl ExhaustivePathwayOptimizer {
             return 0.0;
         }
 
+        combined.iter()
+            .zip(self.target.iter())
+            .map(|(a, b)| (*a as f64) * (*b as f64))
+            .sum()
+    }
+
+    /// Score a prefix (partial permutation) by padding with zeros
+    fn score_prefix(&self, prefix: &[usize]) -> f64 {
+        let mut combined: Vec<f32> = Vec::with_capacity(self.config.dimension);
+        for &i in prefix {
+            if i < self.embeddings.len() {
+                combined.extend(self.embeddings[i].iter().copied());
+            }
+            if combined.len() >= self.config.dimension {
+                break;
+            }
+        }
+        combined.resize(self.config.dimension, 0.0);
+        if combined.len() != self.target.len() {
+            return 0.0;
+        }
         combined.iter()
             .zip(self.target.iter())
             .map(|(a, b)| (*a as f64) * (*b as f64))
@@ -399,6 +432,94 @@ impl ExhaustivePathwayOptimizer {
             .sum();
         
         dist_sq.sqrt()
+    }
+
+    fn sigmoid(x: f64) -> f64 {
+        1.0 / (1.0 + (-x).exp())
+    }
+
+    /// Adaptive beam search with sacred checkpoints and uncertainty-based width
+    pub fn adaptive_beam_search(&self, top_k: usize) -> Vec<ScoredPathway> {
+        let n = self.config.n_nodes.min(self.embeddings.len()).min(10);
+        if n == 0 || self.target.is_empty() {
+            return vec![];
+        }
+
+        // Beam entries: (perm prefix, score)
+        let mut beam: Vec<(Vec<usize>, f64)> = vec![(Vec::new(), 0.0)];
+        let mut finished: Vec<ScoredPathway> = Vec::new();
+
+        for depth in 0..n {
+            let mut candidates: Vec<(Vec<usize>, f64)> = Vec::new();
+            for (prefix, _) in &beam {
+                // Remaining elements to place
+                let mut remaining: Vec<usize> = (0..n)
+                    .filter(|i| !prefix.contains(i))
+                    .collect();
+                for r in remaining.drain(..) {
+                    let mut next = prefix.clone();
+                    next.push(r);
+                    let score = self.score_prefix(&next);
+                    candidates.push((next, score));
+                }
+            }
+
+            if candidates.is_empty() {
+                break;
+            }
+
+            // Uncertainty as normalized std/mean
+            let mean: f64 = candidates.iter().map(|(_, s)| *s).sum::<f64>() / candidates.len() as f64;
+            let var: f64 = candidates.iter().map(|(_, s)| (s - mean).powi(2)).sum::<f64>() / candidates.len() as f64;
+            let std = var.sqrt();
+            let uncertainty = if mean.abs() < 1e-6 { 1.0 } else { (std / mean.abs()).min(5.0) };
+
+            // Beam width scheduling via sigmoid on uncertainty
+            let width = (self.config.beam_base as f64
+                + (self.config.beam_max.saturating_sub(self.config.beam_base)) as f64
+                    * Self::sigmoid(uncertainty))
+                .round()
+                .max(1.0) as usize;
+
+            // Sort by score desc and keep top width
+            candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            candidates.truncate(width);
+
+            // Sacred checkpoints at depths 3, 6, 9 (1-indexed)
+            let checkpoint = self.config.enable_sacred_checkpoints && matches!(depth + 1, 3 | 6 | 9);
+            if checkpoint {
+                // Prune by uncertainty threshold
+                if uncertainty > self.config.uncertainty_threshold {
+                    let cutoff = candidates.first().map(|(_, s)| *s * 0.7).unwrap_or(0.0);
+                    candidates.retain(|(_, s)| *s >= cutoff);
+                }
+            }
+
+            // Split completed vs partial
+            beam.clear();
+            for (perm, score) in candidates {
+                if perm.len() == n {
+                    let beta = self.config.initial_beta;
+                    let mut path = ScoredPathway::new(perm.clone(), score, beta);
+                    path.e8_distance = self.compute_e8_distance(&perm);
+                    finished.push(path);
+                } else {
+                    beam.push((perm, score));
+                }
+            }
+
+            if beam.is_empty() {
+                break;
+            }
+        }
+
+        if finished.is_empty() {
+            return vec![];
+        }
+
+        finished.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        finished.truncate(top_k);
+        finished
     }
 
     /// Run one stack of exhaustive evaluation

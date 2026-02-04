@@ -1432,8 +1432,6 @@ pub struct GenerativeVortexEngine {
     pub knowledge_base: Vec<(String, Vec<f32>)>,
     /// Training step counter
     pub training_steps: usize,
-    /// Dynamic MoE router for all experts
-    pub moe_router: DynamicMoERouter,
     /// Attribute-focused attention for implication extraction
     pub attr_attention: AttributeFocusedAttention,
     /// Accumulated implications from vortex processing
@@ -1480,12 +1478,10 @@ impl GenerativeVortexEngine {
             parallel: true,
             initial_beta: 1.0,
             kl_bound: 0.1,
+            ..Default::default()
         };
         let pathway_optimizer = ExhaustivePathwayOptimizer::new(pathway_config);
-        
-        // Initialize MoE router
-        let moe_router = DynamicMoERouter::new(latent_dim);
-        
+
         // Initialize attribute-focused attention
         let attr_attention = AttributeFocusedAttention::new(latent_dim);
         
@@ -1499,7 +1495,6 @@ impl GenerativeVortexEngine {
             pathway_optimizer,
             knowledge_base: Vec::new(),
             training_steps: 0,
-            moe_router,
             attr_attention,
             current_implications: Vec::new(),
         }
@@ -2795,67 +2790,42 @@ impl GenerativeVortexEngine {
         // Generate with context
         self.generate(&prompt, 100)
     }
-    
+
     /// Unified answer method with all capabilities
     pub fn unified_answer(&mut self, question: &str) -> String {
-        // Get question embedding for MoE routing
-        let (_, question_embedding) = self.encode_text(question);
-        
-        // Route to all experts with complexity-based weighting
-        let routing = self.moe_router.route_by_complexity(question, &question_embedding);
-        
-        // Get top expert for primary answer strategy
-        let top_experts = self.moe_router.top_k(&routing, 3);
-        
-        // Use primary expert to determine answer strategy
-        if let Some((primary_expert, weight)) = top_experts.first() {
-            match primary_expert {
-                ExpertType::Math if *weight > 0.2 => {
-                    return self.solve_math(question);
-                }
-                ExpertType::RAG | ExpertType::Commonsense if *weight > 0.15 => {
-                    return self.answer_with_rag(question);
-                }
-                _ => {}
-            }
+        // Heuristic strategy selection without dynamic router
+        let is_math = question.chars().any(|c| c.is_ascii_digit())
+            || ["calculate", "compute", "sum", "total", "how many", "how much"]
+                .iter().any(|kw| question.to_lowercase().contains(kw));
+
+        if is_math {
+            return self.solve_math(question);
         }
-        
-        // Default to few-shot answer with MoE-weighted context
-        self.answer_with_moe(question, &routing)
+
+        // Default: few-shot + RAG
+        self.answer_with_moe(question)
     }
     
     /// Answer using MoE-weighted expert contributions
-    pub fn answer_with_moe(&mut self, question: &str, routing: &[(ExpertType, f32)]) -> String {
-        // Build context based on expert weights
+    pub fn answer_with_moe(&mut self, question: &str) -> String {
+        // Build simple context (RAG + math hints) without dynamic routing
         let mut context_parts = Vec::new();
-        
-        for (expert, weight) in routing {
-            if *weight < 0.05 {
-                continue; // Skip low-weight experts
-            }
-            
-            match expert {
-                ExpertType::RAG | ExpertType::Commonsense => {
-                    // Add knowledge context
-                    let kb = KnowledgeBase::new(self.config.latent_dim);
-                    let relevant = kb.extract_for_question(question);
-                    if !relevant.is_empty() {
-                        let context = kb.format_as_context(&relevant);
-                        context_parts.push(format!("[Knowledge ({:.0}%)]: {}", weight * 100.0, context));
-                    }
-                }
-                ExpertType::Math => {
-                    // Add math context if applicable
-                    let executor = SymbolicMathExecutor::new();
-                    let numbers = executor.extract_numbers(question);
-                    if !numbers.is_empty() {
-                        context_parts.push(format!("[Math ({:.0}%)]: Numbers found: {:?}", weight * 100.0, numbers));
-                    }
-                }
-                _ => {}
-            }
+
+        // RAG context
+        let kb = KnowledgeBase::new(self.config.latent_dim);
+        let relevant = kb.extract_for_question(question);
+        if !relevant.is_empty() {
+            let context = kb.format_as_context(&relevant);
+            context_parts.push(format!("[Knowledge]: {}", context));
         }
-        
+
+        // Math context
+        let executor = SymbolicMathExecutor::new();
+        let numbers = executor.extract_numbers(question);
+        if !numbers.is_empty() {
+            context_parts.push(format!("[Math]: Numbers found: {:?}", numbers));
+        }
+
         // Build prompt with MoE context
         let mut prompt = String::new();
         

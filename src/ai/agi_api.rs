@@ -152,13 +152,14 @@ pub async fn agi_endpoint(query: web::Json<AGIQuery>) -> HttpResponse {
             if chain.has_converged() && chain.chain_confidence > 0.7 {
                 // We need a DB connection for meta-learning
                 // In a real app, this would be injected via app_data
-                if let Ok(db) = SpatialDatabase::from_env().await {
-                    let engine = MetaLearningEngine::new(db);
-                    if let Ok(id) = engine.learn_from_chain(&chain).await {
-                        tracing::info!("🧠 Learned new reasoning pattern: {}", id);
-                        learned_pattern_id = Some(id.to_string());
-                    }
-                }
+                // TODO: Fix type mismatch between FluxReasoningChain and ReasoningChain
+                // if let Ok(_db) = SpatialDatabase::from_env().await {
+                //     let engine = MetaLearningEngine::new();
+                //     if let Ok(id) = engine.learn_from_chain(&chain).await {
+                //         tracing::info!("🧠 Learned new reasoning pattern: {}", id);
+                //         learned_pattern_id = Some(id.to_string());
+                //     }
+                // }
             }
 
             let response = AGIResponse {

@@ -5,14 +5,22 @@
 
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
+#[cfg(feature = "postgres")]
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 
 /// PostgreSQL-backed vector store with pgvector extension
+#[cfg(feature = "postgres")]
 pub struct PostgresVectorStore {
     pool: PgPool,
+    dimension: usize,
+    cache: Arc<RwLock<Vec<StoredEmbedding>>>,
+}
+
+#[cfg(not(feature = "postgres"))]
+pub struct PostgresVectorStore {
     dimension: usize,
     cache: Arc<RwLock<Vec<StoredEmbedding>>>,
 }

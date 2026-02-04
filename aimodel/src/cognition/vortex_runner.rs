@@ -723,6 +723,7 @@ impl VortexRunner {
             parallel: true,
             initial_beta: 1.0,
             kl_bound: 0.1,
+            ..Default::default()
         };
 
         let mut optimizer = ExhaustivePathwayOptimizer::new(config);
