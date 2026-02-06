@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/WeaveITMeta/aimodel"
 
 [features]
-default = ["onnx", "burn-cpu", "web-learning"]
+default = ["burn-cpu", "web-learning"]  # Burn (pure Rust) instead of onnx
 onnx = ["ort", "tokenizers"]
 burn-cpu = ["burn", "burn-ndarray", "burn-autodiff"]
 burn-gpu = ["burn", "burn-tch", "burn-autodiff"]

@@ -19,6 +19,7 @@ pub mod knowledge;
 pub mod prompt_template;
 pub mod self_optimization;
 pub mod improvements;
+pub mod spatialvortex_agent;
 
 pub use coding_agent::{CodingAgent, AgentConfig, TaskResult};
 pub use coding_agent_enhanced::{
@@ -42,4 +43,9 @@ pub use task_manager::{
 pub use first_principles::{
     FirstPrinciplesReasoner, FirstPrinciplesResult, TruthAssessment, 
     DeceptionType, LogicalOperation, ReasoningStep
+};
+pub use spatialvortex_agent::{
+    SpatialVortexAgent, SpatialVortexConfig, SpatialVortexResult,
+    AgentRequest, VortexPosition, ELPWeights, ELPState, AgentStatus,
+    PerformanceMetrics, ReasoningStep
 };

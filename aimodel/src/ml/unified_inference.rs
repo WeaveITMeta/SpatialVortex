@@ -1276,8 +1276,25 @@ impl UnifiedInferenceEngine {
             }
         }
         
-        // Convert score to confidence (0-1)
-        let confidence = (best_score.abs() / 100.0).min(1.0).max(0.1);
+        // Margin-based confidence: compare best vs second-best score
+        // This measures how decisive the answer is, not just raw magnitude
+        let mut all_scores: Vec<f32> = Vec::new();
+        for (idx, choice) in choices.iter().enumerate() {
+            let choice_lower = choice.to_lowercase();
+            let ws = if idx == world_idx { world_conf * 30.0 } else { 0.0 };
+            let es = self.score_entity_attribute(&full_context, &choice_lower);
+            let ce = self.get_embedding(choice);
+            let cs = self.cosine_similarity(&latent.latent, &ce);
+            all_scores.push(ws + es * 1.5 + cs * 10.0);
+        }
+        all_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        let margin = all_scores[0] - all_scores.get(1).copied().unwrap_or(0.0);
+        let range = all_scores[0] - all_scores.last().copied().unwrap_or(0.0);
+        let confidence = if range > 0.0 {
+            (0.3 + 0.7 * (margin / range)).min(1.0).max(0.15)
+        } else {
+            0.25 // No differentiation — low confidence
+        };
         
         (best_idx, confidence)
     }

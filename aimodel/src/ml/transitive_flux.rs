@@ -14,6 +14,7 @@
 //! - **Context Extraction**: Federated pathway context for generalization
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use crate::core::sacred_geometry::flux_matrix::FluxMatrixEngine;
 
 // =============================================================================
 // Transitive Relation Graph
@@ -58,6 +59,37 @@ pub struct GraphPath {
     pub relations: Vec<String>,
 }
 
+/// Basic entity extracted from text
+#[derive(Debug, Clone)]
+pub struct BasicEntity {
+    /// Original text of the entity
+    pub text: String,
+    /// Cleaned lowercase version
+    pub clean_text: String,
+}
+
+/// Entity match for linking
+#[derive(Debug, Clone)]
+pub struct EntityMatch {
+    /// Matched entity name
+    pub entity: String,
+    /// Confidence in the match
+    pub confidence: f32,
+}
+
+/// Linked entity with flux context
+#[derive(Debug, Clone)]
+pub struct LinkedEntity {
+    /// Original text
+    pub text: String,
+    /// Linked entity name
+    pub linked_to: String,
+    /// Confidence in the linking
+    pub confidence: f32,
+    /// Flux matrix position context
+    pub flux_position: u8,
+}
+
 /// Context extraction result for federated learning
 #[derive(Debug, Clone)]
 pub struct ExtractedContext {
@@ -98,6 +130,8 @@ pub struct TransitiveFluxReasoner {
     entity_counts: HashMap<String, i64>,
     /// Location tracking for path finding
     locations: HashMap<String, String>, // entity -> current_location
+    /// Flux matrix engine for context-aware entity linking
+    flux_engine: FluxMatrixEngine,
 }
 
 impl TransitiveFluxReasoner {
@@ -114,6 +148,7 @@ impl TransitiveFluxReasoner {
             calibration_factor: 1.0,
             entity_counts: HashMap::new(),
             locations: HashMap::new(),
+            flux_engine: FluxMatrixEngine::new(),
         }
     }
     
@@ -131,6 +166,7 @@ impl TransitiveFluxReasoner {
         self.entity_counts.clear();
         self.locations.clear();
         self.calibration_factor = 1.0;
+        self.flux_engine.reset();
     }
     
     /// Extract relations from context text
@@ -183,6 +219,110 @@ impl TransitiveFluxReasoner {
         
         // Compute transitive closure
         self.compute_transitive_closure();
+    }
+    
+    /// Enhanced entity linking using flux matrix sacred positions for disambiguation
+    pub fn link_entities_with_flux_context(&mut self, text: &str, context_position: u8) -> Vec<LinkedEntity> {
+        let entities = self.extract_basic_entities(text);
+        let mut linked_entities = Vec::new();
+        
+        for entity in entities {
+            // Use flux matrix position to determine entity context weight
+            let flux_weight = self.calculate_flux_context_weight(context_position);
+            
+            // Find similar entities in knowledge base
+            let similar_entities = self.find_similar_entities(&entity, flux_weight);
+            
+            // Select best match based on flux position alignment
+            if let Some(best_match) = self.select_flux_aligned_entity(&similar_entities, context_position) {
+                linked_entities.push(LinkedEntity {
+                    text: entity.text,
+                    linked_to: best_match.entity.clone(),
+                    confidence: best_match.confidence * flux_weight,
+                    flux_position: context_position,
+                });
+            }
+        }
+        
+        linked_entities
+    }
+    
+    /// Calculate context weight based on flux matrix position
+    fn calculate_flux_context_weight(&self, position: u8) -> f32 {
+        match position {
+            3 => 1.15, // Unity checkpoint - higher weight for entity coherence
+            6 => 1.10, // Heart checkpoint - higher weight for relational context
+            9 => 1.20, // Ultimate checkpoint - highest weight for abstract concepts
+            _ => 1.0   // Base weight for other positions
+        }
+    }
+    
+    /// Extract basic entities from text
+    fn extract_basic_entities(&self, text: &str) -> Vec<BasicEntity> {
+        let mut entities = Vec::new();
+        let words: Vec<&str> = text.split_whitespace().collect();
+        
+        for word in &words {
+            let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+            if clean_word.len() > 1 {
+                entities.push(BasicEntity {
+                    text: word.to_string(),
+                    clean_text: clean_word,
+                });
+            }
+        }
+        
+        entities
+    }
+    
+    /// Find similar entities in knowledge base
+    fn find_similar_entities(&self, entity: &BasicEntity, _flux_weight: f32) -> Vec<EntityMatch> {
+        let mut matches = Vec::new();
+        
+        // Check existing relations for similar entities
+        for relation in &self.relations {
+            let source_sim = self.string_similarity(&entity.clean_text, &relation.source.to_lowercase());
+            let target_sim = self.string_similarity(&entity.clean_text, &relation.target.to_lowercase());
+            
+            if source_sim > 0.8 {
+                matches.push(EntityMatch {
+                    entity: relation.source.clone(),
+                    confidence: source_sim,
+                });
+            }
+            
+            if target_sim > 0.8 {
+                matches.push(EntityMatch {
+                    entity: relation.target.clone(),
+                    confidence: target_sim,
+                });
+            }
+        }
+        
+        matches
+    }
+    
+    /// Select best entity match based on flux alignment
+    fn select_flux_aligned_entity<'a>(&self, matches: &'a [EntityMatch], _context_position: u8) -> Option<&'a EntityMatch> {
+        matches.iter().max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal))
+    }
+    
+    /// Simple string similarity function
+    fn string_similarity(&self, s1: &str, s2: &str) -> f32 {
+        if s1 == s2 {
+            return 1.0;
+        }
+        
+        let len1 = s1.len();
+        let len2 = s2.len();
+        let max_len = len1.max(len2) as f32;
+        
+        if max_len == 0.0 {
+            return 1.0;
+        }
+        
+        let common_chars = s1.chars().filter(|c| s2.contains(*c)).count();
+        common_chars as f32 / max_len
     }
     
     /// Parse "A <pattern> B" and return (A, B)
@@ -767,7 +907,12 @@ impl TransitiveFluxReasoner {
         // Pattern: "How do you go from X to Y?"
         if let Some(from_pos) = question_lower.find("from ") {
             if let Some(to_pos) = question_lower.find(" to ") {
-                let start = question_lower[from_pos + 5..to_pos]
+                let start_idx = from_pos + 5;
+                // Guard: "from " must appear before " to " with room for entity text
+                if start_idx >= to_pos || to_pos + 4 > question_lower.len() {
+                    return None;
+                }
+                let start = question_lower[start_idx..to_pos]
                     .trim()
                     .trim_start_matches("the ")
                     .to_string();

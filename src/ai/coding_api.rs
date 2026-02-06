@@ -286,8 +286,8 @@ async fn handle_code_generation(
     
     // Extract ELP from final reasoning step
     let final_elp = result.reasoning_chain.steps.last()
-        .map(|step| &step.elp_state)
-        .unwrap_or(&result.reasoning_chain.steps[0].elp_state);
+        .map(|step| (step.elp_state.ethos, step.elp_state.logos, step.elp_state.pathos))
+        .unwrap_or((7.0, 8.0, 5.0)); // Default values
     
     // Store assistant's response with metadata in history
     let metadata = MessageMetadata {
@@ -308,9 +308,9 @@ async fn handle_code_generation(
         code_blocks,
         is_code_response: true,
         elp_values: ELPValues {
-            ethos: final_elp.ethos,
-            logos: final_elp.logos,
-            pathos: final_elp.pathos,
+            ethos: final_elp.0,
+            logos: final_elp.1,
+            pathos: final_elp.2,
         },
         confidence: result.confidence,
         flux_position: result.reasoning_chain.steps.last()

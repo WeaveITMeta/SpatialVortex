@@ -627,9 +627,21 @@ impl UnifiedKnowledgePipeline {
         // STEP 3: RANK by score
         scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         
-        // Return best choice
-        if let Some((best_idx, best_score, best_conf)) = scores.first() {
-            (*best_idx, *best_conf)
+        // Return best choice with margin-based confidence
+        // Margin = how much better the best is vs second-best
+        if scores.len() >= 2 {
+            let best = &scores[0];
+            let second = &scores[1];
+            let range = best.1 - scores.last().map(|s| s.1).unwrap_or(0.0);
+            let margin = best.1 - second.1;
+            let confidence = if range > 0.0 {
+                (0.3 + 0.7 * (margin / range)).min(1.0).max(0.15)
+            } else {
+                0.2
+            };
+            (best.0, confidence)
+        } else if let Some(best) = scores.first() {
+            (best.0, best.2.max(0.2))
         } else {
             (0, 0.0)
         }

@@ -2882,43 +2882,30 @@ impl RealBenchmarkEvaluator {
         }
         
         // =================================================================
-        // TEST-TIME WEB LEARNING: Dynamic knowledge acquisition
-        // Search for question-specific knowledge when internal knowledge is insufficient
+        // TEST-TIME WEB LEARNING: Selective knowledge acquisition
+        // Only search when internal knowledge is truly insufficient.
+        // Single query per question (no per-choice searches — too slow).
+        // Batch sync after learning to avoid repeated RAG rebuilds.
         // =================================================================
-        // Only do web learning for non-code questions (CommonsenseQA, etc.)
         if !is_code_question && self.use_consciousness_learning {
-            // Check if we already have good knowledge about this question
             let has_knowledge = self.check_knowledge_coverage(&question.question);
             
             if !has_knowledge {
-                // Do test-time web search using consciousness learner
                 let query = self.extract_search_query(&question.question);
+                
+                // Single web search per question (not per-choice)
                 let facts = self.consciousness_learner.test_time_web_search(&query);
                 
                 if !facts.is_empty() {
-                    // Sync learned facts to RAG engine for immediate use
                     self.sync_consciousness_to_rag();
                     
                     if self.verbose_debug {
                         println!("   [Test-Time Web] Learned {} facts for: {}", facts.len(), query);
                     }
                 }
-                
-                // CHOICE-SPECIFIC WEB SEARCH: Search for each answer choice
-                // This gets targeted knowledge about whether each choice is correct
-                for (choice_idx, choice) in question.choices.iter().enumerate() {
-                    let choice_query = format!("{} {}", query, choice);
-                    let choice_facts = self.consciousness_learner.test_time_web_search(&choice_query);
-                    
-                    if !choice_facts.is_empty() {
-                        self.sync_consciousness_to_rag();
-                        
-                        if self.verbose_debug {
-                            println!("   [Choice-Web] Learned {} facts for choice {}: {}", 
-                                choice_facts.len(), choice_idx, choice_query);
-                        }
-                    }
-                }
+                // Per-choice web searches removed: they added 4x latency
+                // with minimal accuracy gain. The single query captures the
+                // topic; choice-specific knowledge comes from RAG scoring.
             }
         }
         
@@ -2950,6 +2937,20 @@ impl RealBenchmarkEvaluator {
         
         let question_text = &question.question;
         let question_lower = question_text.to_lowercase();
+        
+        // =================================================================
+        // CONTEXT EXTRACTION: Separate passage/context from actual question
+        // Many benchmarks (MMLU, ARC, SQuAD) embed context before the question.
+        // Splitting lets experts score against the right signal.
+        // =================================================================
+        let lines: Vec<&str> = question_lower.split('\n').collect();
+        let (passage_context, actual_question) = if lines.len() > 1 {
+            let q = lines.last().unwrap_or(&"").to_string();
+            let ctx = lines[..lines.len()-1].join("\n");
+            (ctx, q)
+        } else {
+            (String::new(), question_lower.clone())
+        };
         
         // =================================================================
         // CHAIN-OF-THOUGHT: Decompose question into reasoning steps
@@ -3104,9 +3105,14 @@ impl RealBenchmarkEvaluator {
             let embed_weight = if primary_expert == ExpertType::Semantic { 15.0 } else { 5.0 };
             score += embed_sim * embed_weight;
             
-            // ----- EXPERT 3: RAG RETRIEVAL (MASSIVELY BOOSTED for web-learned knowledge) -----
-            let rag_score = self.rag_engine.score_choice_with_context(question_text, choice);
-            // Ultra-high weight for RAG now that we have web learning
+            // ----- EXPERT 3: RAG RETRIEVAL (context-aware) -----
+            // Use passage context + question for better retrieval when context exists
+            let rag_query = if !passage_context.is_empty() {
+                format!("{}\n{}", passage_context, actual_question)
+            } else {
+                question_text.to_string()
+            };
+            let rag_score = self.rag_engine.score_choice_with_context(&rag_query, choice);
             let rag_weight = if primary_expert == ExpertType::RAG { 50.0 } else { 15.0 };
             score += rag_score * rag_weight;
             
@@ -3220,23 +3226,30 @@ impl RealBenchmarkEvaluator {
             }
             
             // ----- EXPERT 18: WEB-LEARNED KNOWLEDGE PATTERNS -----
-            // Direct pattern matching with web-learned knowledge
-            // 1. Check for exact Q&A pattern match from consciousness learning
+            // Use web-learned subjects and facts to score choices.
+            // score_with_consciousness_facts returns raw scores (0-100+),
+            // so apply a moderate weight to avoid drowning other signals.
             let combined_key = format!("{}|||{}", &question_lower, &choice_lower);
             if self.learned_embeddings.contains_key(&combined_key) {
-                score += 150.0; // Ultra-high boost for exact Q&A match from web
+                score += 80.0; // Strong boost for exact Q&A match from web
             }
             
-            // 2. Semantic match with web-learned facts
-            let fact_score = self.score_with_consciousness_facts(&question_lower, &choice_lower);
+            // Semantic match with web-learned subjects and their attributes
+            // Pass context for better subject-to-question matching
+            let fact_query = if !passage_context.is_empty() {
+                format!("{} {}", passage_context, actual_question)
+            } else {
+                question_lower.clone()
+            };
+            let fact_score = self.score_with_consciousness_facts(&fact_query, &choice_lower);
             if fact_score > 0.0 {
-                score += fact_score * 25.0; // High weight for web-learned facts
+                score += fact_score; // Already scaled internally (10-25 per match)
             }
             
-            // 3. Keyword overlap with vortex knowledge
+            // Keyword overlap with vortex knowledge
             let keyword_score = self.score_vortex_keyword_overlap(&question_lower, &choice_lower);
             if keyword_score > 0.0 {
-                score += keyword_score * 15.0;
+                score += keyword_score * 10.0;
             }
             
             // ----- EXPERT 19: COMPREHENSIVE REASONING -----
@@ -3306,15 +3319,20 @@ impl RealBenchmarkEvaluator {
         let refined_logits = self.iterative_refinement(&combined_logits, &question_embedding, question);
         
         // =================================================================
-        // ENERGY-BASED SELECTION (Quantum Interference)
-        // Instead of pure softmax, combine with energy minimization
+        // TEMPERATURE-SCALED SOFTMAX (fixes confidence collapse)
+        // Raw logits from 20 experts are large & close together (e.g. 150 vs 148).
+        // Standard softmax produces ~uniform probs. Temperature scaling amplifies
+        // the differences so the best answer gets meaningful confidence.
         // =================================================================
+        let temperature = 0.1_f32; // Sharp distribution — amplifies logit gaps
         let max_logit = refined_logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_logits: Vec<f32> = refined_logits.iter().map(|&x| (x - max_logit).exp()).collect();
-        let exp_sum: f32 = exp_logits.iter().sum();
+        let scaled: Vec<f32> = refined_logits.iter()
+            .map(|&x| ((x - max_logit) * temperature).exp())
+            .collect();
+        let scaled_sum: f32 = scaled.iter().sum();
         
-        let probs: Vec<f32> = if exp_sum > 0.0 {
-            exp_logits.iter().map(|&x| x / exp_sum).collect()
+        let probs: Vec<f32> = if scaled_sum > 0.0 {
+            scaled.iter().map(|&x| x / scaled_sum).collect()
         } else {
             vec![1.0 / question.choices.len() as f32; question.choices.len()]
         };
@@ -3325,25 +3343,27 @@ impl RealBenchmarkEvaluator {
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, &0.2));
         
+        // Margin-based confidence: how far ahead is the best vs second-best?
+        // This is more informative than raw softmax probability.
+        let mut sorted_probs = probs.clone();
+        sorted_probs.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        let margin = sorted_probs[0] - sorted_probs.get(1).copied().unwrap_or(0.0);
+        let margin_conf = (sorted_probs[0] + margin).min(1.0);
+        
         // Final decision: if quantum search is confident, use it; otherwise use expert consensus
         let (final_idx, final_conf) = if quantum_confidence > 0.7 {
-            // Quantum search is confident - use its answer
             (quantum_best_idx, quantum_confidence)
-        } else if expert_best_prob > 0.5 {
-            // Expert consensus is strong - use expert answer
-            (expert_best_idx, expert_best_prob)
+        } else if expert_best_prob > 0.4 {
+            (expert_best_idx, margin_conf)
         } else {
-            // Neither is confident - average the signals
-            // If they agree, boost confidence; if they disagree, lower it
             if quantum_best_idx == expert_best_idx {
-                (expert_best_idx, (expert_best_prob + quantum_confidence) / 2.0 + 0.1)
+                (expert_best_idx, (margin_conf + quantum_confidence) / 2.0 + 0.1)
             } else {
-                // Disagreement - use expert but lower confidence
-                (expert_best_idx, expert_best_prob * 0.8)
+                (expert_best_idx, margin_conf * 0.8)
             }
         };
         
-        (final_idx, final_conf.max(0.1).min(1.0))
+        (final_idx, final_conf.max(0.15).min(1.0))
     }
     
     /// Build a prompt for generative inference
@@ -3733,9 +3753,14 @@ impl RealBenchmarkEvaluator {
         // =================================================================
         let refined_logits = self.iterative_refinement(&logits, &question_embedding, question);
         
-        // Apply softmax to get probabilities (like VortexModel.sample_token)
+        // Temperature-scaled softmax (fixes confidence collapse)
+        // Raw logits from many experts are large & close together.
+        // Temperature < 1.0 sharpens the distribution.
+        let temperature = 0.1_f32;
         let max_logit = refined_logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_logits: Vec<f32> = refined_logits.iter().map(|&x| (x - max_logit).exp()).collect();
+        let exp_logits: Vec<f32> = refined_logits.iter()
+            .map(|&x| ((x - max_logit) * temperature).exp())
+            .collect();
         let exp_sum: f32 = exp_logits.iter().sum();
         
         let probs: Vec<f32> = if exp_sum > 0.0 {
@@ -3768,7 +3793,13 @@ impl RealBenchmarkEvaluator {
             }
         }
         
-        (best_idx, best_prob.max(0.1))
+        // Margin-based confidence: how far ahead is best vs second-best?
+        let mut sorted_probs = probs.clone();
+        sorted_probs.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        let margin = sorted_probs[0] - sorted_probs.get(1).copied().unwrap_or(0.0);
+        let margin_conf = (sorted_probs[0] + margin).min(1.0);
+        
+        (best_idx, margin_conf.max(0.15))
     }
     
     /// Score entity-attribute relationship with INDUCTIVE DEDUCTION (critical for bAbI)

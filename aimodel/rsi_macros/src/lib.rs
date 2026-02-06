@@ -8,6 +8,8 @@
 //! - `#[rsi_optimized]` - Attribute macro for RSI-tuned functions
 //! - `generate_expert_weights!` - Generate expert routing weights from RSI state
 //! - `rsi_scoring_coefficients!` - Generate scoring coefficients from RSI learnings
+//! - `define_semantic_chain!` - Define semantic relationship patterns for chaining
+//! - `context_aware_extraction!` - Context-aware entity and relationship extraction
 //!
 //! ## Usage
 //!
@@ -22,11 +24,18 @@
 //!
 //! // Generate expert weights from RSI state
 //! generate_expert_weights!();
+//!
+//! // Define semantic relationship patterns for chaining
+//! define_semantic_chain!(causality: ["causes", "leads_to", "results_in"] => 1.2);
+//!
+//! // Context-aware entity extraction
+//! context_aware_extraction!(temporal: "X happened before Y" => extract_temporal_relationship);
 //! ```
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse_macro_input, ItemFn, parse, Lit, Expr, ExprArray, ExprLit, parse_quote};
+use std::collections::HashMap;
 
 // =============================================================================
 // RSI State (loaded at compile time)
@@ -237,7 +246,188 @@ pub fn rsi_benchmark_switch(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+// =============================================================================  
+// New Semantic Chaining Macros
 // =============================================================================
+
+/// Macro for defining semantic relationship patterns that can be chained
+///
+/// This creates transitive relationship patterns that can be dynamically applied
+/// during knowledge extraction to enhance semantic understanding.
+///
+/// # Arguments
+///
+/// - `name` - Identifier for the semantic chain pattern
+/// - `[relations]` - Array of relation types that form the chain
+/// - `confidence_boost` - Confidence multiplier for chained relationships
+///
+/// # Example
+///
+/// ```rust
+/// define_semantic_chain!(causality: ["causes", "leads_to", "results_in"] => 1.2);
+/// define_semantic_chain!(spatial: ["left_of", "right_of", "above", "below"] => 1.1);
+/// ```
+#[proc_macro]
+pub fn define_semantic_chain(input: TokenStream) -> TokenStream {
+    // Parse: define_semantic_chain!(name: [relation1, relation2, relation3] => confidence_boost)
+    let input_str = input.to_string();
+    
+    // Simple parsing for demonstration - in production, use proper syn parsing
+    let parts: Vec<&str> = input_str.split(">>").collect();
+    if parts.len() != 2 {
+        return quote! {
+            compile_error!("define_semantic_chain! expects format: name: [relations] => confidence_boost")
+        }.into();
+    }
+    
+    let pattern_part = parts[0].trim();
+    let confidence_part = parts[1].trim();
+    
+    // Extract name and relations
+    let pattern_parts: Vec<&str> = pattern_part.split(':').collect();
+    if pattern_parts.len() != 2 {
+        return quote! {
+            compile_error!("define_semantic_chain! expects format: name: [relations] => confidence_boost")
+        }.into();
+    }
+    
+    let name = pattern_parts[0].trim();
+    let relations_str = pattern_parts[1].trim();
+    
+    // Parse relations array (simplified)
+    let relations_clean = relations_str.trim_start_matches('[').trim_end_matches(']');
+    let relations: Vec<&str> = relations_clean.split(',').map(|s| s.trim().trim_matches('"')).collect();
+    
+    // Parse confidence boost
+    let confidence_boost: f32 = confidence_part.parse().unwrap_or(1.0);
+    
+    // Generate the semantic chain structure
+    let name_ident = syn::Ident::new(name, proc_macro2::Span::call_site());
+    let relations_tokens: Vec<proc_macro2::TokenStream> = relations.iter()
+        .map(|rel| {
+            let rel_str = rel.to_string();
+            quote! { #rel_str }
+        })
+        .collect();
+    
+    let expanded = quote! {
+        /// Generated semantic chain pattern
+        pub struct #name_ident;
+        
+        impl #name_ident {
+            /// Get the relation types in this semantic chain
+            pub const fn relations() -> &'static [&'static str] {
+                &[#(#relations_tokens),*]
+            }
+            
+            /// Get the confidence boost for this chain
+            pub const fn confidence_boost() -> f32 {
+                #confidence_boost
+            }
+            
+            /// Check if a relation is part of this semantic chain
+            pub fn is_in_chain(relation: &str) -> bool {
+                Self::relations().contains(&relation)
+            }
+        }
+    };
+    
+    expanded.into()
+}
+
+/// Macro for conditional relationship extraction based on context patterns
+///
+/// This generates optimized extraction code based on learned linguistic patterns
+/// for identifying entities and relationships in text.
+///
+/// # Arguments
+///
+/// - `pattern` - Linguistic pattern to match (e.g., "X is Y")
+/// - `extractor_function` - Function to call when pattern is matched
+///
+/// # Example
+///
+/// ```rust
+/// context_aware_extraction!(causal: "X causes Y" => extract_causal_relationship);
+/// context_aware_extraction!(temporal: "X before Y" => extract_temporal_relationship);
+/// ```
+#[proc_macro]
+pub fn context_aware_extraction(input: TokenStream) -> TokenStream {
+    // Parse: context_aware_extraction!(pattern: "X causes Y" => extractor_function)
+    let input_str = input.to_string();
+    
+    let parts: Vec<&str> = input_str.split(">>").collect();
+    if parts.len() != 2 {
+        return quote! {
+            compile_error!("context_aware_extraction! expects format: pattern: \"pattern_text\" => extractor_function")
+        }.into();
+    }
+    
+    let pattern_part = parts[0].trim();
+    let extractor_part = parts[1].trim();
+    
+    // Extract pattern name and text
+    let pattern_parts: Vec<&str> = pattern_part.split(':').collect();
+    if pattern_parts.len() != 2 {
+        return quote! {
+            compile_error!("context_aware_extraction! expects format: pattern: \"pattern_text\" => extractor_function")
+        }.into();
+    }
+    
+    let pattern_name = pattern_parts[0].trim();
+    let pattern_text = pattern_parts[1].trim().trim_matches('"');
+    
+    // Parse extractor function
+    let extractor_fn = syn::Ident::new(extractor_part, proc_macro2::Span::call_site());
+    let pattern_ident = syn::Ident::new(pattern_name, proc_macro2::Span::call_site());
+    
+    let expanded = quote! {
+        /// Generated context-aware extraction pattern
+        pub struct #pattern_ident;
+        
+        impl #pattern_ident {
+            /// The linguistic pattern to match
+            pub const PATTERN: &'static str = #pattern_text;
+            
+            /// Extract relationships using the specified extractor function
+            pub fn extract(text: &str) -> Vec<ExtractedRelationship> {
+                #extractor_fn(text)
+            }
+            
+            /// Check if text matches this pattern
+            pub fn matches(text: &str) -> bool {
+                // Simple substring matching for demonstration
+                // In practice, this would use more sophisticated NLP
+                text.contains(Self::PATTERN.split('X').next().unwrap_or(""))
+                    && text.contains(Self::PATTERN.split('Y').last().unwrap_or(""))
+            }
+        }
+    };
+    
+    expanded.into()
+}
+
+// =============================================================================  
+// Helper Structs for Semantic Chaining (internal to macro implementation)
+// =============================================================================
+
+/// Relationship extracted from text
+#[derive(Debug, Clone)]
+struct ExtractedRelationship {
+    source: String,
+    relation: String,
+    target: String,
+    confidence: f32,
+}
+
+/// Semantic chain pattern for transitive reasoning
+struct SemanticChainPattern {
+    name: String,
+    relations: Vec<String>,
+    confidence_boost: f32,
+}
+
+// =============================================================================  
 // Helper Macros (declarative)
 // =============================================================================
 

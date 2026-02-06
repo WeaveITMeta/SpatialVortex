@@ -29,6 +29,7 @@ pub mod sacred_moe;
 pub mod sacred_swarm;
 pub mod generative_arch;
 pub mod transitive_flux;
+pub mod stacked_flux;
 pub mod flux_object_macro;
 pub mod flux_compression_sota;
 pub mod reasoning_engine;

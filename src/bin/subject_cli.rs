@@ -4,6 +4,7 @@
 /// Example: cargo run --bin subject_cli -- "Chemistry"
 use spatial_vortex::{ai_integration::AIModelIntegration, subject_generator::SubjectGenerator};
 use std::env;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -47,7 +48,7 @@ async fn main() {
     println!("  Subject: {}\n", subject_name);
 
     // Initialize AI integration
-    let ai_integration = AIModelIntegration::new(api_key, endpoint);
+    let ai_integration = Arc::new(AIModelIntegration::new(api_key, endpoint));
 
     // Create subject generator
     let generator = SubjectGenerator::new(ai_integration, None);

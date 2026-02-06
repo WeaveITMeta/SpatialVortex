@@ -327,6 +327,15 @@ pub struct BETRDataSelector {
     score_cache: HashMap<String, f32>,
 }
 
+impl Default for BETRDataSelector {
+    fn default() -> Self {
+        let store = BenchmarkEmbeddingStore::new(384);
+        let config = BETRConfig::default();
+        let scorer = BETRDocumentScorer::new(store, config.clone());
+        Self::new(scorer, config)
+    }
+}
+
 impl BETRDataSelector {
     pub fn new(scorer: BETRDocumentScorer, config: BETRConfig) -> Self {
         Self {
@@ -419,6 +428,16 @@ impl BETRDataSelector {
             .count();
         let hit_rate = if total > 0 { cached as f32 / total as f32 } else { 0.0 };
         (cached, total, hit_rate)
+    }
+
+    /// Score context relevance for contextual learning
+    pub fn score_context_relevance(&self, example: &crate::ml::stacked_flux::TrainingExample, _embedding: &crate::ml::stacked_flux::ContextualEmbedding) -> f32 {
+        // Simple implementation - score based on input text similarity to cached scores
+        if let Some(&score) = self.score_cache.get(&example.input) {
+            score * example.priority
+        } else {
+            example.priority
+        }
     }
 }
 

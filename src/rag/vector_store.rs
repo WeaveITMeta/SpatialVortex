@@ -315,8 +315,8 @@ impl VectorStore {
     pub async fn embed_text(&self, text: &str) -> Result<Vec<f32>> {
         if let Some(pool) = &self.onnx_pool {
             let embeddings = pool.embed(text).await?;
-            // Extract first embedding from batch
-            Ok(embeddings.into_iter().next().unwrap_or_default())
+            // embeddings is already Vec<f32>
+            Ok(embeddings)
         } else {
             // Fallback to simple embedding (for testing)
             Ok(self.simple_embedding(text))
