@@ -2032,6 +2032,12 @@ impl GenerativeVortexEngine {
     }
     
     /// Enhanced pre-training with CALM weight updates
+    /// Fixes applied:
+    ///   1. Contrastive: next-sentence as positive, 8 negatives from buffer (not self-similarity)
+    ///   2. gen_loss: real next-token targets from tokenizer (not pseudo-random hash)
+    ///   3. calm_loss: reconstruct original input beams (not decoder's own output)
+    ///   4. Cosine annealing LR schedule for better convergence
+    ///   5. Multiple negatives per contrastive step for sharper embeddings
     pub fn pretrain_calm(&mut self, texts: &[String], epochs: usize, learning_rate: f32) {
         println!("Pre-training CALM weights on {} texts for {} epochs...", texts.len(), epochs);
         
@@ -2044,10 +2050,11 @@ impl GenerativeVortexEngine {
             self.tokenizer.vocab_size(),
         );
         
-        // Pre-compute all embeddings for GPU-style batched processing
-        let batch_size = 32; // Process 32 texts at a time for better throughput
+        // Pre-compute all embeddings, beams, AND token sequences
+        let batch_size = 32;
         let mut all_embeddings: Vec<Vec<f32>> = Vec::with_capacity(texts.len());
         let mut all_beams: Vec<Vec<BeamTensor>> = Vec::with_capacity(texts.len());
+        let mut all_tokens: Vec<Vec<u32>> = Vec::with_capacity(texts.len());
         
         println!("  Pre-computing {} embeddings...", texts.len());
         for text in texts.iter() {
@@ -2055,6 +2062,7 @@ impl GenerativeVortexEngine {
             if tokens.len() < 3 {
                 all_embeddings.push(vec![0.0; self.config.latent_dim]);
                 all_beams.push(vec![BeamTensor::default(); 8]);
+                all_tokens.push(Vec::new());
                 continue;
             }
             
@@ -2076,37 +2084,51 @@ impl GenerativeVortexEngine {
             let beams = self.embedding_to_beams(&text_embed);
             all_beams.push(beams);
             all_embeddings.push(text_embed);
+            all_tokens.push(tokens);
         }
         
         let num_batches = (texts.len() + batch_size - 1) / batch_size;
+        let total_steps = epochs * texts.len();
+        let num_negatives = 8; // Sample 8 negatives per contrastive step
+        
+        // Seed negative buffer with initial embeddings for contrastive learning
+        let mut negative_buffer: Vec<Vec<f32>> = all_embeddings.iter()
+            .filter(|e| e.iter().any(|&v| v != 0.0))
+            .take(128)
+            .cloned()
+            .collect();
         
         for epoch in 0..epochs {
             let mut total_loss = 0.0f32;
             let mut calm_loss = 0.0f32;
             let mut contrastive_loss = 0.0f32;
+            let mut sample_count = 0usize;
             
-            // Process in batches for better cache utilization (GPU-style)
+            // Cosine annealing LR: lr * 0.5 * (1 + cos(pi * epoch / epochs))
+            let lr = learning_rate * 0.5 * (1.0 + (std::f32::consts::PI * epoch as f32 / epochs as f32).cos());
+            
+            // Process in batches for better cache utilization
             for batch_idx in 0..num_batches {
                 let start_idx = batch_idx * batch_size;
                 let end_idx = (start_idx + batch_size).min(texts.len());
                 
-                // Batch forward pass - accumulate gradients
                 for text_idx in start_idx..end_idx {
                     let text_embed = &all_embeddings[text_idx];
                     let beams = &all_beams[text_idx];
+                    let tokens = &all_tokens[text_idx];
                     
-                    if beams.is_empty() || text_embed.iter().all(|&v| v == 0.0) {
+                    if beams.is_empty() || text_embed.iter().all(|&v| v == 0.0) || tokens.is_empty() {
                         continue;
                     }
                     
-                    // Encode with CALM
+                    sample_count += 1;
+                    
+                    // === FIX 3: CALM reconstruction — train decoder to reconstruct ORIGINAL input ===
                     let latent = self.calm.encode(beams);
+                    self.calm.train_step(beams, beams, lr);
                     
-                    // Train CALM encoder-decoder (reconstruction loss)
+                    // Compute reconstruction loss against original input (not decoder output)
                     let decoded = self.calm.decode(&latent);
-                    self.calm.train_step(beams, &decoded, learning_rate);
-                    
-                    // Compute reconstruction loss
                     let mut recon_loss = 0.0f32;
                     for (orig, dec) in beams.iter().zip(decoded.iter()) {
                         for i in 0..9 {
@@ -2116,43 +2138,92 @@ impl GenerativeVortexEngine {
                     }
                     calm_loss += recon_loss / beams.len().max(1) as f32;
                     
-                    // Contrastive learning with next text in batch
+                    // === FIX 1: Contrastive — use next text as positive, sample negatives from buffer ===
                     if text_idx + 1 < end_idx {
-                        let neg_embed = &all_embeddings[text_idx + 1];
-                        let negatives = vec![neg_embed.clone()];
-                        self.calm.train_contrastive(text_embed, text_embed, &negatives, learning_rate);
-                        let pos_sim = cosine_similarity(text_embed, text_embed);
-                        let neg_sim = cosine_similarity(text_embed, &negatives[0]);
-                        contrastive_loss += (1.0 - pos_sim + neg_sim).max(0.0);
-                    }
-                    
-                    // Next-token prediction using latent state
-                    let logits = self.generation_head.forward(&latent.latent);
-                    let max_logit = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-                    let exp_sum: f32 = logits.iter().map(|&l| (l - max_logit).exp()).sum();
-                    
-                    // Use first non-zero embedding value as pseudo-target
-                    let target_token = (text_embed.iter().take(100).map(|&v| v.abs()).sum::<f32>() * 100.0) as usize % self.generation_head.vocab_size.max(1);
-                    let log_prob = logits.get(target_token).unwrap_or(&0.0) - max_logit - exp_sum.ln();
-                    total_loss += -log_prob;
-                    
-                    // Update generation head
-                    let probs: Vec<f32> = logits.iter()
-                        .map(|&l| ((l - max_logit).exp() / exp_sum))
-                        .collect();
-                    
-                    for v in 0..self.generation_head.vocab_size.min(probs.len()) {
-                        let target_prob = if v == target_token { 1.0 } else { 0.0 };
-                        let grad = probs[v] - target_prob;
+                        let positive_embed = &all_embeddings[text_idx + 1];
                         
-                        for l in 0..self.config.latent_dim.min(latent.latent.len()) {
-                            let idx = v * self.config.latent_dim + l;
-                            if idx < self.generation_head.projection.len() {
-                                self.generation_head.projection[idx] -= learning_rate * grad * latent.latent[l];
+                        // Sample negatives from buffer (not just 1, use num_negatives)
+                        let mut negatives: Vec<Vec<f32>> = Vec::with_capacity(num_negatives);
+                        if !negative_buffer.is_empty() {
+                            for k in 0..num_negatives {
+                                let neg_idx = (self.training_steps.wrapping_mul(7) + k * 13 + text_idx) % negative_buffer.len();
+                                negatives.push(negative_buffer[neg_idx].clone());
                             }
                         }
-                        if v < self.generation_head.bias.len() {
-                            self.generation_head.bias[v] -= learning_rate * grad;
+                        
+                        if !negatives.is_empty() {
+                            self.calm.train_contrastive(text_embed, positive_embed, &negatives, lr);
+                            let pos_sim = cosine_similarity(text_embed, positive_embed);
+                            let avg_neg_sim: f32 = negatives.iter()
+                                .map(|n| cosine_similarity(text_embed, n))
+                                .sum::<f32>() / negatives.len() as f32;
+                            contrastive_loss += (1.0 - pos_sim + avg_neg_sim).max(0.0);
+                        }
+                        
+                        // Refresh negative buffer with current embedding
+                        if negative_buffer.len() < 256 {
+                            negative_buffer.push(text_embed.clone());
+                        } else {
+                            let replace_idx = self.training_steps % negative_buffer.len();
+                            negative_buffer[replace_idx] = text_embed.clone();
+                        }
+                    }
+                    
+                    // === FIX 2: gen_loss — use real next-token targets from tokenizer ===
+                    // Train on actual next-token prediction for each position in the sequence
+                    let max_positions = tokens.len().min(16); // Cap to avoid O(n^2) blowup
+                    for pos in 1..max_positions {
+                        let target_token = tokens[pos] as usize;
+                        if target_token >= self.generation_head.vocab_size {
+                            continue;
+                        }
+                        
+                        // Get context embedding up to this position
+                        let ctx_tokens = &tokens[..pos];
+                        let ctx_embeds = self.tokenizer.get_embeddings(ctx_tokens);
+                        let mut ctx_embed = vec![0.0f32; self.config.latent_dim];
+                        for embed in &ctx_embeds {
+                            for (j, &val) in embed.iter().enumerate() {
+                                if j < ctx_embed.len() {
+                                    ctx_embed[j] += val;
+                                }
+                            }
+                        }
+                        if !ctx_embeds.is_empty() {
+                            for val in &mut ctx_embed {
+                                *val /= ctx_embeds.len() as f32;
+                            }
+                        }
+                        
+                        // Encode context to latent and predict next token
+                        let ctx_beams = self.embedding_to_beams(&ctx_embed);
+                        let ctx_latent = self.calm.encode(&ctx_beams);
+                        let logits = self.generation_head.forward(&ctx_latent.latent);
+                        
+                        // Cross-entropy loss with real target
+                        let max_logit = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                        let exp_sum: f32 = logits.iter().map(|&l| (l - max_logit).exp()).sum();
+                        let log_prob = logits.get(target_token).unwrap_or(&0.0) - max_logit - exp_sum.ln();
+                        total_loss += -log_prob;
+                        
+                        // Update generation head with real gradient
+                        let probs: Vec<f32> = logits.iter()
+                            .map(|&l| ((l - max_logit).exp() / exp_sum))
+                            .collect();
+                        
+                        for v in 0..self.generation_head.vocab_size.min(probs.len()) {
+                            let target_prob = if v == target_token { 1.0 } else { 0.0 };
+                            let grad = probs[v] - target_prob;
+                            
+                            for l in 0..self.config.latent_dim.min(ctx_latent.latent.len()) {
+                                let idx = v * self.config.latent_dim + l;
+                                if idx < self.generation_head.projection.len() {
+                                    self.generation_head.projection[idx] -= lr * grad * ctx_latent.latent[l];
+                                }
+                            }
+                            if v < self.generation_head.bias.len() {
+                                self.generation_head.bias[v] -= lr * grad;
+                            }
                         }
                     }
                     
@@ -2160,9 +2231,9 @@ impl GenerativeVortexEngine {
                 }
             }
             
-            let n = texts.len().max(1) as f32;
-            println!("  Epoch {}/{}: gen_loss={:.4}, calm_loss={:.4}, contrastive={:.4}", 
-                     epoch + 1, epochs, total_loss / n, calm_loss / n, contrastive_loss / n);
+            let n = sample_count.max(1) as f32;
+            println!("  Epoch {}/{}: gen_loss={:.4}, calm_loss={:.4}, contrastive={:.4} (lr={:.6})", 
+                     epoch + 1, epochs, total_loss / n, calm_loss / n, contrastive_loss / n, lr);
         }
         
         println!("CALM pre-training complete. {} total steps.", self.training_steps);

@@ -43,8 +43,8 @@ struct Args {
     #[arg(long, required = true)]
     tasks: String,
 
-    /// Number of few-shot examples (0 for zero-shot)
-    #[arg(long, default_value_t = 0)]
+    /// Number of few-shot examples (0 for zero-shot, 5 is standard for MMLU)
+    #[arg(long, default_value_t = 5)]
     num_fewshot: usize,
 
     /// Batch size for inference
@@ -78,6 +78,10 @@ struct Args {
     /// Enable parallel processing for faster evaluation (disables web search)
     #[arg(long, default_value_t = false)]
     parallel: bool,
+
+    /// Enable deep reasoning debug: shows full expert score breakdown for EVERY question
+    #[arg(long, default_value_t = false)]
+    debug_reasoning: bool,
 }
 
 // =============================================================================
@@ -149,6 +153,7 @@ fn main() -> Result<()> {
     println!("| Batch size:   {}                                              ", args.batch_size);
     println!("| Few-shot:     {}                                              ", args.num_fewshot);
     println!("| Limit:        {}                                              ", if args.limit == 0 { "all".to_string() } else { args.limit.to_string() });
+    println!("| Debug:        {}                                              ", if args.debug_reasoning { "FULL REASONING TRACE" } else { "normal" });
     println!("| Output:       {:?}                                            ", args.output_path);
     println!("+===============================================================+");
 
@@ -165,9 +170,13 @@ fn main() -> Result<()> {
     // Initialize evaluator
     let mut evaluator = RealBenchmarkEvaluator::new(&args.data_dir);
     evaluator.set_verbose_debug(args.verbose);
+    evaluator.set_debug_reasoning(args.debug_reasoning);
     
     // Enable generative mode with GPU-accelerated exhaustive pathway search
     evaluator.set_generative_mode(true);
+    
+    // Set few-shot count from CLI
+    evaluator.set_num_fewshot(args.num_fewshot);
 
     // NOTE: Web learning already happens in RealBenchmarkEvaluator::new()
     // Order: HuggingFace → Commonsense → Web Learning → CALM Pretraining

@@ -18,7 +18,7 @@ pub mod reasoning;
 
 pub use thinking::{ThinkingEngine, Thought, ThoughtChain, ThinkingConfig, ThoughtType};
 pub use memory::{MemoryStore, Memory, MemoryType, MemoryQuery};
-pub use constitution::{Constitution, Principle, ConstitutionalGuard};
+pub use constitution::{Constitution, Principle, ConstitutionalGuard, TruthChecker};
 pub use rag::{RAGEngine, RAGConfig, RetrievedContext, Document};
 pub use vortex_runner::{VortexRunner, VortexState, Subject, FluxNode, LadderEntry, SourceType, SharedCALM};
 pub use tools::{Tool, ToolRegistry, ToolCall, ToolResult, ToolType};

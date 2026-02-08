@@ -657,18 +657,30 @@ impl CALMEngine {
         let latent_dim = self.config.latent_dim;
         let input_dim = self.config.chunk_size * 9;
         
-        // Gradient: push anchor closer to positive, away from negatives
+        // Attraction: push anchor closer to positive
         let pos_sim = self.cosine_similarity(anchor, positive);
-        let gradient_scale = learning_rate * (1.0 - pos_sim) * 0.01;
+        let attract_scale = learning_rate * (1.0 - pos_sim).max(0.0) * 0.1;
         
         for i in 0..latent_dim.min(anchor.len()).min(positive.len()) {
-            let error = positive[i] - anchor[i];
+            let attract_grad = positive[i] - anchor[i];
+            
+            // Repulsion: push anchor away from negatives
+            let mut repel_grad = 0.0f32;
+            for neg in negatives {
+                if i < neg.len() {
+                    let neg_sim = self.cosine_similarity(anchor, neg);
+                    let repel_scale = neg_sim.max(0.0) * 0.05; // Stronger repulsion for more similar negatives
+                    repel_grad -= (neg[i] - anchor[i]) * repel_scale;
+                }
+            }
+            
+            let total_grad = attract_grad * attract_scale + repel_grad * learning_rate;
             
             // Update encoder weights
             for j in 0..input_dim.min(self.encoder_weights.len() / latent_dim) {
                 let idx = i * input_dim + j;
                 if idx < self.encoder_weights.len() {
-                    self.encoder_weights[idx] += gradient_scale * error;
+                    self.encoder_weights[idx] += total_grad;
                 }
             }
         }
@@ -695,7 +707,8 @@ impl CALMEngine {
         self.multi_head_attention.forward(&query_latent.latent, &keys, &values)
     }
     
-    /// Train the CALM encoder/decoder on input-target pairs
+    /// Train the CALM encoder/decoder on input-target reconstruction
+    /// Encodes input to latent, decodes back, updates weights to minimize reconstruction error
     pub fn train_step(&mut self, input: &[BeamTensor], target: &[BeamTensor], learning_rate: f32) {
         if input.is_empty() || target.is_empty() {
             return;
@@ -703,31 +716,82 @@ impl CALMEngine {
         
         self.training_steps += 1;
         
-        // Encode input
-        let input_latent = self.encode(input);
-        let target_latent = self.encode(target);
-        
-        // Compute error between predicted and target latent
         let latent_dim = self.config.latent_dim;
         let input_dim = self.config.chunk_size * 9;
+        let chunk_size = self.config.chunk_size.min(input.len());
         
-        // Update encoder weights to minimize reconstruction error
-        let lr = learning_rate / (1.0 + self.training_steps as f32 * 0.0001);
+        // Encode input to latent
+        let latent = self.encode(input);
         
-        for i in 0..latent_dim.min(input_latent.latent.len()).min(target_latent.latent.len()) {
-            let error = target_latent.latent[i] - input_latent.latent[i];
+        // Decode latent back to output
+        let decoded = self.decode(&latent);
+        
+        // Flatten target digits for comparison
+        let mut target_flat = Vec::with_capacity(chunk_size * 9);
+        for beam in target.iter().take(chunk_size) {
+            target_flat.extend_from_slice(&beam.digits);
+        }
+        while target_flat.len() < self.config.chunk_size * 9 {
+            target_flat.push(0.0);
+        }
+        
+        // Flatten decoded digits
+        let mut decoded_flat = Vec::with_capacity(chunk_size * 9);
+        for beam in decoded.iter().take(chunk_size) {
+            decoded_flat.extend_from_slice(&beam.digits);
+        }
+        while decoded_flat.len() < self.config.chunk_size * 9 {
+            decoded_flat.push(0.0);
+        }
+        
+        // Compute reconstruction error per output dimension
+        let output_dim = self.config.chunk_size * 9;
+        let lr = learning_rate / (1.0 + self.training_steps as f32 * 0.00001);
+        
+        // Update decoder weights: minimize (decoded - target)^2
+        for i in 0..output_dim.min(decoded_flat.len()).min(target_flat.len()) {
+            let error = decoded_flat[i] - target_flat[i];
             
-            // Update encoder weights
-            for j in 0..input_dim.min(self.encoder_weights.len() / latent_dim) {
-                let idx = i * input_dim + j;
-                if idx < self.encoder_weights.len() {
-                    self.encoder_weights[idx] += lr * error * 0.01;
+            for j in 0..latent_dim.min(latent.latent.len()) {
+                let idx = j * output_dim + i;
+                if idx < self.decoder_weights.len() {
+                    self.decoder_weights[idx] -= lr * error * latent.latent[j];
                 }
             }
-            
-            // Update attention weights
-            if i < self.attention_weights.len() {
-                self.attention_weights[i] += lr * error.abs() * 0.001;
+        }
+        
+        // Update encoder weights via chain rule: d(loss)/d(encoder) = d(loss)/d(latent) * d(latent)/d(encoder)
+        // Compute d(loss)/d(latent) first
+        let mut latent_grad = vec![0.0f32; latent_dim];
+        for j in 0..latent_dim.min(latent.latent.len()) {
+            for i in 0..output_dim.min(decoded_flat.len()).min(target_flat.len()) {
+                let error = decoded_flat[i] - target_flat[i];
+                let idx = j * output_dim + i;
+                if idx < self.decoder_weights.len() {
+                    latent_grad[j] += error * self.decoder_weights[idx];
+                }
+            }
+            // Apply tanh derivative: d(tanh(x))/dx = 1 - tanh(x)^2
+            let tanh_val = latent.latent[j];
+            latent_grad[j] *= 1.0 - tanh_val * tanh_val;
+        }
+        
+        // Flatten input for encoder gradient
+        let mut input_flat = Vec::with_capacity(chunk_size * 9);
+        for beam in input.iter().take(chunk_size) {
+            input_flat.extend_from_slice(&beam.digits);
+        }
+        while input_flat.len() < self.config.chunk_size * 9 {
+            input_flat.push(0.0);
+        }
+        
+        // Update encoder weights
+        for i in 0..latent_dim {
+            for j in 0..input_dim.min(input_flat.len()) {
+                let idx = i * input_dim + j;
+                if idx < self.encoder_weights.len() {
+                    self.encoder_weights[idx] -= lr * latent_grad[i] * input_flat[j];
+                }
             }
         }
         
@@ -741,8 +805,8 @@ impl CALMEngine {
                 
                 // Update embedding toward current latent
                 for (i, e) in embedding.iter_mut().enumerate() {
-                    if i < input_latent.latent.len() {
-                        *e = *e * 0.99 + input_latent.latent[i] * 0.01;
+                    if i < latent.latent.len() {
+                        *e = *e * 0.95 + latent.latent[i] * 0.05;
                     }
                 }
             }

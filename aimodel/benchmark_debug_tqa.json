@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-02-07T21:52:44.122599300+00:00",
+  "model_config": {
+    "name": "spatialvortex-7b-dev",
+    "training_epochs": 0,
+    "gpu_enabled": true,
+    "features": [
+      "sacred_geometry",
+      "vortex_cycles",
+      "elp_attributes",
+      "moe_routing"
+    ]
+  },
+  "task_results": [
+    {
+      "task": "truthfulqa",
+      "accuracy": 50.0,
+      "num_correct": 5,
+      "total": 10,
+      "avg_confidence": 0.47058016,
+      "time_secs": 1.1479158,
+      "wrong_samples": []
+    }
+  ],
+  "overall": {
+    "total_correct": 5,
+    "total_questions": 10,
+    "overall_accuracy": 50.0,
+    "total_time_secs": 127.0812535
+  }
+}
