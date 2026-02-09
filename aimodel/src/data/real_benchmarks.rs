@@ -1781,8 +1781,11 @@ impl RealBenchmarkEvaluator {
         
         let mut loader = HFDatasetLoader::new(config);
         
-        // Load key datasets by category for knowledge bootstrapping
+        // Load ALL dataset categories for comprehensive knowledge bootstrapping
         let categories = [
+            (DatasetCategory::PreTraining, "pretraining"),
+            (DatasetCategory::Code, "code"),
+            (DatasetCategory::Benchmark, "benchmark"),
             (DatasetCategory::Commonsense, "commonsense"),
             (DatasetCategory::Entailment, "entailment"),
             (DatasetCategory::Reasoning, "reasoning"),
@@ -1795,7 +1798,7 @@ impl RealBenchmarkEvaluator {
         let mut failed_count = 0;
         for (category, _name) in &categories {
             let datasets = get_datasets_by_category(*category);
-            for dataset in datasets.iter().take(5) { // Top 5 per category
+            for dataset in datasets.iter().take(10) { // Top 10 per category
                 match loader.load_dataset(&dataset.hf_path) {
                     Ok(count) => total_loaded += count,
                     Err(_) => failed_count += 1,

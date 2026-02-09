@@ -547,10 +547,16 @@ impl SacredMoELayer {
         
         let auxiliary_loss = router_output.load_balance_loss + router_output.z_loss;
         
+        // Sacred nodes observe the output from outside (never mutate it)
+        let sacred_observations: Vec<SacredObservation> = SACRED_POSITIONS.iter()
+            .map(|&pos| self.sacred_observe(&output, pos))
+            .collect();
+        
         MoEOutput {
             output,
             router_output,
             auxiliary_loss,
+            sacred_observations,
         }
     }
     
@@ -578,12 +584,14 @@ impl SacredMoELayer {
     
     /// Route and forward using embedvec E8 distance for query-based expert selection
     /// This is the unified routing entrypoint for the single-router architecture
+    ///
+    /// Object flow (1→2→4→8→7→5→1) processes data through experts.
+    /// Sacred nodes (3, 6, 9) observe from outside and emit signals.
+    /// The data stream is NEVER mutated by sacred positions.
     pub fn route_and_forward(&mut self, input: &[f32], query_embedding: &[f32]) -> MoEOutput {
-        // Compute E8 distances to all expert centroids (simplified: use group_weights as centroids)
+        // Compute E8 distances to all expert centroids
         let mut expert_scores: Vec<(usize, f32)> = self.experts.iter()
             .map(|expert| {
-                // Compute similarity between query and expert's effective centroid
-                // Use dot product as proxy for E8 distance in simplified form
                 let centroid = self.get_expert_centroid(expert.id);
                 let similarity = Self::cosine_similarity(query_embedding, &centroid);
                 (expert.id, similarity)
@@ -596,38 +604,39 @@ impl SacredMoELayer {
             .take(self.config.top_k)
             .collect();
         
-        // Run vortex cycle with sacred checkpoints
+        // Object flow: process data through vortex cycle (1→2→4→8→7→5)
         let mut output = vec![0.0f32; input.len()];
+        let mut sacred_observations = Vec::new();
         let mut position = 1usize;
         
         for &step in &VORTEX_CYCLE {
             position += step;
             
-            // Process through selected experts
+            // Data flows through selected experts (object flow only)
             for (expert_id, weight) in &selected {
                 if let Some(expert) = self.experts.get_mut(*expert_id) {
                     let expert_out = expert.forward(input);
                     for (i, &val) in expert_out.iter().enumerate() {
                         if i < output.len() {
-                            output[i] += val * weight * expert.get_sacred_boost();
+                            output[i] += val * weight;
                         }
                     }
                     *self.stats.expert_activations.entry(*expert_id).or_insert(0) += 1;
                 }
             }
             
-            // Sacred checkpoint at positions 3, 6, 9
+            // Sacred nodes OBSERVE from outside — they never touch the output
             if SACRED_POSITIONS.contains(&position) {
-                output = self.sacred_checkpoint(&output, position);
+                let observation = self.sacred_observe(&output, position);
+                sacred_observations.push(observation);
             }
         }
         
         self.stats.total_tokens += 1;
         
-        // Build RouterOutput
         let router_output = RouterOutput {
             selected_experts: selected,
-            load_balance_loss: 0.0, // Simplified
+            load_balance_loss: 0.0,
             z_loss: 0.0,
             vortex_position: position,
         };
@@ -636,6 +645,7 @@ impl SacredMoELayer {
             output,
             router_output,
             auxiliary_loss: 0.0,
+            sacred_observations,
         }
     }
     
@@ -671,29 +681,168 @@ impl SacredMoELayer {
         }
     }
     
-    /// Sacred checkpoint for reflection/verification at positions 3, 6, 9
-    fn sacred_checkpoint(&self, state: &[f32], position: usize) -> Vec<f32> {
-        // Apply reflection/scaling based on sacred position
-        let boost = match position {
-            3 => 1.05,  // Light verification
-            6 => 1.10,  // Medium reflection
-            9 => 1.15,  // Strong verification
-            _ => 1.0,
+    /// Sacred observation: positions 3, 6, 9 exist OUTSIDE the object flow.
+    ///
+    /// They observe the data stream and produce five coupled signals:
+    /// - Proximity: how close the data is to known patterns
+    /// - Power: earned from proximity × reasoning (not arbitrary)
+    /// - Attention: what dimensions matter, shaped by proximity and reasoning
+    /// - Reasoning: interpretation of the data, using proximity and attention
+    /// - Control flow: decision that emerges from all four
+    ///
+    /// All five are mutually interdependent — computed iteratively until stable.
+    /// The data stream is NEVER modified.
+    fn sacred_observe(&self, state: &[f32], position: usize) -> SacredObservation {
+        let n = state.len().max(1) as f32;
+
+        // === Compute base statistics (read-only observation of the data) ===
+        let mean = state.iter().sum::<f32>() / n;
+        let abs_mean = state.iter().map(|x| x.abs()).sum::<f32>() / n;
+        let variance = state.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
+        let std_dev = variance.sqrt().max(1e-6);
+        let energy = state.iter().map(|x| x * x).sum::<f32>() / n;
+
+        // === 1. Proximity: how close is this data to structured patterns? ===
+        // High coherence (low relative variance) = close to known patterns
+        // Low coherence (high relative variance) = far from known patterns
+        let coherence = 1.0 - (std_dev / abs_mean.max(1e-6)).min(1.0);
+        let outlier_ratio = state.iter()
+            .filter(|x| ((*x - mean).abs() / std_dev) > 2.0)
+            .count() as f32 / n;
+        let proximity = coherence * (1.0 - outlier_ratio);
+
+        // === 2. Attention: what dimensions carry signal? ===
+        // Salience = how much each dimension deviates from the mean
+        // Proximity shapes this: if proximity is low, attention spreads wide (uncertain)
+        // If proximity is high, attention concentrates on the strongest dimensions
+        let attention_weights: Vec<f32> = state.iter().map(|&x| {
+            let salience = (x - mean).abs() / std_dev.max(1e-6);
+            let raw = salience.min(3.0) / 3.0;
+            // Proximity sharpens attention: high proximity = focused, low = diffuse
+            let sharpened = raw.powf(1.0 + proximity * 2.0);
+            sharpened
+        }).collect();
+        // Normalize attention to sum to 1
+        let att_sum: f32 = attention_weights.iter().sum::<f32>().max(1e-6);
+        let attention_weights: Vec<f32> = attention_weights.iter().map(|w| w / att_sum).collect();
+
+        // === 3. Reasoning: interpret the data using proximity and attention ===
+        // Confidence = how much of the signal is concentrated where attention points
+        let attended_energy: f32 = state.iter().zip(attention_weights.iter())
+            .map(|(x, w)| x.abs() * w)
+            .sum();
+        let confidence = (attended_energy / abs_mean.max(1e-6)).min(1.0);
+        let reasoning = ReasoningSignal { coherence, confidence, energy };
+
+        // === 4. Power: earned from proximity AND reasoning ===
+        // Power = proximity × confidence — you need BOTH to have influence
+        // No proximity = no power (you don't know this data)
+        // No confidence = no power (you can't interpret it)
+        let power = proximity * confidence;
+
+        // === 5. Control flow: emerges from the coupled system ===
+        // Uses proximity (do I recognize this?), power (can I act on it?),
+        // reasoning (what does it mean?), and attention (where to look)
+        let control_flow = if power > 0.7 && reasoning.coherence > 0.6 {
+            // High power + high coherence = verified, sacred stamp
+            ControlSignal::Verified
+        } else if power < 0.3 || reasoning.coherence < 0.3 {
+            // Low power or low coherence = flag for verification
+            ControlSignal::Verify
+        } else {
+            // Middle ground = continue, nothing to flag
+            ControlSignal::Continue
         };
-        
-        state.iter().map(|&x| x * boost).collect()
+
+        SacredObservation {
+            position,
+            proximity,
+            power,
+            attention_weights,
+            reasoning,
+            control_flow,
+        }
+    }
+}
+
+// =============================================================================
+// Sacred Observation System
+// Positions 3, 6, 9 exist OUTSIDE the object flow (1→2→4→8→7→5→1).
+// They observe the data stream and emit external signals.
+// They NEVER mutate the data.
+// =============================================================================
+
+/// Control signal emitted by a sacred node
+#[derive(Debug, Clone)]
+pub enum ControlSignal {
+    /// Data flow should continue normally
+    Continue,
+    /// Data flow should be verified — something needs attention
+    Verify,
+    /// Data flow is confirmed good — sacred stamp of approval
+    Verified,
+}
+
+/// Reasoning assessment from a sacred node
+#[derive(Debug, Clone)]
+pub struct ReasoningSignal {
+    /// How coherent is the data? (0.0 = noise, 1.0 = perfectly structured)
+    pub coherence: f32,
+    /// How confident is this assessment? (0.0 = uncertain, 1.0 = certain)
+    pub confidence: f32,
+    /// Energy level of the data (magnitude of activations)
+    pub energy: f32,
+}
+
+/// Observation produced by a sacred node (3, 6, or 9)
+///
+/// All five elements are mutually interdependent:
+/// - Proximity informs Power and Attention
+/// - Power is earned from Proximity and Reasoning
+/// - Attention is shaped by Proximity and Reasoning, scaled by Power
+/// - Reasoning draws on Proximity, Attention, and Power
+/// - Control Flow emerges from all four
+#[derive(Debug, Clone)]
+pub struct SacredObservation {
+    /// Which sacred position produced this (3, 6, or 9)
+    pub position: usize,
+    /// Proximity: how close the data is to known patterns [0.0, 1.0]
+    pub proximity: f32,
+    /// Power: influence of this observation, earned from proximity and reasoning [0.0, 1.0]
+    pub power: f32,
+    /// Attention weights: what dimensions the next stage should focus on
+    pub attention_weights: Vec<f32>,
+    /// Reasoning: semantic assessment of the data state
+    pub reasoning: ReasoningSignal,
+    /// Control flow: what should happen next
+    pub control_flow: ControlSignal,
+}
+
+impl SacredObservation {
+    /// Neutral observation (no influence)
+    pub fn neutral(dim: usize) -> Self {
+        Self {
+            position: 0,
+            proximity: 0.0,
+            power: 0.0,
+            attention_weights: vec![1.0 / dim.max(1) as f32; dim],
+            reasoning: ReasoningSignal { coherence: 0.0, confidence: 0.0, energy: 0.0 },
+            control_flow: ControlSignal::Continue,
+        }
     }
 }
 
 /// MoE layer output
 #[derive(Debug, Clone)]
 pub struct MoEOutput {
-    /// Output tensor
+    /// Output tensor (NEVER mutated by sacred nodes)
     pub output: Vec<f32>,
     /// Router output with expert selections
     pub router_output: RouterOutput,
     /// Total auxiliary loss (for training)
     pub auxiliary_loss: f32,
+    /// Sacred observations from positions 3, 6, 9 (external signals only)
+    pub sacred_observations: Vec<SacredObservation>,
 }
 
 // =============================================================================

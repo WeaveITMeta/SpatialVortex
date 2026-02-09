@@ -99,6 +99,7 @@ pub use sacred_moe::{
     SacredExpert, ExpertSpecialization,
     GeometricRouter, RouterOutput,
     MultiHeadLatentAttention, MoEOutput, ModelStats,
+    SacredObservation, ControlSignal, ReasoningSignal,
     PHI, PHI_INV, SACRED_POSITIONS, VORTEX_CYCLE,
 };
 pub use sacred_swarm::{

@@ -332,12 +332,16 @@ pub fn is_sacred_position(pos: u8) -> bool {
 }
 
 /// Get sacred magnification factor for position
+/// Differentiated by RLHF-style gate role:
+/// - 3 (Good gate): Light magnification for quality-filtered signals
+/// - 6 (Bad gate): No magnification — this gate suppresses, not amplifies
+/// - 9 (Verified gate): Strongest — only sacred verified signals get full boost
 #[inline]
 pub fn sacred_magnification(pos: u8) -> f64 {
     match pos {
-        3 => 1.5,  // Entity/Property verification
-        6 => 1.5,  // Relationship verification
-        9 => 1.5,  // Final verification (strongest)
+        3 => 1.2,  // Good gate: quality-filtered signals get light boost
+        6 => 1.0,  // Bad gate: suppression only, no amplification
+        9 => 1.5,  // Verified gate: sacred verified signals (strongest)
         _ => 1.0,
     }
 }
