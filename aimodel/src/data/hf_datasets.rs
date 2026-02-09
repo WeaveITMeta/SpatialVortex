@@ -58,40 +58,41 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         // =============================================================================
         // 1. Large-Scale Text/Language Corpora (1-20)
         // =============================================================================
-        DatasetInfo { hf_path: "HuggingFaceFW/fineweb".to_string(), name: "FineWeb".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 15_000_000_000, license: "ODC-BY".to_string(), priority: 1 },
+        // HuggingFaceFW/fineweb removed: 501 (too large for Datasets Server API)
         DatasetInfo { hf_path: "HuggingFaceFW/fineweb-edu".to_string(), name: "FineWeb-Edu".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 5_400_000_000, license: "ODC-BY".to_string(), priority: 2 },
-        DatasetInfo { hf_path: "allenai/dolma".to_string(), name: "Dolma".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 3_000_000_000_000, license: "ODC-BY".to_string(), priority: 3 },
-        DatasetInfo { hf_path: "togethercomputer/RedPajama-Data-1T".to_string(), name: "RedPajama".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 1_200_000_000_000, license: "Apache-2.0".to_string(), priority: 4 },
-        DatasetInfo { hf_path: "EleutherAI/the_pile".to_string(), name: "The Pile".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 825_000_000_000, license: "MIT".to_string(), priority: 5 },
+        // allenai/dolma removed: 500 (too large for Datasets Server API)
+        // togethercomputer/RedPajama-Data-1T removed: 501 (too large for Datasets Server API)
+        // EleutherAI/the_pile removed: 404
         DatasetInfo { hf_path: "allenai/c4".to_string(), name: "C4".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 750_000_000_000, license: "ODC-BY".to_string(), priority: 6 },
-        DatasetInfo { hf_path: "oscar-corpus/OSCAR-2109".to_string(), name: "OSCAR".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 400_000_000_000, license: "CC-BY".to_string(), priority: 7 },
-        DatasetInfo { hf_path: "EleutherAI/bookcorpus".to_string(), name: "BookCorpus".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 985_000_000, license: "MIT".to_string(), priority: 8 },
-        DatasetInfo { hf_path: "wikipedia".to_string(), name: "Wikipedia".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 6_000_000_000, license: "CC-BY-SA".to_string(), priority: 9 },
-        DatasetInfo { hf_path: "skylion007/openwebtext".to_string(), name: "OpenWebText".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 8_000_000_000, license: "MIT".to_string(), priority: 10 },
-        DatasetInfo { hf_path: "allenai/cc-news".to_string(), name: "CC-News".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 76_000_000_000, license: "CC-BY".to_string(), priority: 11 },
-        DatasetInfo { hf_path: "allenai/mc4".to_string(), name: "MC4".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 100_000_000_000, license: "ODC-BY".to_string(), priority: 12 },
-        DatasetInfo { hf_path: "bigscience-data/roots".to_string(), name: "ROOTS".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 1_600_000_000_000, license: "Apache-2.0".to_string(), priority: 13 },
+        // oscar-corpus/OSCAR-2109 removed: 401 (gated)
+        // EleutherAI/bookcorpus removed: 401 (gated)
+        DatasetInfo { hf_path: "wikimedia/wikipedia".to_string(), name: "Wikipedia".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 6_000_000_000, license: "CC-BY-SA".to_string(), priority: 9 },
+        DatasetInfo { hf_path: "Salesforce/wikitext".to_string(), name: "WikiText".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 100_000_000, license: "CC-BY-SA".to_string(), priority: 10 },
+        // skylion007/openwebtext removed: 404
+        // allenai/cc-news removed: 401 (gated)
+        // allenai/mc4 removed: 401 (gated)
+        // bigscience-data/roots removed: 401 (gated)
         DatasetInfo { hf_path: "tiiuae/falcon-refinedweb".to_string(), name: "RefinedWeb".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 600_000_000_000, license: "ODC-BY".to_string(), priority: 14 },
-        DatasetInfo { hf_path: "nguyentito/CultureX".to_string(), name: "CultureX".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 50_000_000_000, license: "CC-BY".to_string(), priority: 15 },
+        // nguyentito/CultureX removed: 401 (gated)
         DatasetInfo { hf_path: "open-web-math/open-web-math".to_string(), name: "OpenWebMath".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 14_700_000_000, license: "ODC-BY".to_string(), priority: 16 },
-        DatasetInfo { hf_path: "cerebras/SlimPajama-627B".to_string(), name: "SlimPajama".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 627_000_000_000, license: "Apache-2.0".to_string(), priority: 17 },
+        // cerebras/SlimPajama-627B removed: 401 (gated)
         DatasetInfo { hf_path: "Skywork/SkyPile-150B".to_string(), name: "SkyPile".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 150_000_000_000, license: "Apache-2.0".to_string(), priority: 18 },
-        DatasetInfo { hf_path: "EleutherAI/webtext2".to_string(), name: "WebText2".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 40_000_000_000, license: "MIT".to_string(), priority: 19 },
-        DatasetInfo { hf_path: "allenai/cc-stories".to_string(), name: "CC-Stories".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 31_000_000_000, license: "CC-BY".to_string(), priority: 20 },
+        // EleutherAI/webtext2 removed: 401 (gated)
+        // allenai/cc-stories removed: 401 (gated)
 
         // =============================================================================
         // 2. Code and Programming Datasets (21-30)
         // =============================================================================
-        DatasetInfo { hf_path: "openai_humaneval".to_string(), name: "HumanEval".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 164, license: "MIT".to_string(), priority: 21 },
-        DatasetInfo { hf_path: "bigcode/the-stack".to_string(), name: "The Stack".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 3_000_000_000_000, license: "Various".to_string(), priority: 22 },
-        DatasetInfo { hf_path: "codeparrot/github-code".to_string(), name: "GitHub Code".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 1_000_000_000_000, license: "Various".to_string(), priority: 23 },
-        DatasetInfo { hf_path: "hendrycks/apps".to_string(), name: "APPS".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 10_000, license: "MIT".to_string(), priority: 24 },
-        DatasetInfo { hf_path: "microsoft/CodeXGLUE".to_string(), name: "CodeXGLUE".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 50_000, license: "MIT".to_string(), priority: 25 },
-        DatasetInfo { hf_path: "google-research/mbpp".to_string(), name: "MBPP".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 974, license: "CC-BY".to_string(), priority: 26 },
-        DatasetInfo { hf_path: "microsoft/ds1000".to_string(), name: "DS-1000".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 1_000, license: "MIT".to_string(), priority: 27 },
-        DatasetInfo { hf_path: "bigcode-project/bigcodebench".to_string(), name: "BigCodeBench".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 5_000, license: "Apache-2.0".to_string(), priority: 28 },
-        DatasetInfo { hf_path: "bigcode/starcoderdata".to_string(), name: "StarCoderData".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 250_000_000_000, license: "Various".to_string(), priority: 29 },
-        DatasetInfo { hf_path: "thebigpile/python-stackoverflow".to_string(), name: "Python StackOverflow".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 10_000_000, license: "CC-BY-SA".to_string(), priority: 30 },
+        DatasetInfo { hf_path: "openai/openai_humaneval".to_string(), name: "HumanEval".to_string(), category: DatasetCategory::Code, split: "test".to_string(), estimated_tokens: 164, license: "MIT".to_string(), priority: 21 },
+        // bigcode/the-stack removed: 401 (gated)
+        DatasetInfo { hf_path: "deepmind/code_contests".to_string(), name: "Code Contests".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 50_000, license: "Apache-2.0".to_string(), priority: 23 },
+        // hendrycks/apps removed: 401 (gated)
+        // microsoft/CodeXGLUE removed: 401 (gated)
+        DatasetInfo { hf_path: "google-research-datasets/mbpp".to_string(), name: "MBPP".to_string(), category: DatasetCategory::Code, split: "train".to_string(), estimated_tokens: 974, license: "CC-BY".to_string(), priority: 26 },
+        // microsoft/ds1000 removed: likely gated
+        // bigcode-project/bigcodebench removed: likely gated
+        // bigcode/starcoderdata removed: 401 (gated)
+        // thebigpile/python-stackoverflow removed: 404
 
         // =============================================================================
         // 3. Vision and Image Datasets (31-40) - DISABLED
@@ -109,14 +110,15 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         // 5. Science, Math, and Reasoning Datasets (51-60)
         // =============================================================================
         DatasetInfo { hf_path: "openai/gsm8k".to_string(), name: "GSM8K".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 8_500, license: "MIT".to_string(), priority: 51 },
-        DatasetInfo { hf_path: "hendrycks/math".to_string(), name: "MATH".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 12_500, license: "MIT".to_string(), priority: 52 },
+        DatasetInfo { hf_path: "camel-ai/math".to_string(), name: "MATH".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 50_000, license: "Apache-2.0".to_string(), priority: 52 },
+        DatasetInfo { hf_path: "microsoft/orca-math-word-problems-200k".to_string(), name: "Orca-Math".to_string(), category: DatasetCategory::Math, split: "train".to_string(), estimated_tokens: 200_000, license: "MIT".to_string(), priority: 53 },
         DatasetInfo { hf_path: "ccdv/arxiv-summarization".to_string(), name: "arXiv".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 215_913, license: "CC-BY".to_string(), priority: 53 },
         DatasetInfo { hf_path: "qiaojin/PubMedQA".to_string(), name: "PubMedQA".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 211_000, license: "MIT".to_string(), priority: 54 },
         DatasetInfo { hf_path: "GBaker/MedQA-USMLE-4-options".to_string(), name: "MedQA".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 50_000, license: "Apache-2.0".to_string(), priority: 55 },
         DatasetInfo { hf_path: "allenai/sciq".to_string(), name: "SciQ".to_string(), category: DatasetCategory::Science, split: "train".to_string(), estimated_tokens: 13_679, license: "CC-BY".to_string(), priority: 56 },
         DatasetInfo { hf_path: "allenai/ai2_arc".to_string(), name: "ARC".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 7_800, license: "Apache-2.0".to_string(), priority: 57 },
         DatasetInfo { hf_path: "allenai/openbookqa".to_string(), name: "OpenBookQA".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 5_957, license: "Apache-2.0".to_string(), priority: 58 },
-        DatasetInfo { hf_path: "EleutherAI/proof-pile-2".to_string(), name: "Proof-Pile-2".to_string(), category: DatasetCategory::Math, split: "default".to_string(), estimated_tokens: 55_000_000_000, license: "Apache-2.0".to_string(), priority: 59 },
+        // EleutherAI/proof-pile-2 removed: 404
         DatasetInfo { hf_path: "wenhu/theoremqa".to_string(), name: "TheoremQA".to_string(), category: DatasetCategory::Math, split: "test".to_string(), estimated_tokens: 800, license: "MIT".to_string(), priority: 60 },
 
         // =============================================================================
@@ -126,7 +128,7 @@ pub fn get_priority_datasets() -> Vec<DatasetInfo> {
         DatasetInfo { hf_path: "glue".to_string(), name: "GLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 100_000, license: "Various".to_string(), priority: 62 },
         DatasetInfo { hf_path: "super_glue".to_string(), name: "SuperGLUE".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 50_000, license: "Various".to_string(), priority: 62 },
         DatasetInfo { hf_path: "rajpurkar/squad".to_string(), name: "SQuAD".to_string(), category: DatasetCategory::QA, split: "train".to_string(), estimated_tokens: 87_599, license: "CC-BY-SA".to_string(), priority: 63 },
-        DatasetInfo { hf_path: "cnn_dailymail".to_string(), name: "CNN/Daily Mail".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 300_000, license: "Apache-2.0".to_string(), priority: 64 },
+        DatasetInfo { hf_path: "abisee/cnn_dailymail".to_string(), name: "CNN/Daily Mail".to_string(), category: DatasetCategory::PreTraining, split: "train".to_string(), estimated_tokens: 300_000, license: "Apache-2.0".to_string(), priority: 64 },
         DatasetInfo { hf_path: "hendrycks/ethics".to_string(), name: "Ethics".to_string(), category: DatasetCategory::Reasoning, split: "train".to_string(), estimated_tokens: 130_000, license: "MIT".to_string(), priority: 65 },
         DatasetInfo { hf_path: "truthful_qa".to_string(), name: "TruthfulQA".to_string(), category: DatasetCategory::Benchmark, split: "validation".to_string(), estimated_tokens: 817, license: "Apache-2.0".to_string(), priority: 66 },
         DatasetInfo { hf_path: "Rowan/hellaswag".to_string(), name: "HellaSwag".to_string(), category: DatasetCategory::Benchmark, split: "train".to_string(), estimated_tokens: 70_000, license: "MIT".to_string(), priority: 67 },
@@ -327,6 +329,8 @@ impl HFDatasetLoader {
                     println!("   ⚠ Failed to load {}: {}", dataset.name, e);
                 }
             }
+            // Rate limit between datasets to avoid 429
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
         
         Ok(total)
@@ -364,34 +368,93 @@ impl HFDatasetLoader {
     }
     
     /// Load dataset from HuggingFace Datasets Server API
+    /// Paginates to get up to max_samples (API returns max 100 per request)
     fn load_from_hf_hub(&self, info: &DatasetInfo) -> Result<Vec<TrainingExample>, String> {
-        // Use HuggingFace Datasets Server REST API (more reliable than file downloads)
-        let max_samples = if self.config.max_samples == 0 { 100 } else { self.config.max_samples.min(100) };
+        let max_samples = if self.config.max_samples == 0 { 100 } else { self.config.max_samples };
+        let page_size = 100; // HF Datasets Server API max per request
         
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| format!("Client error: {}", e))?;
         
-        // Dataset-specific configs (many HF datasets require specific config names)
         let configs = self.get_dataset_configs(&info.hf_path);
         
-        for config in &configs {
-            let url = format!(
-                "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset=0&length={}",
-                info.hf_path, config, info.split, max_samples
-            );
+        for (config_idx, config) in configs.iter().enumerate() {
+            // Delay between config attempts (not the first one)
+            if config_idx > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
             
-            if let Ok(response) = client.get(&url)
-                .header("User-Agent", "SpatialVortex/1.0")
-                .send() 
-            {
-                if response.status().is_success() {
-                    return self.parse_hf_api_response(response, info);
-                } else {
-                    // Log the actual error for debugging
-                    eprintln!("      ⚠ HF API error for {} with config '{}': HTTP {}", info.name, config, response.status());
+            let mut all_examples: Vec<TrainingExample> = Vec::new();
+            let mut offset = 0;
+            
+            loop {
+                let length = page_size.min(max_samples - all_examples.len());
+                if length == 0 { break; }
+                
+                let url = format!(
+                    "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length={}",
+                    info.hf_path, config, info.split, offset, length
+                );
+                
+                // Retry loop with exponential backoff for 429
+                let mut response = None;
+                for retry in 0..5u32 {
+                    match client.get(&url)
+                        .header("User-Agent", "SpatialVortex/1.0")
+                        .send()
+                    {
+                        Ok(r) => {
+                            if r.status().as_u16() == 429 {
+                                // Rate limited — back off exponentially (3s, 6s, 12s, 24s, 48s)
+                                let wait = std::time::Duration::from_secs(3 * 2u64.pow(retry));
+                                eprintln!("      ⚠ 429 rate limited for {}, retry {}/5, waiting {:?}...", info.name, retry + 1, wait);
+                                std::thread::sleep(wait);
+                                continue;
+                            }
+                            response = Some(r);
+                            break;
+                        }
+                        Err(_) => break,
+                    }
                 }
+                
+                let response = match response {
+                    Some(r) => r,
+                    None => break,
+                };
+                
+                if !response.status().is_success() {
+                    if offset == 0 {
+                        // First page failed — try next config
+                        eprintln!("      ⚠ HF API error for {} with config '{}': HTTP {}", info.name, config, response.status());
+                        break;
+                    }
+                    // Subsequent page failed — return what we have
+                    break;
+                }
+                
+                let page = match self.parse_hf_api_response(response, info) {
+                    Ok(ex) => ex,
+                    Err(_) => break,
+                };
+                
+                let page_count = page.len();
+                all_examples.extend(page);
+                offset += page_size;
+                
+                // Stop if we got fewer than requested (end of dataset)
+                if page_count < length { break; }
+                // Stop if we have enough
+                if all_examples.len() >= max_samples { break; }
+                
+                // Rate limit: delay between pages to avoid 429
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+            
+            if !all_examples.is_empty() {
+                return Ok(all_examples);
             }
         }
         
@@ -399,85 +462,69 @@ impl HFDatasetLoader {
     }
     
     /// Get dataset-specific config names to try
+    /// Each dataset on HF requires a specific config name for the Datasets Server API.
+    /// Only verified working configs are listed here.
     fn get_dataset_configs(&self, hf_path: &str) -> Vec<&'static str> {
         match hf_path {
-            // ARC has ARC-Easy and ARC-Challenge configs
-            "allenai/ai2_arc" => vec!["ARC-Easy", "ARC-Challenge"],
-            // WinoGrande configs
-            "allenai/winogrande" => vec!["winogrande_xl", "winogrande_l", "winogrande_m"],
-            // SWAG config
-            "allenai/swag" => vec!["regular", "full"],
-            // HellaSwag
-            "Rowan/hellaswag" => vec!["default"],
-            // OpenBookQA
-            "allenai/openbookqa" => vec!["main", "additional"],
-            // SICK
-            "mteb/sickr-sts" => vec!["default"],
-            // Ethics
-            "hendrycks/ethics" => vec!["commonsense", "deontology", "justice", "utilitarianism", "virtue"],
-            // ANLI - facebook/anli uses plain_text config with train_r1/r2/r3 splits
-            "facebook/anli" => vec!["plain_text"],
-            // arXiv
-            "ccdv/arxiv-summarization" => vec!["document", "section"],
-            // PubMedQA
-            "qiaojin/PubMedQA" => vec!["pqa_labeled", "pqa_unlabeled", "pqa_artificial"],
-            // MedQA (replacement for BioASQ)
-            "bigbio/med_qa" => vec!["med_qa_en_source", "med_qa_en_bigbio_qa"],
-            // SocialIQA
-            "allenai/social_i_qa" => vec!["default"],
-            "sap2019/socialiqa" => vec!["default"],
-            // PIQA
-            "piqa" => vec!["plain_text"],
-            "ybisk/piqa" => vec!["plain_text", "default"],
-            // CosmosQA
-            "allenai/cosmosqa" => vec!["default"],
-            // DROP
-            "drop" => vec!["default"],
-            "allenai/drop" => vec!["default"],
-            // XNLI - needs language config
-            "facebook/xnli" => vec!["en", "all_languages"],
-            // CoQA
-            "stanfordnlp/coqa" => vec!["default"],
-            // MultiRC
-            "aps/super_glue" => vec!["multirc"],
-            "super_glue" => vec!["multirc"],
-            "multi_rc" => vec!["default"],
-            // MATH
-            "lighteval/MATH" => vec!["default", "all"],
-            "hendrycks/math" => vec!["default"],
-            // TheoremQA
-            "TIGER-Lab/TheoremQA" => vec!["default"],
-            "wenhu/theoremqa" => vec!["default"],
-            // SciTail
-            "allenai/scitail" => vec!["snli_format", "tsv_format"],
-            // ConceptNet5 (replacement for LAMA)
-            "conceptnet5/conceptnet5" => vec!["conceptnet5"],
-            // CommonsenseQA
-            "tau/commonsense_qa" => vec!["default"],
-            // SciQ
-            "allenai/sciq" => vec!["default"],
-            // SNLI
-            "stanfordnlp/snli" => vec!["plain_text", "default"],
-            "snli" => vec!["plain_text", "default"],
-            // MultiNLI
-            "nyu-mll/multi_nli" => vec!["default"],
-            "multi_nli" => vec!["default"],
-            // SICK
-            "sick" => vec!["default"],
-            // Ethics
-            "hendrycks_ethics" => vec!["commonsense", "deontology", "justice", "utilitarianism", "virtue"],
-            // PIQA alternatives
-            "baber/piqa" => vec!["plain_text", "default"],
-            // WinoGrande variants
-            "allenai/winogrande" => vec!["winogrande_xl", "winogrande_l", "winogrande_m", "winogrande_s", "winogrande_xs"],
-            // ARC variants
-            "allenai/ai2_arc" => vec!["ARC-Easy", "ARC-Challenge"],
-            // HellaSwag variants
-            "Rowan/hellaswag" => vec!["default", "full"],
-            // OpenWebMath (replacement for ProofPile)
+            // PreTraining
+            "HuggingFaceFW/fineweb-edu" => vec!["default"],
+            "allenai/c4" => vec!["en"],
+            "wikimedia/wikipedia" => vec!["20231101.en"],
+            "Salesforce/wikitext" => vec!["wikitext-103-v1", "wikitext-2-v1"],
+            "tiiuae/falcon-refinedweb" => vec!["default"],
+            "Skywork/SkyPile-150B" => vec!["default"],
+            "abisee/cnn_dailymail" => vec!["3.0.0"],
+            // Code
+            "openai/openai_humaneval" => vec!["openai_humaneval"],
+            "deepmind/code_contests" => vec!["default"],
+            "google-research-datasets/mbpp" => vec!["sanitized", "full"],
+            // Math
+            "openai/gsm8k" => vec!["main"],
             "open-web-math/open-web-math" => vec!["default"],
+            "camel-ai/math" => vec!["default"],
+            "microsoft/orca-math-word-problems-200k" => vec!["default"],
+            "wenhu/theoremqa" => vec!["default"],
+            // Science
+            "ccdv/arxiv-summarization" => vec!["document", "section"],
+            "qiaojin/PubMedQA" => vec!["pqa_labeled", "pqa_unlabeled", "pqa_artificial"],
+            "GBaker/MedQA-USMLE-4-options" => vec!["default"],
+            "allenai/sciq" => vec!["default"],
+            "allenai/scitail" => vec!["snli_format", "tsv_format"],
+            // Benchmarks
+            "allenai/ai2_arc" => vec!["ARC-Easy", "ARC-Challenge"],
+            "allenai/openbookqa" => vec!["main", "additional"],
+            "cais/mmlu" => vec!["all"],
+            "glue" => vec!["sst2", "mnli", "qqp", "qnli"],
+            "super_glue" => vec!["boolq", "cb", "copa", "multirc", "rte", "wic", "wsc.fixed"],
+            "truthful_qa" => vec!["generation", "multiple_choice"],
+            "Rowan/hellaswag" => vec!["default"],
+            // QA
+            "rajpurkar/squad" => vec!["plain_text"],
+            "google/boolq" => vec!["default"],
+            "stanfordnlp/coqa" => vec!["default"],
+            "hotpot_qa" => vec!["distractor", "fullwiki"],
+            "trivia_qa" => vec!["rc", "unfiltered"],
+            "quac" => vec!["default"],
+            // Reasoning
+            "hendrycks/ethics" => vec!["commonsense", "deontology", "justice", "utilitarianism", "virtue"],
+            "ybisk/piqa" => vec!["plain_text", "default"],
+            "piqa" => vec!["plain_text"],
+            "sap2019/socialiqa" => vec!["default"],
+            "allenai/cosmosqa" => vec!["default"],
+            "allenai/drop" => vec!["default"],
+            // Entailment
+            "stanfordnlp/snli" => vec!["plain_text"],
+            "nyu-mll/multi_nli" => vec!["default"],
+            "facebook/anli" => vec!["plain_text"],
+            "ynie/xnli" => vec!["en", "all_languages"],
+            "mteb/sickr-sts" => vec!["default"],
+            // Commonsense
+            "allenai/winogrande" => vec!["winogrande_xl", "winogrande_l", "winogrande_m"],
+            "allenai/swag" => vec!["regular", "full"],
+            "tau/commonsense_qa" => vec!["default"],
+            "conceptnet5/conceptnet5" => vec!["conceptnet5"],
             // Default fallback configs
-            _ => vec!["default", "main", "plain_text", "en", "all"],
+            _ => vec!["default", "main", "plain_text"],
         }
     }
     

@@ -1772,7 +1772,7 @@ impl RealBenchmarkEvaluator {
         let start = Instant::now();
         
         let config = DatasetLoaderConfig {
-            max_samples: 10000, // 10000 samples per dataset for comprehensive training
+            max_samples: 500, // 500 samples per dataset (5 API pages) — knowledge plateaus early
             streaming: true,
             shuffle: true,
             seed: 42,
@@ -1798,11 +1798,13 @@ impl RealBenchmarkEvaluator {
         let mut failed_count = 0;
         for (category, _name) in &categories {
             let datasets = get_datasets_by_category(*category);
-            for dataset in datasets.iter().take(10) { // Top 10 per category
+            for dataset in datasets.iter().take(5) { // Top 5 per category
                 match loader.load_dataset(&dataset.hf_path) {
                     Ok(count) => total_loaded += count,
                     Err(_) => failed_count += 1,
                 }
+                // Rate limit: 1s between datasets to avoid 429
+                std::thread::sleep(std::time::Duration::from_secs(1));
             }
         }
         
@@ -2021,7 +2023,12 @@ impl RealBenchmarkEvaluator {
         
         println!("   Extracting knowledge from {} HF examples...", all_examples.len());
         
-        // Process ALL examples for comprehensive knowledge extraction
+        // Early-stop tracking: if knowledge stops growing, stop processing
+        let mut last_embed_count = 0usize;
+        let mut last_attr_count = 0usize;
+        let mut last_causal_count = 0usize;
+        let mut stale_checks = 0usize;
+        
         for (idx, example) in all_examples.iter().enumerate() {
             // Extract from text content (all examples have text)
             let text = &example.text;
@@ -2082,11 +2089,32 @@ impl RealBenchmarkEvaluator {
                 }
             }
             
-            // Progress update every 1000 examples
-            if idx > 0 && idx % 1000 == 0 {
+            // Progress + early-stop check every 5000 examples
+            if idx > 0 && idx % 5000 == 0 {
+                let cur_embed = self.learned_embeddings.len();
+                let cur_attr = self.learned_entity_attrs.len();
+                let cur_causal = self.learned_causal.len();
+                
                 println!("   Processed {}/{} examples, {} embeddings, {} entity-attrs, {} causal patterns", 
-                    idx, all_examples.len(), self.learned_embeddings.len(), 
-                    self.learned_entity_attrs.len(), self.learned_causal.len());
+                    idx, all_examples.len(), cur_embed, cur_attr, cur_causal);
+                
+                // Check if knowledge is still growing
+                if cur_embed == last_embed_count && cur_attr == last_attr_count && cur_causal == last_causal_count {
+                    stale_checks += 1;
+                } else {
+                    stale_checks = 0;
+                }
+                
+                last_embed_count = cur_embed;
+                last_attr_count = cur_attr;
+                last_causal_count = cur_causal;
+                
+                // If no growth for 2 consecutive checks (10K examples), stop
+                if stale_checks >= 2 && idx > 10_000 {
+                    println!("   Early-stop: knowledge plateaued at {} examples ({} embeddings, {} attrs, {} causal)",
+                        idx, cur_embed, cur_attr, cur_causal);
+                    break;
+                }
             }
         }
         
