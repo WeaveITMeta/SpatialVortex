@@ -3133,11 +3133,13 @@ impl RealBenchmarkEvaluator {
                 &question.choices,
             );
             
-            // If pipeline has high confidence, use its answer
+            // Pipeline + TruthChecker is the primary inference path.
+            // The fallback (unified → multi-expert) is less accurate, so commit
+            // to pipeline answers even at moderate confidence.
             if confidence > 0.3 {
                 return (answer_idx, confidence);
             }
-            // Otherwise fall through to legacy system for backup
+            // Otherwise fall through to unified inference for backup
         }
         
         // =================================================================
@@ -4981,13 +4983,12 @@ impl RealBenchmarkEvaluator {
         
         // Split questions into few-shot exemplars and test questions
         let n_fewshot = self.num_fewshot.min(questions.len().saturating_sub(1));
-        let (exemplars, test_questions) = if n_fewshot > 0 {
+        let (_exemplars, test_questions) = if n_fewshot > 0 {
             let (ex, test) = questions.split_at(n_fewshot);
             (ex, test)
         } else {
             (&questions[..0], questions)
         };
-        let fewshot_prompt = Self::build_fewshot_prompt(exemplars);
         
         println!("\n   Running {} evaluation ({} REAL questions from {})...", 
                  name, test_questions.len(), self.data_dir);
@@ -4998,15 +4999,6 @@ impl RealBenchmarkEvaluator {
         }
         
         for (i, q) in test_questions.iter().enumerate() {
-            // Prepend few-shot context to the question for in-context learning
-            let q_with_fewshot = if !fewshot_prompt.is_empty() {
-                let mut augmented = q.clone();
-                augmented.question = format!("{}{}", fewshot_prompt, q.question);
-                augmented
-            } else {
-                q.clone()
-            };
-            let q_ref = &q_with_fewshot;
             // Debug: show full question before inference
             if self.debug_reasoning {
                 println!("\n   +===============================================================");
@@ -5024,8 +5016,7 @@ impl RealBenchmarkEvaluator {
             }
             
             // ACTUAL AI INFERENCE - not hardcoded
-            // Use q_ref (with few-shot context prepended) for inference
-            let (predicted, confidence) = self.ai_inference(q_ref);
+            let (predicted, confidence) = self.ai_inference(q);
             let is_correct = predicted == q.correct_answer;
             
             if is_correct {

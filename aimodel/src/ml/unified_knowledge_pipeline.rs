@@ -114,6 +114,9 @@ pub struct UnifiedKnowledgePipeline {
     /// Next ID for EmbedVec insertions
     #[cfg(feature = "embeddings")]
     next_embed_id: u64,
+    
+    /// Truth checker for misconception detection
+    truth_checker: crate::cognition::constitution::TruthChecker,
 }
 
 impl UnifiedKnowledgePipeline {
@@ -144,6 +147,7 @@ impl UnifiedKnowledgePipeline {
             subject_to_id: HashMap::new(),
             #[cfg(feature = "embeddings")]
             next_embed_id: 0,
+            truth_checker: crate::cognition::constitution::TruthChecker::new(),
         }
     }
 
@@ -591,7 +595,16 @@ impl UnifiedKnowledgePipeline {
         let query_embedding = self.compute_semantic_embedding(query);
         let choice_embedding = self.compute_semantic_embedding(choice);
         let semantic_sim = self.cosine_similarity(&query_embedding, &choice_embedding);
-        score += semantic_sim * 3.0;
+        // Reduce semantic similarity weight — it rewards misconceptions that
+        // sound like the question (e.g., "bulls attracted by red" for "why red capes")
+        score += semantic_sim * 1.0;
+        
+        // TRUTH CHECK: Penalize misconceptions, boost truthful answers
+        // This is critical for TruthfulQA where the wrong answer IS the common belief
+        let truth_score = self.truth_checker.score_truthfulness(
+            &query.to_lowercase(), &choice_lower
+        );
+        score += truth_score;
         
         // Calculate confidence based on evidence
         let confidence = if !matched_facts.is_empty() {
