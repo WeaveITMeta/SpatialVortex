@@ -115,64 +115,114 @@ impl SubwordTokenizer {
         self.embeddings.insert(id, embedding);
     }
     
-    /// Learn BPE merges from corpus
+    /// Learn BPE merges from corpus (proper re-scan after each merge)
     pub fn learn_bpe(&mut self, corpus: &[String], num_merges: usize) {
-        // Count pair frequencies
-        let mut pair_counts: HashMap<(String, String), usize> = HashMap::new();
+        // Represent each word as a sequence of symbols (initially characters)
+        // word_freqs: Vec<(symbol_sequence, frequency)>
+        let mut word_freqs: Vec<(Vec<String>, usize)> = Vec::new();
+        let mut word_counts: HashMap<String, usize> = HashMap::new();
         
+        // Count word frequencies from corpus
         for text in corpus {
-            let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
-            for window in chars.windows(2) {
-                let pair = (window[0].clone(), window[1].clone());
-                *pair_counts.entry(pair).or_insert(0) += 1;
+            for word in text.split_whitespace() {
+                *word_counts.entry(word.to_string()).or_insert(0) += 1;
             }
         }
         
-        // Greedily merge most frequent pairs
-        for _ in 0..num_merges {
-            if let Some(((a, b), _count)) = pair_counts.iter()
-                .max_by_key(|(_, &count)| count)
-                .map(|(pair, count)| (pair.clone(), *count))
-            {
-                let merged = format!("{}{}", a, b);
-                self.merges.push((a.clone(), b.clone()));
-                self.add_token(&merged, self.next_id);
-                self.next_id += 1;
-                
-                // Update pair counts (simplified - full BPE would re-scan)
-                pair_counts.remove(&(a, b));
-            } else {
-                break;
+        // Initialize: each word is a sequence of characters
+        for (word, count) in &word_counts {
+            let symbols: Vec<String> = word.chars().map(|c| c.to_string()).collect();
+            if !symbols.is_empty() {
+                word_freqs.push((symbols, *count));
             }
         }
+        
+        // Greedily merge most frequent adjacent pairs
+        for merge_i in 0..num_merges {
+            // Count all adjacent symbol pairs across all words
+            let mut pair_counts: HashMap<(String, String), usize> = HashMap::new();
+            for (symbols, freq) in &word_freqs {
+                for window in symbols.windows(2) {
+                    let pair = (window[0].clone(), window[1].clone());
+                    *pair_counts.entry(pair).or_insert(0) += freq;
+                }
+            }
+            
+            // Find the most frequent pair
+            let best_pair = pair_counts.into_iter()
+                .max_by_key(|(_, count)| *count);
+            
+            let (best_a, best_b, best_count) = match best_pair {
+                Some(((a, b), count)) if count >= 2 => (a, b, count),
+                _ => break, // No more pairs worth merging
+            };
+            
+            let merged = format!("{}{}", best_a, best_b);
+            self.merges.push((best_a.clone(), best_b.clone()));
+            self.add_token(&merged, self.next_id);
+            self.next_id += 1;
+            
+            // Apply this merge to all word representations
+            for (symbols, _) in word_freqs.iter_mut() {
+                let mut i = 0;
+                while i + 1 < symbols.len() {
+                    if symbols[i] == best_a && symbols[i + 1] == best_b {
+                        symbols[i] = merged.clone();
+                        symbols.remove(i + 1);
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+            
+            if merge_i < 5 || (merge_i + 1) % 200 == 0 {
+                println!("   [BPE] Merge {}/{}: '{}' + '{}' → '{}' (freq={})", 
+                    merge_i + 1, num_merges, best_a, best_b, merged, best_count);
+            }
+        }
+        
+        println!("   [BPE] Learned {} merges, vocab size: {}", self.merges.len(), self.vocab_size());
     }
     
-    /// Tokenize text into subword tokens
+    /// Tokenize text into subword tokens (BPE within word boundaries)
     pub fn tokenize(&self, text: &str) -> Vec<u32> {
         let mut tokens = vec![self.bos_id];
         
-        // Simple character-level with merge application
-        let mut chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
-        
-        // Apply merges greedily
-        for (a, b) in &self.merges {
-            let merged = format!("{}{}", a, b);
-            let mut i = 0;
-            while i + 1 < chars.len() {
-                if &chars[i] == a && &chars[i + 1] == b {
-                    chars[i] = merged.clone();
-                    chars.remove(i + 1);
+        // Split on whitespace, tokenize each word independently, add space tokens between
+        let words: Vec<&str> = text.split(' ').collect();
+        for (wi, word) in words.iter().enumerate() {
+            if word.is_empty() { continue; }
+            
+            // Start with character-level symbols for this word
+            let mut symbols: Vec<String> = word.chars().map(|c| c.to_string()).collect();
+            
+            // Apply learned BPE merges in order (greedy, within word boundary)
+            for (a, b) in &self.merges {
+                let merged = format!("{}{}", a, b);
+                let mut i = 0;
+                while i + 1 < symbols.len() {
+                    if symbols[i] == *a && symbols[i + 1] == *b {
+                        symbols[i] = merged.clone();
+                        symbols.remove(i + 1);
+                    } else {
+                        i += 1;
+                    }
                 }
-                i += 1;
             }
-        }
-        
-        // Convert to token IDs
-        for subword in chars {
-            let id = self.token_to_id.get(&subword)
-                .copied()
-                .unwrap_or(self.unk_id);
-            tokens.push(id);
+            
+            // Convert subword symbols to token IDs
+            for subword in &symbols {
+                let id = self.token_to_id.get(subword)
+                    .copied()
+                    .unwrap_or(self.unk_id);
+                tokens.push(id);
+            }
+            
+            // Add space token between words (not after last word)
+            if wi + 1 < words.len() {
+                let space_id = self.token_to_id.get(" ").copied().unwrap_or(self.unk_id);
+                tokens.push(space_id);
+            }
         }
         
         tokens.push(self.eos_id);

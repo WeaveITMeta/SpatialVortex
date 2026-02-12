@@ -1044,6 +1044,8 @@ pub struct RealBenchmarkEvaluator {
     ltr_pathway: crate::ml::pillar_integration::JEPAPathwayIntegration,
     /// Pillar Integration: Writing Gate vetting + Structured Prediction cascades + Trait Ledger
     gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline,
+    /// Inference audit collector — tracks per-expert contributions for ablation analysis
+    audit: crate::data::inference_audit::AuditCollector,
 }
 
 impl RealBenchmarkEvaluator {
@@ -1138,6 +1140,7 @@ impl RealBenchmarkEvaluator {
             dynamic_rsi: crate::ml::dynamic_rsi::DynamicRSI::new(),
             ltr_pathway: crate::ml::pillar_integration::JEPAPathwayIntegration::new(),
             gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline::new(),
+            audit: crate::data::inference_audit::AuditCollector::new(),
         };
         
         // STEP 1: Load all HuggingFace datasets to bootstrap knowledge
@@ -2233,6 +2236,23 @@ impl RealBenchmarkEvaluator {
         self.num_fewshot = n;
     }
     
+    /// Print the inference audit report (expert ablation analysis)
+    /// Call this after running benchmarks to see which experts help/hurt
+    pub fn print_audit_report(&self) {
+        let report = self.audit.ablation_report();
+        println!("{}", report);
+    }
+    
+    /// Get the audit collector for external analysis
+    pub fn audit(&self) -> &crate::data::inference_audit::AuditCollector {
+        &self.audit
+    }
+    
+    /// Print the last N inference traces for debugging
+    pub fn print_recent_traces(&self, n: usize) {
+        self.audit.print_recent(n);
+    }
+    
     // =========================================================================
     // EMBEDVEC STORAGE: HNSW-indexed embedding storage and retrieval
     // =========================================================================
@@ -3151,27 +3171,27 @@ impl RealBenchmarkEvaluator {
     /// - Exhaustive Pathway = Amplitude Amplification (searches all n! paths)
     /// - Energy Function = Quantum Interference (constructive for correct)
     /// 
-    /// Integrates ALL 12+ experts into unified generative architecture:
-    /// 1. Entity-Attribute - Critical for structured reasoning (bAbI)
-    /// 2. Semantic - Word embedding similarity
-    /// 3. RAG - Retrieval-augmented generation
-    /// 4. Multi-Head Attention - Context-aware representations
-    /// 5. NTP (Neural Theorem Prover) - Deductive reasoning
-    /// 6. Symbolic Math - Arithmetic evaluation
-    /// 7. Causal Reasoning - Cause-effect relationships
-    /// 8. One-Shot Learning - Learn during inference
-    /// 9. CALM Retrieval - Unified knowledge base search
-    /// 10. Commonsense - World knowledge reasoning
-    /// 11. Chain-of-Thought - Reasoning decomposition
-    /// 12. Grounded Context - Extract relevant spans
-    /// 13. 369 Sacred Attention - Implication extraction
-    /// 14. Exhaustive Pathway Search - Optimal reasoning paths
-    /// 15. MoE Routing - Expert selection
-    /// 16. Vortex Cycle Refinement - Iterative improvement
-    /// 17. JEPA Target Prediction - Quantum oracle
-    /// 18. Energy-Based Selection - Quantum interference
+    /// Streamlined 10-expert pipeline (was 21):
+    /// 1. Entity-Attribute - Structured reasoning (bAbI)
+    /// 2. Semantic Embedding - Cosine similarity
+    /// 3. RAG Retrieval - Context-aware knowledge
+    /// 4. Multi-Head Attention - Q/K/V projections
+    /// 5. Symbolic Math - Arithmetic reasoning (GSM8K)
+    /// 6. Knowledge Lookup - Merged one-shot + grounded context
+    /// 7. Transitive Flux - Spatial/size reasoning (bAbI 17/18)
+    /// 8. Web Knowledge - Merged web patterns + CALM web
+    /// 9. Comprehensive Reasoning - Multi-hop, temporal, span
+    /// 10. Truth Checker - Constitutional misconception detection
+    /// + LTR Pathway Integration for re-ranking
+    /// + Vortex Cycle Refinement + Quantum JEPA search
     fn generative_inference(&mut self, question: &RealBenchmarkQuestion) -> (usize, f32) {
-        use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig};
+        use crate::data::inference_audit::InferenceTrace;
+        
+        let trace_start = std::time::Instant::now();
+        let mut trace = InferenceTrace::new(
+            &question.id, &question.source, &question.question,
+            question.choices.len(), question.correct_answer,
+        );
         
         // =================================================================
         // DYNAMIC RSI: Runtime self-improving inference routing
@@ -3208,6 +3228,10 @@ impl RealBenchmarkEvaluator {
                 tag, confidence, answer_idx, chosen, question.correct_answer, correct, question.source, q_short);
             
             if confidence > strategy.pipeline_threshold {
+                trace.record_decision("pipeline", "committed", confidence);
+                trace.finalize(answer_idx, confidence, "pipeline", &[], &[]);
+                trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
+                self.audit.record(trace);
                 return (answer_idx, confidence);
             }
             println!("   [PIPELINE] conf {:.2} <= {:.1}, falling through", confidence, strategy.pipeline_threshold);
@@ -3285,12 +3309,20 @@ impl RealBenchmarkEvaluator {
             // The caller (ai_inference) already picks the best path, so we just
             // need to decide whether unified is confident enough to skip multi-expert.
             if unified_conf >= strategy.unified_threshold {
+                trace.record_decision("unified", "committed", unified_conf);
+                trace.finalize(unified_idx, unified_conf, "unified", &[], &[]);
+                trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
+                self.audit.record(trace);
                 return (unified_idx, unified_conf);
             }
             // Fall through to multi-expert path for deliberation on uncertain answers
             // Unless strategy says no multi-expert (e.g. bAbI) — return unified answer as-is
             if !strategy.use_multi_expert {
                 println!("   [RSI] No multi-expert for strategy={}, returning unified answer", strategy.strategy_name);
+                trace.record_decision("unified", "no-multi-expert-fallback", unified_conf);
+                trace.finalize(unified_idx, unified_conf, "unified-fallback", &[], &[]);
+                trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
+                self.audit.record(trace);
                 return (unified_idx, unified_conf);
             }
         }
@@ -3311,11 +3343,6 @@ impl RealBenchmarkEvaluator {
         } else {
             (String::new(), question_lower.clone())
         };
-        
-        // =================================================================
-        // CHAIN-OF-THOUGHT: Decompose question into reasoning steps
-        // =================================================================
-        let reasoning_chain = self.decompose_question(&question_lower);
         
         // =================================================================
         // GROUNDED CONTEXT: Extract relevant spans before scoring
@@ -3349,6 +3376,10 @@ impl RealBenchmarkEvaluator {
                 for (idx, choice) in question.choices.iter().enumerate() {
                     let choice_lower = choice.to_lowercase();
                     if choice_lower == path_answer {
+                        trace.record_decision("transitive_path", "direct_match", confidence);
+                        trace.finalize(idx, confidence, "transitive_path", &[], &[]);
+                        trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
+                        self.audit.record(trace);
                         return (idx, confidence);
                     }
                 }
@@ -3489,102 +3520,27 @@ impl RealBenchmarkEvaluator {
             score += attn_weight * mha_weight;
             breakdown.push(("mha", attn_weight * mha_weight));
             
-            // ----- EXPERT 5: NEURAL THEOREM PROVER (Deductive) -----
-            let ntp_score = self.score_with_theorem_prover(&question_lower, &choice_lower);
-            score += ntp_score;
-            breakdown.push(("ntp", ntp_score));
+            // =============================================================
+            // STREAMLINED EXPERT PIPELINE (8 experts, was 21)
+            // Removed: ntp(stub), causal(keyword), calm_retrieval(prefix),
+            //   cot(keyword), 369_impl(dead), pathway(O(n!) for 3.0),
+            //   attn_word(redundant), passage_attn(redundant)
+            // =============================================================
             
-            // ----- EXPERT 6: SYMBOLIC MATH -----
+            // ----- EXPERT 5: SYMBOLIC MATH -----
             let math_score = self.score_symbolic_arithmetic(&question_lower, &choice_lower);
             score += math_score;
             breakdown.push(("math", math_score));
             
-            // ----- EXPERT 7: CAUSAL REASONING -----
-            let causal_score = self.score_causal_reasoning(&question_lower, &choice_lower);
-            score += causal_score;
-            breakdown.push(("causal", causal_score));
-            
-            // ----- EXPERT 8: ONE-SHOT LEARNED KNOWLEDGE -----
+            // ----- EXPERT 6: KNOWLEDGE LOOKUP (merged one_shot + grounded + commonsense) -----
             let learned_score = self.score_with_learned_knowledge(&question_lower, &choice_lower);
-            score += learned_score;
-            breakdown.push(("one_shot", learned_score));
-            
-            // ----- EXPERT 9: CALM SEMANTIC RETRIEVAL -----
-            let calm_score = self.score_with_calm_retrieval(&question_embedding, &choice_words);
-            score += calm_score;
-            breakdown.push(("calm", calm_score));
-            
-            // ----- EXPERT 10: COMMONSENSE REASONING -----
-            let is_commonsense_question = !question_lower.contains("where is ") 
-                && !question_lower.contains("where was ")
-                && !question_lower.contains("what is") 
-                && question_lower.len() > 30;
-            if is_commonsense_question {
-                let cs_score = self.score_with_commonsense(&question_lower, &choice_lower);
-                score += cs_score;
-                breakdown.push(("commonsense", cs_score));
-            }
-            
-            // ----- EXPERT 11: CHAIN-OF-THOUGHT -----
-            let cot_score = self.score_with_reasoning_chain(&reasoning_chain, &choice_lower);
-            score += cot_score;
-            breakdown.push(("cot", cot_score));
-            
-            // ----- EXPERT 12: GROUNDED CONTEXT -----
             let grounded_score = self.score_with_grounded_context(&grounded_context, &choice_lower);
-            score += grounded_score;
-            breakdown.push(("grounded", grounded_score));
+            let knowledge_score = learned_score + grounded_score;
+            score += knowledge_score;
+            breakdown.push(("knowledge", knowledge_score));
             
-            // ----- EXPERT 13: 369 SACRED IMPLICATIONS -----
-            let impl_score = self.rag_engine.score_with_implications(
-                question_text,
-                choice,
-                &self.current_implications,
-            );
-            score += impl_score;
-            breakdown.push(("369_impl", impl_score));
-            
-            // ----- EXPERT 14: EXHAUSTIVE PATHWAY SEARCH -----
-            if choice_words.len() >= 3 {
-                let mut pathway_config = PathwayConfig::default();
-                pathway_config.n_nodes = choice_words.len().min(7);
-                pathway_config.dimension = 256;
-                pathway_config.parallel = true;
-                
-                let mut optimizer = ExhaustivePathwayOptimizer::new(pathway_config);
-                let word_embeds: Vec<Vec<f32>> = choice_words.iter()
-                    .map(|w| self.get_text_embedding(&[*w]))
-                    .collect();
-                optimizer.set_embeddings(&word_embeds);
-                optimizer.set_target(&question_embedding);
-                
-                let top_paths = optimizer.fast_search(5);
-                if let Some(best_path) = top_paths.first() {
-                    score += (best_path.score as f32).abs().min(3.0);
-                }
-            }
-            
-            // ----- EXPERT 15: ATTENTION-WEIGHTED WORD MATCHING -----
-            let mut attn_word_score = 0.0;
-            for choice_word in &choice_words {
-                for q_word in &question_words {
-                    attn_word_score += self.word_similarity(choice_word, q_word);
-                }
-            }
-            if !choice_words.is_empty() && !question_words.is_empty() {
-                attn_word_score /= (choice_words.len() * question_words.len()) as f32;
-                attn_word_score *= 5.0;
-            }
-            score += attn_word_score;
-            
-            // ----- EXPERT 16: PASSAGE ATTENTION -----
-            let passage_score = self.score_passage_attention(&question_lower, &choice_lower);
-            score += passage_score;
-            
-            // ----- EXPERT 17: TRANSITIVE FLUX REASONING (Ladder Index) -----
-            // Uses Vortex Flux Matrix with infinite ladder index for transitive reasoning
-            // Handles spatial (left_of, right_of) and size (bigger_than, fits_inside) relations
-            // Only apply if this looks like a spatial/size question
+            // ----- EXPERT 7: TRANSITIVE FLUX REASONING -----
+            // Only fires for spatial/size questions (bAbI 17/18)
             let is_spatial_question = question_lower.contains("left of") 
                 || question_lower.contains("right of")
                 || question_lower.contains("above")
@@ -3592,27 +3548,20 @@ impl RealBenchmarkEvaluator {
                 || question_lower.contains("bigger than")
                 || question_lower.contains("smaller than")
                 || question_lower.contains("fits inside");
-            
             if is_spatial_question {
                 let flux_score = self.transitive_reasoner.score_answer_comprehensive(
-                    &question_lower,
-                    &question_lower,
-                    &choice_lower,
+                    &question_lower, &question_lower, &choice_lower,
                 );
                 score += flux_score;
+                breakdown.push(("transitive", flux_score));
             }
             
-            // ----- EXPERT 18: WEB-LEARNED KNOWLEDGE PATTERNS -----
-            // Use web-learned subjects and facts to score choices.
-            // score_with_consciousness_facts returns raw scores (0-100+),
-            // so apply a moderate weight to avoid drowning other signals.
+            // ----- EXPERT 8: WEB KNOWLEDGE (merged web_patterns + calm_web) -----
             let combined_key = format!("{}|||{}", &question_lower, &choice_lower);
+            let mut web_score = 0.0f32;
             if self.learned_embeddings.contains_key(&combined_key) {
-                score += 80.0; // Strong boost for exact Q&A match from web
+                web_score += 80.0;
             }
-            
-            // Semantic match with web-learned subjects and their attributes
-            // Pass context for better subject-to-question matching
             let fact_query = if !passage_context.is_empty() {
                 format!("{} {}", passage_context, actual_question)
             } else {
@@ -3620,33 +3569,21 @@ impl RealBenchmarkEvaluator {
             };
             let fact_score = self.score_with_consciousness_facts(&fact_query, &choice_lower);
             if fact_score > 0.0 {
-                score += fact_score; // Already scaled internally (10-25 per match)
+                web_score += fact_score;
             }
+            let calm_web_score = self.score_with_calm_web(&question_lower, &choice_lower);
+            web_score += calm_web_score;
+            score += web_score;
+            breakdown.push(("web_knowledge", web_score));
             
-            // Keyword overlap with vortex knowledge
-            let keyword_score = self.score_vortex_keyword_overlap(&question_lower, &choice_lower);
-            if keyword_score > 0.0 {
-                score += keyword_score * 10.0;
-            }
-            
-            // ----- EXPERT 19: COMPREHENSIVE REASONING -----
-            // Temporal state tracking, multi-hop reasoning, span extraction, symbolic math
+            // ----- EXPERT 9: COMPREHENSIVE REASONING -----
             let comprehensive_score = self.comprehensive_reasoner.score_answer(
-                question_text,
-                &choice_lower,
+                question_text, &choice_lower,
             );
             score += comprehensive_score;
             breakdown.push(("comprehensive", comprehensive_score));
             
-            // ----- EXPERT 20: CALM-WEB SEMANTIC LEARNING -----
-            let calm_web_score = self.score_with_calm_web(&question_lower, &choice_lower);
-            score += calm_web_score;
-            breakdown.push(("calm_web", calm_web_score));
-            
-            // ----- EXPERT 21: TRUTH CHECKER (Constitutional) -----
-            // Penalizes choices matching known misconceptions.
-            // Boosts choices with epistemic humility ("I don't know").
-            // Detects question-as-answer patterns (TruthfulQA format).
+            // ----- EXPERT 10: TRUTH CHECKER (Constitutional) -----
             let truth_score = self.truth_checker.score_truthfulness(
                 &question_lower, &choice_lower
             );
@@ -3852,6 +3789,19 @@ impl RealBenchmarkEvaluator {
             println!("      | Ledger: {} traits, {} revisions", ledger_stats.trait_count, ledger_stats.total_revisions);
             println!("      +------------------------------------------------------------");
         }
+        
+        // =================================================================
+        // AUDIT: Record expert contributions from breakdown for ablation
+        // =================================================================
+        for (ci, bd) in debug_breakdowns.iter().enumerate() {
+            for (name, val) in bd {
+                trace.record_expert(ci, name, *val);
+            }
+        }
+        trace.record_decision("final", decision_path, final_conf);
+        trace.finalize(final_idx, final_conf, decision_path, &refined_logits, &probs);
+        trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
+        self.audit.record(trace);
         
         (final_idx, final_conf.max(0.15).min(1.0))
     }
@@ -5447,6 +5397,9 @@ impl RealBenchmarkEvaluator {
             
             println!("   OVERALL: {:.1}% ({}/{})", overall, total_correct, total_questions);
             println!("===============================================================\n");
+            
+            // Print expert ablation audit report
+            self.print_audit_report();
         } else {
             println!("\n   [ERROR] No benchmark data found!");
             println!("   Run: .\\benchmarks\\scripts\\download_datasets.ps1");

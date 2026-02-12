@@ -16,7 +16,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use aimodel::data::{
+use vortex::data::{
     RealBenchmarkEvaluator, RealBenchmarkResult,
     load_commonsenseqa, load_squad, load_babi,
     load_mmlu, load_gsm8k, load_arc, load_hellaswag, load_truthfulqa, load_humaneval,
@@ -25,7 +25,7 @@ use aimodel::data::{
 };
 
 #[allow(unused_imports)]
-use aimodel::data::RealBenchmarkQuestion;
+use vortex::data::RealBenchmarkQuestion;
 
 // =============================================================================
 // CLI Arguments
@@ -82,6 +82,11 @@ struct Args {
     /// Enable deep reasoning debug: shows full expert score breakdown for EVERY question
     #[arg(long, default_value_t = false)]
     debug_reasoning: bool,
+
+    /// Print expert ablation audit report after evaluation
+    /// Shows which experts help/hurt accuracy and recommends removals
+    #[arg(long, default_value_t = false)]
+    audit: bool,
 }
 
 // =============================================================================
@@ -306,6 +311,11 @@ fn main() -> Result<()> {
 
     // Print comparison to SOTA
     print_sota_comparison(&output);
+
+    // Print expert ablation audit report if requested
+    if args.audit {
+        evaluator.print_audit_report();
+    }
 
     Ok(())
 }

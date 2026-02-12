@@ -12,6 +12,7 @@ pub mod models;
 pub mod hf_datasets;
 pub mod benchmark_eval;
 pub mod real_benchmarks;
+pub mod inference_audit;
 
 pub use attributes::{Attributes, AttributeValue, AttributeAccessor, Tags};
 #[allow(deprecated)]
