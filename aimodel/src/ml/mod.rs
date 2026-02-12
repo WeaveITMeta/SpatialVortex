@@ -57,6 +57,13 @@ pub use task_specific_moe::{
 pub use test_time_compute::{TTCWrapper, TTCConfig};
 pub mod unified_knowledge_pipeline;
 pub mod sacred_attention;
+pub mod dynamic_rsi;
+pub mod rl_actor_critic;
+pub mod writing_gate;
+pub mod structured_prediction;
+pub mod secure_aggregation;
+pub mod learning_to_rank;
+pub mod pillar_integration;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm_alignment::{
@@ -201,4 +208,37 @@ pub use sacred_attention::{
 pub use unified_knowledge_pipeline::{
     UnifiedKnowledgePipeline, PipelineConfig, PipelineStats,
     ExtractedFact as PipelineFact, RetrievalResult, SemanticEmbedding,
+};
+pub use rl_actor_critic::{
+    ActorCriticPolicy, ActorCriticStats, QTable, QTableStats,
+    DiscreteAction, EvidenceEvent, EvidenceType,
+    StateTransition, TransitionReward, RewardWeights,
+    PathCurator, CurationMode, HumanFeedbackEncoder,
+    RLMetrics, RLMetricsSummary,
+};
+pub use writing_gate::{
+    WritingGate, GatePolicy, TraitProposal, ProposalVerdict,
+    VerdictDecision, GateMetrics,
+};
+pub use structured_prediction::{
+    TraitDependencyGraph, DependencyEdge, PropagationRule,
+    UnaryPotential, PairwisePotential,
+    BeliefPropagation, BPResult,
+    CascadeEngine, CascadeResult, CascadeStats,
+    ConsistencyChecker, ConsistencyResult, ConsistencyViolation,
+};
+pub use secure_aggregation::{
+    DifferentialPrivacy, NoiseMechanism, SecretSharing, SecretShare,
+    SecureAggregator, AggregationResult, AggregationStats,
+    PrivacyBudget, FederatedProtocol, FederatedRoundResult, FederatedStats,
+};
+pub use learning_to_rank::{
+    RankableItem, ItemType, LambdaRank, LambdaRankStats,
+    SlidingIndex, IndexMode, IndexStats,
+    RankTrainer, RankTrainerStats, RankMetrics,
+};
+pub use pillar_integration::{
+    JEPAPathwayIntegration, InferenceMode, ScoredPath,
+    GatedProposalPipeline, ProposalOrigin, GatedProposalResult,
+    InferenceEvidence, ProvenanceTrace, ProvenanceStep,
 };

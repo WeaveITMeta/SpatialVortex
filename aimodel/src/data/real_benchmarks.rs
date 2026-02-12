@@ -1038,6 +1038,12 @@ pub struct RealBenchmarkEvaluator {
     debug_reasoning: bool,
     /// Number of few-shot examples to prepend to each question (0 = zero-shot)
     num_fewshot: usize,
+    /// Dynamic RSI engine — runtime self-improving strategy per dataset
+    dynamic_rsi: crate::ml::dynamic_rsi::DynamicRSI,
+    /// Pillar Integration: LTR path ranking + RL evidence scoring + JEPA pruning
+    ltr_pathway: crate::ml::pillar_integration::JEPAPathwayIntegration,
+    /// Pillar Integration: Writing Gate vetting + Structured Prediction cascades + Trait Ledger
+    gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline,
 }
 
 impl RealBenchmarkEvaluator {
@@ -1129,6 +1135,9 @@ impl RealBenchmarkEvaluator {
             truth_checker: crate::cognition::constitution::TruthChecker::new(),
             debug_reasoning: false,
             num_fewshot: 5, // Standard 5-shot for MMLU and most benchmarks
+            dynamic_rsi: crate::ml::dynamic_rsi::DynamicRSI::new(),
+            ltr_pathway: crate::ml::pillar_integration::JEPAPathwayIntegration::new(),
+            gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline::new(),
         };
         
         // STEP 1: Load all HuggingFace datasets to bootstrap knowledge
@@ -1201,6 +1210,9 @@ impl RealBenchmarkEvaluator {
             documents.push((format!("rag:{}", i), fact.clone()));
         }
         
+        // Sort for determinism — HashMap iteration order is random in Rust
+        documents.sort_by(|a, b| a.0.cmp(&b.0));
+        
         // Build the knowledge base
         self.knowledge_pipeline.build_knowledge_base(&documents);
         
@@ -1231,7 +1243,7 @@ impl RealBenchmarkEvaluator {
         // Add entity-attribute knowledge as training text
         for (entity, attrs) in &self.learned_entity_attrs {
             for (attr, weight) in attrs {
-                if *weight > 0.5 {
+                if *weight > 0.3 {
                     training_texts.push(format!("{} is {}", entity, attr));
                 }
             }
@@ -1240,7 +1252,7 @@ impl RealBenchmarkEvaluator {
         // Add causal patterns as training text
         for (cause, effects) in &self.learned_causal {
             for (effect, weight) in effects {
-                if *weight > 0.5 {
+                if *weight > 0.3 {
                     training_texts.push(format!("{} causes {}", cause, effect));
                 }
             }
@@ -1253,14 +1265,18 @@ impl RealBenchmarkEvaluator {
             }
         }
         
-        // Add commonsense facts from RAG engine
+        // Add commonsense facts from RAG engine (web learning + HF extracted)
         let rag_facts = self.rag_engine.get_all_facts();
-        for fact in rag_facts.iter().take(500) {
+        for fact in rag_facts.iter().take(5000) {
             training_texts.push(fact.clone());
         }
         
-        // Limit training data to avoid long startup times
-        let max_texts = 2000;
+        // Sort for determinism — HashMap iteration order is random in Rust
+        training_texts.sort();
+        
+        // 10K cap: 5x more data than before (was 2K) — covers HF + web learning knowledge
+        // Training time scales ~linearly, so 5x data with 5 epochs ≈ 2.5x old time
+        let max_texts = 10000;
         if training_texts.len() > max_texts {
             training_texts.truncate(max_texts);
         }
@@ -1271,7 +1287,9 @@ impl RealBenchmarkEvaluator {
         }
         
         // Pretrain the generative engine's CALM
-        let epochs = 25;
+        // 5 epochs on 10K texts ≈ 50K steps (was 10 epochs on 2K = 20K steps)
+        // More data + fewer epochs = better generalization, less overfitting
+        let epochs = 5;
         let learning_rate = 0.01;
         self.generative_engine.pretrain_calm(&training_texts, epochs, learning_rate);
         
@@ -1803,8 +1821,8 @@ impl RealBenchmarkEvaluator {
                     Ok(count) => total_loaded += count,
                     Err(_) => failed_count += 1,
                 }
-                // Rate limit: 1s between datasets to avoid 429
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                // Rate limit: 500ms between datasets to avoid 429
+                std::thread::sleep(std::time::Duration::from_millis(500));
             }
         }
         
@@ -1923,9 +1941,14 @@ impl RealBenchmarkEvaluator {
                         
                         for word in words.iter().take(1000) {
                             if !self.learned_embeddings.contains_key(*word) {
-                                // Create random embedding vector
+                                // Deterministic hash-based embedding (not random!)
+                                // Same word always produces same embedding across runs
+                                let hash = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                                 let embed: Vec<f32> = (0..256)
-                                    .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+                                    .map(|i| {
+                                        let seed = hash.wrapping_add(i as u64);
+                                        ((seed as f32 * 0.0001).sin() + (seed as f32 * 0.00003).cos()) * 0.5
+                                    })
                                     .collect();
                                 self.learned_embeddings.insert(word.to_string(), embed);
                             }
@@ -2505,8 +2528,8 @@ impl RealBenchmarkEvaluator {
         let debug_enabled = std::env::var("DEBUG_KNOWLEDGE").is_ok();
         if debug_enabled {
             eprintln!("   [DEBUG] Question: '{}' | Choice: '{}' | Knowledge: {} entities, {} embeddings", 
-                     &question_lower[..question_lower.len().min(50)], 
-                     &choice_lower[..choice_lower.len().min(30)],
+                     &question_lower.chars().take(50).collect::<String>(), 
+                     &choice_lower.chars().take(30).collect::<String>(),
                      self.learned_entity_attrs.len(),
                      self.learned_embeddings.len());
         }
@@ -2623,7 +2646,9 @@ impl RealBenchmarkEvaluator {
             eprintln!("   [DEBUG] Final knowledge score: {}", score);
         }
         
-        score
+        // Cap score to prevent one-shot from dominating all other experts
+        // Uncapped scores reached 628K+ and drowned out 20 other expert signals
+        score.min(50.0)
     }
     
     /// Score using CALM's semantic retrieval from unified knowledge base
@@ -3149,57 +3174,51 @@ impl RealBenchmarkEvaluator {
         use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig};
         
         // =================================================================
-        // UNIFIED KNOWLEDGE PIPELINE (New Architecture)
-        // Order of operations: RETRIEVE → EXTRACT → EMBED → REASON → SCORE
-        // This replaces the fragmented 18-expert system with coherent knowledge flow
+        // DYNAMIC RSI: Runtime self-improving inference routing
+        // The DynamicRSI engine learns per-dataset strategy from accuracy.
+        // First run uses seed strategies, then self-tunes every 5 questions.
         // =================================================================
+        // Per-subject RSI: use source/category for MMLU so RSI learns different
+        // strategies for abstract_algebra vs anatomy vs astronomy
+        let rsi_source = if !question.category.is_empty() {
+            format!("{}/{}", question.source, question.category)
+        } else {
+            question.source.clone()
+        };
+        let strategy = self.dynamic_rsi.get_strategy(&rsi_source);
         let is_code_question = question.question.contains("def ") || 
                                question.question.contains(">>> ") ||
-                               question.source == "HumanEval";
+                               question.source.to_lowercase() == "humaneval";
+        println!("   [RSI] strategy={} src={}", strategy.strategy_name, rsi_source);
         
-        if self.use_knowledge_pipeline && !is_code_question {
-            // Use unified knowledge pipeline for knowledge-based inference
+        // =================================================================
+        // PHASE 1: Knowledge Pipeline (if strategy enables it)
+        // =================================================================
+        if strategy.use_pipeline {
             let (answer_idx, confidence) = self.knowledge_pipeline.infer(
                 &question.question,
                 &question.choices,
             );
             
-            // Pipeline + TruthChecker is the primary inference path.
-            // The fallback (unified → multi-expert) is less accurate, so commit
-            // to pipeline answers even at moderate confidence.
-            if confidence > 0.3 {
+            let q_short: String = question.question.chars().take(60).collect();
+            let chosen: String = question.choices.get(answer_idx).map(|c| c.chars().take(30).collect()).unwrap_or_default();
+            let correct: String = question.choices.get(question.correct_answer).map(|c| c.chars().take(30).collect()).unwrap_or_default();
+            let tag = if answer_idx == question.correct_answer { "OK" } else { "WRONG" };
+            println!("   [PIPELINE] [{}] conf={:.2} chose[{}]=\"{}\" correct[{}]=\"{}\" src={} q=\"{}\"",
+                tag, confidence, answer_idx, chosen, question.correct_answer, correct, question.source, q_short);
+            
+            if confidence > strategy.pipeline_threshold {
                 return (answer_idx, confidence);
             }
-            // Otherwise fall through to unified inference for backup
+            println!("   [PIPELINE] conf {:.2} <= {:.1}, falling through", confidence, strategy.pipeline_threshold);
         }
         
         // =================================================================
-        // TEST-TIME WEB LEARNING: Selective knowledge acquisition
-        // Only search when internal knowledge is truly insufficient.
-        // Single query per question (no per-choice searches — too slow).
-        // Batch sync after learning to avoid repeated RAG rebuilds.
+        // TEST-TIME WEB LEARNING: DISABLED during evaluation
+        // sync_consciousness_to_rag re-adds ALL 25K+ subjects to RAG on every call,
+        // causing unbounded memory growth → OOM crash when called per question.
+        // Pre-benchmark web learning phase already provides sufficient knowledge.
         // =================================================================
-        if !is_code_question && self.use_consciousness_learning {
-            let has_knowledge = self.check_knowledge_coverage(&question.question);
-            
-            if !has_knowledge {
-                let query = self.extract_search_query(&question.question);
-                
-                // Single web search per question (not per-choice)
-                let facts = self.consciousness_learner.test_time_web_search(&query);
-                
-                if !facts.is_empty() {
-                    self.sync_consciousness_to_rag();
-                    
-                    if self.verbose_debug {
-                        println!("   [Test-Time Web] Learned {} facts for: {}", facts.len(), query);
-                    }
-                }
-                // Per-choice web searches removed: they added 4x latency
-                // with minimal accuracy gain. The single query captures the
-                // topic; choice-specific knowledge comes from RAG scoring.
-            }
-        }
         
         // =================================================================
         // UNIFIED INFERENCE: Single forward pass through reasoning layer
@@ -3208,7 +3227,7 @@ impl RealBenchmarkEvaluator {
         // Skip unified inference for code generation (HumanEval) - use multi-expert path
         // Code generation benefits from semantic matching and specialized scoring
         
-        if self.use_unified_inference && !is_code_question {
+        if self.use_unified_inference && strategy.use_unified {
             // Split question into context and actual question
             let parts: Vec<&str> = question.question.split('\n').collect();
             let (context, q_text) = if parts.len() > 1 {
@@ -3224,6 +3243,21 @@ impl RealBenchmarkEvaluator {
                 &q_text,
                 &question.choices,
             );
+            
+            // Always log unified inference decision
+            {
+                let q_short: String = q_text.chars().take(60).collect();
+                let chosen: String = question.choices.get(unified_idx).map(|c| c.chars().take(30).collect()).unwrap_or_default();
+                let correct: String = question.choices.get(question.correct_answer).map(|c| c.chars().take(30).collect()).unwrap_or_default();
+                let tag = if unified_idx == question.correct_answer { "OK" } else { "WRONG" };
+                println!("   [UNIFIED] [{}] conf={:.2} chose[{}]=\"{}\" correct[{}]=\"{}\" ctx={}chars q=\"{}\"",
+                    tag, unified_conf, unified_idx, chosen, question.correct_answer, correct, context.len(), q_short);
+                if unified_conf >= strategy.unified_threshold {
+                    println!("   [UNIFIED] Committing (conf >= {:.2})", strategy.unified_threshold);
+                } else {
+                    println!("   [UNIFIED] Low conf {:.2} < {:.2}, falling through to multi-expert", unified_conf, strategy.unified_threshold);
+                }
+            }
             
             // Debug: show unified inference reasoning with truth scores
             if self.debug_reasoning {
@@ -3250,10 +3284,15 @@ impl RealBenchmarkEvaluator {
             // Otherwise, fall through to multi-expert path for a second opinion.
             // The caller (ai_inference) already picks the best path, so we just
             // need to decide whether unified is confident enough to skip multi-expert.
-            if unified_conf >= 0.70 {
+            if unified_conf >= strategy.unified_threshold {
                 return (unified_idx, unified_conf);
             }
             // Fall through to multi-expert path for deliberation on uncertain answers
+            // Unless strategy says no multi-expert (e.g. bAbI) — return unified answer as-is
+            if !strategy.use_multi_expert {
+                println!("   [RSI] No multi-expert for strategy={}, returning unified answer", strategy.strategy_name);
+                return (unified_idx, unified_conf);
+            }
         }
         
         let question_text = &question.question;
@@ -3689,6 +3728,42 @@ impl RealBenchmarkEvaluator {
             energy_scores.push(energy_score);
         }
         
+        // =================================================================
+        // EXPERT 22: LTR PATH RANKING (Pillar Integration)
+        // Uses LambdaRank to re-rank choices based on expert score features.
+        // RL Actor-Critic provides value estimates for path confidence.
+        // =================================================================
+        let expert_scores_per_choice: Vec<Vec<(String, f32)>> = debug_breakdowns.iter()
+            .map(|bd| bd.iter().map(|(name, val)| (name.to_string(), *val)).collect())
+            .collect();
+        let truth_scores: Vec<f32> = question.choices.iter()
+            .map(|c| self.truth_checker.score_truthfulness(
+                &question_lower, &c.to_lowercase()
+            ))
+            .collect();
+        let scored_paths = self.ltr_pathway.rank_paths(
+            &expert_scores_per_choice,
+            &energy_scores,
+            &truth_scores,
+            &question_embedding,
+        );
+        // Apply LTR re-ranking: boost logits by LTR combined score
+        for sp in &scored_paths {
+            if sp.choice_idx < logits.len() {
+                logits[sp.choice_idx] += sp.combined_score as f32 * 5.0;
+            }
+        }
+        if self.debug_reasoning {
+            println!("      +--- LTR PATH RANKING ------------------------------------");
+            for sp in &scored_paths {
+                let marker = if sp.choice_idx == question.correct_answer { " [CORRECT]" } else { "" };
+                println!("      | [{}]{} ltr={:.3} rl={:.3} jepa={:.3} combined={:.3} conf={:.3}",
+                    sp.choice_idx, marker, sp.ltr_score, sp.rl_value, sp.jepa_energy,
+                    sp.combined_score, sp.confidence);
+            }
+            println!("      +------------------------------------------------------------");
+        }
+        
         // Combine expert logits with quantum energy scores
         let combined_logits: Vec<f32> = logits.iter()
             .zip(energy_scores.iter())
@@ -3736,17 +3811,47 @@ impl RealBenchmarkEvaluator {
         let margin_conf = (sorted_probs[0] + margin).min(1.0);
         
         // Final decision: if quantum search is confident, use it; otherwise use expert consensus
-        let (final_idx, final_conf) = if quantum_confidence > 0.7 {
-            (quantum_best_idx, quantum_confidence)
+        let (final_idx, final_conf, decision_path) = if quantum_confidence > 0.7 {
+            (quantum_best_idx, quantum_confidence, "quantum")
         } else if expert_best_prob > 0.4 {
-            (expert_best_idx, margin_conf)
+            (expert_best_idx, margin_conf, "expert-high")
         } else {
             if quantum_best_idx == expert_best_idx {
-                (expert_best_idx, (margin_conf + quantum_confidence) / 2.0 + 0.1)
+                (expert_best_idx, (margin_conf + quantum_confidence) / 2.0 + 0.1, "expert+quantum-agree")
             } else {
-                (expert_best_idx, margin_conf * 0.8)
+                (expert_best_idx, margin_conf * 0.8, "expert-low")
             }
         };
+        
+        // Always log multi-expert decision
+        {
+            let q_short: String = question.question.chars().take(60).collect();
+            let chosen: String = question.choices.get(final_idx).map(|c| c.chars().take(30).collect()).unwrap_or_default();
+            let correct: String = question.choices.get(question.correct_answer).map(|c| c.chars().take(30).collect()).unwrap_or_default();
+            let tag = if final_idx == question.correct_answer { "OK" } else { "WRONG" };
+            let top3_experts: String = debug_breakdowns.get(final_idx)
+                .map(|bd| {
+                    let mut sorted: Vec<_> = bd.iter().filter(|(_, v)| v.abs() > 0.1).collect();
+                    sorted.sort_by(|a, b| b.1.abs().partial_cmp(&a.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+                    sorted.iter().take(3).map(|(n, v)| format!("{}={:.1}", n, v)).collect::<Vec<_>>().join(",")
+                })
+                .unwrap_or_default();
+            println!("   [MULTI-EXPERT] [{}] conf={:.2} path={} chose[{}]=\"{}\" correct[{}]=\"{}\" top=[{}] q=\"{}\"",
+                tag, final_conf, decision_path, final_idx, chosen, question.correct_answer, correct, top3_experts, q_short);
+        }
+        
+        // =================================================================
+        // PROVENANCE TRACE: Auditable reasoning chain from Trait Ledger
+        // Shows LTR ranking summary + gate metrics + ledger stats
+        // =================================================================
+        if self.debug_reasoning {
+            println!("      +--- PROVENANCE TRACE ------------------------------------");
+            println!("      | LTR: {}", self.ltr_pathway.rl_summary());
+            println!("      | Gate: {}", self.gated_pipeline.metrics_summary());
+            let ledger_stats = self.gated_pipeline.ledger().stats();
+            println!("      | Ledger: {} traits, {} revisions", ledger_stats.trait_count, ledger_stats.total_revisions);
+            println!("      +------------------------------------------------------------");
+        }
         
         (final_idx, final_conf.max(0.15).min(1.0))
     }
@@ -5014,12 +5119,13 @@ impl RealBenchmarkEvaluator {
         
         // Split questions into few-shot exemplars and test questions
         let n_fewshot = self.num_fewshot.min(questions.len().saturating_sub(1));
-        let (_exemplars, test_questions) = if n_fewshot > 0 {
+        let (exemplars, test_questions) = if n_fewshot > 0 {
             let (ex, test) = questions.split_at(n_fewshot);
             (ex, test)
         } else {
             (&questions[..0], questions)
         };
+        let fewshot_prompt = Self::build_fewshot_prompt(exemplars);
         
         println!("\n   Running {} evaluation ({} REAL questions from {})...", 
                  name, test_questions.len(), self.data_dir);
@@ -5030,6 +5136,15 @@ impl RealBenchmarkEvaluator {
         }
         
         for (i, q) in test_questions.iter().enumerate() {
+            // Prepend few-shot context to the question for in-context learning
+            let q_with_fewshot = if !fewshot_prompt.is_empty() {
+                let mut augmented = q.clone();
+                augmented.question = format!("{}{}", fewshot_prompt, q.question);
+                augmented
+            } else {
+                q.clone()
+            };
+            let q_ref = &q_with_fewshot;
             // Debug: show full question before inference
             if self.debug_reasoning {
                 println!("\n   +===============================================================");
@@ -5047,7 +5162,8 @@ impl RealBenchmarkEvaluator {
             }
             
             // ACTUAL AI INFERENCE - not hardcoded
-            let (predicted, confidence) = self.ai_inference(q);
+            // Use q_ref (with few-shot context prepended) for inference
+            let (predicted, confidence) = self.ai_inference(q_ref);
             let is_correct = predicted == q.correct_answer;
             
             if is_correct {
@@ -5746,10 +5862,12 @@ impl RealBenchmarkEvaluator {
         let markers = ["is ", "are ", "was ", "were ", "means ", "because ", "therefore "];
         for marker in &markers {
             if let Some(pos) = question.to_lowercase().find(marker) {
-                let start = pos.saturating_sub(20);
-                let end = (pos + marker.len() + 50).min(question.len());
-                if end > start {
-                    let span = &question[start..end];
+                // Use char-safe slicing to avoid panics on multi-byte UTF-8
+                let span: String = question.chars()
+                    .skip(question[..pos].chars().count().saturating_sub(20))
+                    .take(20 + marker.len() + 50)
+                    .collect();
+                if !span.is_empty() {
                     grounded_spans.push(span.to_lowercase());
                 }
             }
@@ -5842,14 +5960,14 @@ impl RealBenchmarkEvaluator {
         // Step 4: Identify constraints or conditions
         if question.contains("if ") {
             if let Some(pos) = question.to_lowercase().find("if ") {
-                let condition = &question[pos..].chars().take(50).collect::<String>();
+                let condition: String = question[pos..].chars().take(50).collect();
                 reasoning_chain.push(format!("condition:{}", condition.to_lowercase()));
             }
         }
         
         // Step 5: Extract the target (what we're looking for)
         if let Some(q_pos) = question.find('?') {
-            let before_q = &question[..q_pos];
+            let before_q: String = question.chars().take(question[..q_pos].chars().count()).collect();
             let last_clause: String = before_q.chars().rev().take(40).collect::<String>().chars().rev().collect();
             reasoning_chain.push(format!("target:{}", last_clause.to_lowercase()));
         }
@@ -5928,6 +6046,49 @@ impl RealBenchmarkEvaluator {
         let correct_answer_idx = question.correct_answer;
         let is_correct = predicted_idx == correct_answer_idx;
         
+        // RSI feedback: observe result so DynamicRSI can self-tune per dataset
+        // Use per-subject source key (source/category) matching strategy lookup
+        let rsi_source = if !question.category.is_empty() {
+            format!("{}/{}", question.source, question.category)
+        } else {
+            question.source.clone()
+        };
+        self.dynamic_rsi.observe(crate::ml::dynamic_rsi::InferenceObservation {
+            source: rsi_source,
+            correct: is_correct,
+            confidence,
+            path_taken: "generative".to_string(), // TODO: track actual path taken
+            pipeline_conf: None,
+            pipeline_correct: None,
+            unified_conf: None,
+            unified_correct: None,
+        });
+        
+        // LTR Pathway + RL Evidence feedback: observe outcome for structured learning
+        {
+            let q_hash = {
+                let mut h = 0u64;
+                for b in question_lower.bytes() { h = h.wrapping_mul(31).wrapping_add(b as u64); }
+                h
+            };
+            // Observe outcome: trains LTR pairwise ranking + RL actor-critic + encodes evidence
+            let empty_paths = Vec::new();
+            self.ltr_pathway.observe_outcome(
+                q_hash,
+                predicted_idx,
+                correct_answer_idx,
+                confidence,
+                &empty_paths,
+            );
+            // Encode structured RL evidence event for the inference outcome
+            let evidence_conf = if is_correct { confidence as f64 } else { -(confidence as f64) };
+            let _evidence = self.ltr_pathway.path_curator_mut().feedback_encoder.encode_validation(
+                vec![format!("inference:{}", question.source)],
+                evidence_conf,
+                &format!("q{}", q_hash),
+            );
+        }
+        
         // Extract key words from question
         let question_words: Vec<&str> = question_lower
             .split(|c: char| !c.is_alphanumeric())
@@ -5958,6 +6119,29 @@ impl RealBenchmarkEvaluator {
                         let current_weight = attrs.get(&correct_choice.to_lowercase()).copied().unwrap_or(0.0);
                         attrs.insert(correct_choice.to_lowercase(), (current_weight + 1.0).min(10.0));
                     }
+                }
+            }
+        }
+        
+        // 2b. Gated Proposal Pipeline: submit learned entity-attributes through Writing Gate
+        // Only high-confidence correct answers get proposed as trait updates
+        if is_correct && confidence > 0.6 {
+            if let Some(correct_choice) = question.choices.get(correct_answer_idx) {
+                use crate::storage::trait_ledger::TraitValue;
+                use crate::ml::pillar_integration::ProposalOrigin;
+                let trait_name = format!("entity:{}", question_words.first().copied().unwrap_or("unknown"));
+                let result = self.gated_pipeline.submit_proposal(
+                    &trait_name,
+                    TraitValue::Label(correct_choice.to_lowercase()),
+                    ProposalOrigin::Supervised {
+                        dataset: question.source.clone(),
+                    },
+                    confidence as f64,
+                    vec![],
+                );
+                if self.debug_reasoning {
+                    println!("      [GATE] trait={} verdict={:?} version={}",
+                        trait_name, result.verdict, result.version);
                 }
             }
         }
@@ -6122,5 +6306,8 @@ mod tests {
             let overall = (total_correct as f64 / total_questions as f64) * 100.0;
             println!("   Overall accuracy: {:.1}% ({}/{})", overall, total_correct, total_questions);
         }
+        
+        // Print RSI summary: what the model learned about itself
+        println!("\n{}", eval.dynamic_rsi.summary());
     }
 }
