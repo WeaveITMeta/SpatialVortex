@@ -2667,8 +2667,8 @@ impl RealBenchmarkEvaluator {
         }
         
         // Cap score to prevent one-shot from dominating all other experts
-        // Uncapped scores reached 628K+ and drowned out 20 other expert signals
-        score.min(50.0)
+        // Uncapped scores reached 628K+. Audit showed avg=51.2 still drowns others.
+        score.min(20.0)
     }
     
     /// Score using CALM's semantic retrieval from unified knowledge base
@@ -3560,7 +3560,7 @@ impl RealBenchmarkEvaluator {
             let combined_key = format!("{}|||{}", &question_lower, &choice_lower);
             let mut web_score = 0.0f32;
             if self.learned_embeddings.contains_key(&combined_key) {
-                web_score += 80.0;
+                web_score += 15.0; // Was 80.0 — reduced to avoid drowning other experts
             }
             let fact_query = if !passage_context.is_empty() {
                 format!("{} {}", passage_context, actual_question)
@@ -3569,10 +3569,10 @@ impl RealBenchmarkEvaluator {
             };
             let fact_score = self.score_with_consciousness_facts(&fact_query, &choice_lower);
             if fact_score > 0.0 {
-                web_score += fact_score;
+                web_score += fact_score.min(15.0); // Cap individual sub-scorer
             }
             let calm_web_score = self.score_with_calm_web(&question_lower, &choice_lower);
-            web_score += calm_web_score;
+            web_score += calm_web_score.min(15.0);
             score += web_score;
             breakdown.push(("web_knowledge", web_score));
             
