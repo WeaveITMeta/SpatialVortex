@@ -1063,6 +1063,20 @@ pub struct RealBenchmarkEvaluator {
 
 impl RealBenchmarkEvaluator {
     pub fn new(data_dir: &str) -> Self {
+        let mut evaluator = Self::new_uninit(data_dir);
+        evaluator.initialize(false);
+        evaluator
+    }
+    
+    /// Create evaluator with option to skip HuggingFace downloads
+    pub fn new_with_options(data_dir: &str, skip_hf: bool) -> Self {
+        let mut evaluator = Self::new_uninit(data_dir);
+        evaluator.initialize(skip_hf);
+        evaluator
+    }
+    
+    /// Construct evaluator without running initialization pipeline
+    fn new_uninit(data_dir: &str) -> Self {
         use crate::ml::calm::CALMConfig;
         
         // Initialize deduction engine with commonsense knowledge
@@ -1092,7 +1106,7 @@ impl RealBenchmarkEvaluator {
             })
         };
         
-        let mut evaluator = Self {
+        Self {
             calm_engine: CALMEngine::new(CALMConfig::default()),
             moe_gate: MoEInferenceGate::new(),
             model_weights: Vec::new(),
@@ -1154,31 +1168,37 @@ impl RealBenchmarkEvaluator {
             ltr_pathway: crate::ml::pillar_integration::JEPAPathwayIntegration::new(),
             gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline::new(),
             audit: crate::data::inference_audit::AuditCollector::new(),
-        };
-        
-        // STEP 1: Load all HuggingFace datasets to bootstrap knowledge
-        evaluator.load_all_hf_datasets();
+        }
+    }
+    
+    /// Initialize knowledge loading pipeline
+    /// When skip_hf=true, skips the ~4 min HF download phase for faster iteration
+    fn initialize(&mut self, skip_hf: bool) {
+        if skip_hf {
+            println!("   [--skip-hf] Skipping HuggingFace dataset downloads");
+        } else {
+            // STEP 1: Load all HuggingFace datasets to bootstrap knowledge
+            self.load_all_hf_datasets();
+        }
         
         // STEP 2: Pre-seed consciousness vortex from HF entity-attrs
         // This gives the vortex a strong baseline (high health score) before web learning
-        evaluator.seed_vortex_from_hf_data();
-        evaluator.sync_commonsense_to_rag();
+        self.seed_vortex_from_hf_data();
+        self.sync_commonsense_to_rag();
         
         // STEP 3: Web learning AFTER HF data - uses knowledge gaps to guide queries
         // This ensures web learning knows what's missing from HF data
         println!("\n[PHASE 3] Web Learning - Learning from web to fill knowledge gaps...");
         let web_categories = vec!["commonsense", "piqa", "winogrande"];
-        evaluator.consciousness_learn_for_benchmarks(&web_categories);
+        self.consciousness_learn_for_benchmarks(&web_categories);
         
         // STEP 4: Pretrain CALM weights on ALL knowledge (HF + hardcoded + web)
         // This trains the encoder/decoder weights on the complete loaded knowledge
-        evaluator.pretrain_calm_weights();
+        self.pretrain_calm_weights();
         
         // STEP 5: Build unified knowledge pipeline from learned knowledge
         // This pre-builds the knowledge base BEFORE benchmarks (not during)
-        evaluator.build_knowledge_pipeline();
-        
-        evaluator
+        self.build_knowledge_pipeline();
     }
     
     /// Build unified knowledge pipeline from all learned knowledge

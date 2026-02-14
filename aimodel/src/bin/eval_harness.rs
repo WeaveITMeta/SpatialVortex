@@ -87,6 +87,11 @@ struct Args {
     /// Shows which experts help/hurt accuracy and recommends removals
     #[arg(long, default_value_t = false)]
     audit: bool,
+
+    /// Skip HuggingFace dataset downloads (use only local data + web learning)
+    /// Saves ~4 minutes of rate-limited API calls during fast iteration
+    #[arg(long, default_value_t = false)]
+    skip_hf: bool,
 }
 
 // =============================================================================
@@ -173,7 +178,7 @@ fn main() -> Result<()> {
     };
 
     // Initialize evaluator
-    let mut evaluator = RealBenchmarkEvaluator::new(&args.data_dir);
+    let mut evaluator = RealBenchmarkEvaluator::new_with_options(&args.data_dir, args.skip_hf);
     evaluator.set_verbose_debug(args.verbose);
     evaluator.set_debug_reasoning(args.debug_reasoning);
     
