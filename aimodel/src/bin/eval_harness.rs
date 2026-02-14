@@ -563,6 +563,7 @@ fn load_csv_benchmark(path: &PathBuf, limit: usize) -> Result<Vec<RealBenchmarkQ
                 category: "csv".to_string(),
                 source: path.to_string_lossy().to_string(),
                 difficulty: None,
+                fewshot_context: String::new(),
             });
         }
     }
@@ -602,6 +603,7 @@ fn load_json_benchmark(path: &PathBuf, limit: usize) -> Result<Vec<RealBenchmark
                 category: "json".to_string(),
                 source: path.to_string_lossy().to_string(),
                 difficulty: None,
+                fewshot_context: String::new(),
             }
         })
         .collect();

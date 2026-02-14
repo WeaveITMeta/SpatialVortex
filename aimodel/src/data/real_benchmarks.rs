@@ -41,6 +41,9 @@ pub struct RealBenchmarkQuestion {
     pub category: String,
     pub source: String,
     pub difficulty: Option<String>,
+    /// Few-shot exemplar context (prepended during evaluation, kept separate from question)
+    #[serde(default)]
+    pub fewshot_context: String,
 }
 
 /// Result of evaluating a benchmark
@@ -117,6 +120,7 @@ pub fn load_commonsenseqa(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, 
                     category: "commonsense".to_string(),
                     source: "CommonsenseQA".to_string(),
                     difficulty: None,
+                    fewshot_context: String::new(),
                 });
             }
             Err(e) => {
@@ -245,6 +249,7 @@ pub fn load_squad(data_dir: &str, max_questions: usize) -> Result<Vec<RealBenchm
                     category: "reading_comprehension".to_string(),
                     source: "SQuAD 2.0".to_string(),
                     difficulty: None,
+                    fewshot_context: String::new(),
                 });
                 
                 if questions.len() >= max_questions {
@@ -321,6 +326,7 @@ pub fn load_mmlu(data_dir: &str, subject: Option<&str>) -> Result<Vec<RealBenchm
                             category: subj.to_string(),
                             source: "MMLU".to_string(),
                             difficulty: None,
+                            fewshot_context: String::new(),
                         });
                     }
                 }
@@ -371,6 +377,7 @@ pub fn load_gsm8k(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, String> 
                 category: "math".to_string(),
                 source: "GSM8K".to_string(),
                 difficulty: Some("grade_school".to_string()),
+                fewshot_context: String::new(),
             });
         }
     }
@@ -439,6 +446,7 @@ pub fn load_arc(data_dir: &str, challenge: bool) -> Result<Vec<RealBenchmarkQues
                 category: "science".to_string(),
                 source: subset.to_string(),
                 difficulty: Some(if challenge { "challenge" } else { "easy" }.to_string()),
+                fewshot_context: String::new(),
             });
         }
     }
@@ -479,6 +487,7 @@ pub fn load_hellaswag(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, Stri
                 category: "commonsense".to_string(),
                 source: "HellaSwag".to_string(),
                 difficulty: None,
+                fewshot_context: String::new(),
             });
         }
     }
@@ -532,6 +541,7 @@ pub fn load_truthfulqa(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, Str
                 category,
                 source: "TruthfulQA".to_string(),
                 difficulty: None,
+                fewshot_context: String::new(),
             });
         }
     }
@@ -607,6 +617,7 @@ pub fn load_humaneval(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, Stri
                 category: "code".to_string(),
                 source: "HumanEval".to_string(),
                 difficulty: None,
+                fewshot_context: String::new(),
             });
         }
     }
@@ -665,6 +676,7 @@ pub fn load_swebench(data_dir: &str, lite: bool) -> Result<Vec<RealBenchmarkQues
                 category: "software_engineering".to_string(),
                 source: format!("SWE-Bench ({})", if lite { "Lite" } else { "Full" }),
                 difficulty: Some(if test_patch.len() > 500 { "hard" } else { "medium" }.to_string()),
+                fewshot_context: String::new(),
             });
             
             // Limit to reasonable number for evaluation
@@ -754,6 +766,7 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
                                 category: format!("babi_task_{}", task_num),
                                 source: "bAbI".to_string(),
                                 difficulty: Some(format!("task_{}", task_num)),
+                                fewshot_context: String::new(),
                             });
                         }
                         // Don't clear story - multiple questions can share the same context
@@ -3254,13 +3267,18 @@ impl RealBenchmarkEvaluator {
         if self.use_unified_inference && strategy.use_unified {
             // Split question into context and actual question
             let parts: Vec<&str> = question.question.split('\n').collect();
-            let (context, q_text) = if parts.len() > 1 {
+            let (mut context, q_text) = if parts.len() > 1 {
                 let q = parts.last().unwrap_or(&"");
                 let ctx = parts[..parts.len()-1].join("\n");
                 (ctx, q.to_string())
             } else {
                 (String::new(), question.question.clone())
             };
+            
+            // Prepend few-shot exemplars as additional context (not as the question)
+            if !question.fewshot_context.is_empty() {
+                context = format!("{}\n{}", question.fewshot_context, context);
+            }
             
             let (unified_idx, unified_conf) = self.unified_engine.infer(
                 &context,
@@ -3334,15 +3352,24 @@ impl RealBenchmarkEvaluator {
         // CONTEXT EXTRACTION: Separate passage/context from actual question
         // Many benchmarks (MMLU, ARC, SQuAD) embed context before the question.
         // Splitting lets experts score against the right signal.
+        // Few-shot exemplars are in fewshot_context (kept separate from question).
         // =================================================================
         let lines: Vec<&str> = question_lower.split('\n').collect();
-        let (passage_context, actual_question) = if lines.len() > 1 {
+        let (mut passage_context, actual_question) = if lines.len() > 1 {
             let q = lines.last().unwrap_or(&"").to_string();
             let ctx = lines[..lines.len()-1].join("\n");
             (ctx, q)
         } else {
             (String::new(), question_lower.clone())
         };
+        // Include few-shot exemplars as passage context for expert scoring
+        if !question.fewshot_context.is_empty() {
+            if passage_context.is_empty() {
+                passage_context = question.fewshot_context.to_lowercase();
+            } else {
+                passage_context = format!("{}\n{}", question.fewshot_context.to_lowercase(), passage_context);
+            }
+        }
         
         // =================================================================
         // GROUNDED CONTEXT: Extract relevant spans before scoring
@@ -5086,10 +5113,11 @@ impl RealBenchmarkEvaluator {
         }
         
         for (i, q) in test_questions.iter().enumerate() {
-            // Prepend few-shot context to the question for in-context learning
+            // Store few-shot context separately — DO NOT prepend to question.question
+            // Previous bug: prepending caused pipeline/unified to answer the first exemplar
             let q_with_fewshot = if !fewshot_prompt.is_empty() {
                 let mut augmented = q.clone();
-                augmented.question = format!("{}{}", fewshot_prompt, q.question);
+                augmented.fewshot_context = fewshot_prompt.clone();
                 augmented
             } else {
                 q.clone()
