@@ -3284,6 +3284,9 @@ impl RealBenchmarkEvaluator {
         // Skip unified inference for code generation (HumanEval) - use multi-expert path
         // Code generation benefits from semantic matching and specialized scoring
         
+        // Unified answer stored here for tiebreaking if multi-expert is uncertain
+        let mut unified_deferred: Option<(usize, f32)> = None;
+        
         if self.use_unified_inference && strategy.use_unified {
             // Split question into context and actual question
             let parts: Vec<&str> = question.question.split('\n').collect();
@@ -3363,6 +3366,9 @@ impl RealBenchmarkEvaluator {
                 self.audit.record(trace);
                 return (unified_idx, unified_conf);
             }
+            // Store unified answer for tiebreaking in multi-expert path
+            trace.record_decision("unified", "deferred-to-multi-expert", unified_conf);
+            unified_deferred = Some((unified_idx, unified_conf));
         }
         
         let question_text = &question.question;
@@ -3795,10 +3801,18 @@ impl RealBenchmarkEvaluator {
         let margin_conf = (sorted_probs[0] + margin).min(1.0);
         
         // Final decision: if quantum search is confident, use it; otherwise use expert consensus
+        // When multi-expert is uncertain (expert-low), prefer unified's answer as tiebreaker
+        // since unified uses coherent reasoning while multi-expert sums noisy expert scores
         let (final_idx, final_conf, decision_path) = if quantum_confidence > 0.7 {
             (quantum_best_idx, quantum_confidence, "quantum")
         } else if expert_best_prob > 0.4 {
             (expert_best_idx, margin_conf, "expert-high")
+        } else if let Some((u_idx, u_conf)) = unified_deferred {
+            // Multi-expert is uncertain — prefer unified's answer as tiebreaker
+            // Unified uses coherent 3-pass reasoning; multi-expert is noisy expert sum
+            println!("   [TIEBREAK] Multi-expert uncertain (prob={:.2}), using unified answer[{}] conf={:.2}",
+                expert_best_prob, u_idx, u_conf);
+            (u_idx, (u_conf + margin_conf) / 2.0, "unified-tiebreak")
         } else {
             if quantum_best_idx == expert_best_idx {
                 (expert_best_idx, (margin_conf + quantum_confidence) / 2.0 + 0.1, "expert+quantum-agree")
