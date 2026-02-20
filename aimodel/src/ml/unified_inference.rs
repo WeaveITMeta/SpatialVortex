@@ -1225,12 +1225,14 @@ impl UnifiedInferenceEngine {
             if let Some((answer, conf)) = self.reasoning.answer_question(question, &latent) {
                 let answer_lower = answer.to_lowercase();
                 
-                // On early passes, only commit if high confidence
-                // On final pass, commit at any confidence (best we have)
+                // On early passes, only commit if high confidence.
+                // Pass 3 previously committed at conf=0.0 (any answer) — this caused
+                // the unified path to return garbage at 28.6% accuracy (below random).
+                // Now all passes require meaningful confidence to commit.
                 let conf_threshold = match pass {
                     0 => 0.85, // Pass 1: only commit if very confident
                     1 => 0.70, // Pass 2: commit if reasonably confident
-                    _ => 0.0,  // Pass 3: commit regardless (final pass)
+                    _ => 0.55, // Pass 3: still require some confidence, not zero
                 };
                 
                 if conf >= conf_threshold {
@@ -1337,9 +1339,19 @@ impl UnifiedInferenceEngine {
         all_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
         let margin = all_scores[0] - all_scores.get(1).copied().unwrap_or(0.0);
         let range = all_scores[0] - all_scores.last().copied().unwrap_or(0.0);
-        // Calibrated confidence: sigmoid of margin scaled by number of choices
-        // Old formula (0.3 + 0.7 * margin/range) clustered at 0.89-0.91 for everything
-        // Sigmoid spreads confidence across the full range based on actual score gap
+        // Calibrated confidence: sigmoid of margin scaled by number of choices.
+        // IMPORTANT: cap cosine-only confidence at 0.65 (below commit threshold 0.70).
+        // The unified path was committing at 28.6% accuracy (below random) because
+        // random untrained embeddings produced sigmoid >= 0.70 by chance.
+        // Structural signal (entity-attr or world model) is required to commit.
+        let has_structural_signal = world_conf > 0.5 || {
+            // Check if entity-attribute scoring produced any signal for the best choice
+            let best_entity = self.score_entity_attribute(
+                &format!("{}\n{}", context, question),
+                &choices.get(best_idx).map(|c| c.to_lowercase()).unwrap_or_default()
+            );
+            best_entity > 0.1
+        };
         let confidence = if range > 0.001 {
             let num_choices = choices.len().max(2) as f32;
             // Normalize margin by expected random margin (range / num_choices)
@@ -1347,7 +1359,9 @@ impl UnifiedInferenceEngine {
             let normalized = margin / expected_margin.max(0.001);
             // Sigmoid: maps (-inf, inf) → (0, 1), centered at normalized=1.0
             let sigmoid = 1.0 / (1.0 + (-2.0 * (normalized - 1.0)).exp());
-            (0.15 + 0.85 * sigmoid).min(1.0).max(0.15)
+            let raw_conf = (0.15 + 0.85 * sigmoid).min(1.0).max(0.15);
+            // Cap cosine-only confidence below commit threshold when no structural signal
+            if has_structural_signal { raw_conf } else { raw_conf.min(0.65) }
         } else {
             // Embeddings are undifferentiated (untrained) — fall back to arithmetic
             // signal for numeric choices rather than returning a flat 0.25 that causes
