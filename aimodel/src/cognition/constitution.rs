@@ -1072,6 +1072,29 @@ impl TruthChecker {
             "much larger",
             &["closer to the sun", "inner", "terrestrial"],
         );
+        // Gas planets are FARTHER from Sun (outer solar system), not closer
+        self.add_misconception(
+            &["gas planets", "solar system", "true"],
+            "gas planets are closer",
+            &["solid planets are closer", "terrestrial", "inner"],
+        );
+        self.add_misconception(
+            &["solar system", "statement", "true"],
+            "gas planets are closer to",
+            &["solid planets are closer", "terrestrial", "inner"],
+        );
+        // Electrolysis of water: correct balanced equation is 2H2O → 2H2 + O2
+        // The unbalanced H2O → 2H + O is wrong
+        self.add_misconception(
+            &["electric current", "water", "passed"],
+            "h_{2}o(l) -> 2h(g) + o(g)",
+            &["2h_{2}o", "2h_{2}(g)", "o_{2}(g)"],
+        );
+        self.add_misconception(
+            &["electrolysis", "h2o", "current"],
+            "-> 2h(g) + o(g)",
+            &["2h2", "h2(g)", "o2"],
+        );
     }
 
     /// Add a misconception to the database
