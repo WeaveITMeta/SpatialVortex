@@ -836,6 +836,87 @@ impl TruthChecker {
             "damage your eyes permanently",
             &["eyestrain", "no permanent", "not permanently"],
         );
+
+        // =================================================================
+        // ARC-Challenge Science Facts
+        // =================================================================
+
+        // Water freezing point — 0°C not 32°C (32°F is Fahrenheit)
+        self.add_misconception(
+            &["water", "freeze", "temperature"],
+            "32 degrees celsius",
+            &["0 degrees", "zero degrees", "0°c"],
+        );
+        self.add_misconception(
+            &["water", "freeze", "celsius"],
+            "32",
+            &["0", "zero"],
+        );
+        // Plankton produce oxygen (photosynthesis), not just colorful
+        self.add_misconception(
+            &["plankton", "oceans"],
+            "colorful",
+            &["oxygen", "photosynthesis", "release oxygen"],
+        );
+        // Mitochondria break down food/wastes for energy, not control activities
+        self.add_misconception(
+            &["cell", "energy", "food"],
+            "controlling the activities",
+            &["breaking down", "mitochondria", "energy production"],
+        );
+        // Juice in freezer becomes solid (freezes), doesn't evaporate
+        self.add_misconception(
+            &["freezer", "juice", "tray"],
+            "evaporated",
+            &["solid", "frozen", "became a solid", "froze"],
+        );
+        self.add_misconception(
+            &["freezer", "liquid", "put"],
+            "evaporated",
+            &["solid", "frozen", "became a solid", "froze"],
+        );
+        // Devil facial tumor disease — infectious (transmissible cancer)
+        self.add_misconception(
+            &["devil", "facial", "tumor"],
+            "non-infectious",
+            &["infectious", "transmissible", "contagious"],
+        );
+        // Pika (mountain mammal) stores food for winter, doesn't migrate
+        self.add_misconception(
+            &["mammal", "mountain", "western"],
+            "migration",
+            &["store food", "food cache", "winter"],
+        );
+        // Fossil palm trees near glaciers — climate was once warmer
+        self.add_misconception(
+            &["petrified", "palm", "glaciers"],
+            "more water",
+            &["climate", "warmer", "temperature"],
+        );
+        // Sun influences water cycle / cloud formation
+        self.add_misconception(
+            &["sun", "effect", "water cycle"],
+            "creates water",
+            &["influences", "evaporation", "formation"],
+        );
+        // Fossils tell us about environment, not exact age alone
+        self.add_misconception(
+            &["fossils", "bones", "teeth"],
+            "exact age",
+            &["environment", "habitat", "ecosystem", "type of environment"],
+        );
+        // Electrolysis of water produces H2 and O2 gas
+        self.add_misconception(
+            &["electric current", "water", "h2o"],
+            "2h(g) + o(g)",
+            &["2h2(g)", "h2(g)", "o2(g)", "hydrogen gas"],
+        );
+        // Penguins live in cold climates (Antarctica), not just "most interesting"
+        self.add_misconception(
+            &["penguins", "fact"],
+            "most interesting",
+            &["cold climate", "antarctica", "cold", "survive"],
+        );
     }
 
     /// Add a misconception to the database
