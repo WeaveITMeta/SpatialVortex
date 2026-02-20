@@ -3613,16 +3613,27 @@ impl RealBenchmarkEvaluator {
                 || question_lower.contains("maximum possible order")
                 || question_lower.contains("generator")
                 || question_lower.contains("z_")        // Z_n notation (modular arithmetic groups)
-                || question_lower.contains("z_8")
-                || question_lower.contains("z_11")
-                || question_lower.contains("z_15")
-                || question_lower.contains("z_26")
                 || question_lower.contains("linearly ind")
                 || question_lower.contains("linear transformation")
                 || question_lower.contains("vector space")
                 || question_lower.contains("integral domain")
                 || question_lower.contains("splitting field")
-                || question_lower.contains("finite field");
+                || question_lower.contains("finite field")
+                || question_lower.contains("integers z ")  // "integers Z with..."
+                || question_lower.contains("set of integers")
+                || question_lower.contains("binary operation")
+                || question_lower.contains("factor group")
+                || question_lower.contains("multiplicative group")
+                || question_lower.contains("additive group")
+                || question_lower.contains("permutation")
+                || question_lower.contains("eigenvalue")
+                || question_lower.contains("eigenvector")
+                || question_lower.contains("determinant")
+                || question_lower.contains("matrix")
+                || question_lower.contains("invertible")
+                || question_lower.contains("injective")
+                || question_lower.contains("surjective")
+                || question_lower.contains("bijective");
             let math_score = if !is_abstract_algebra {
                 self.score_symbolic_arithmetic(&question_lower, &choice_lower)
             } else {
