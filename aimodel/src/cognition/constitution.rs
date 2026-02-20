@@ -1153,6 +1153,12 @@ impl TruthChecker {
             "comes outside and takes a clos",
             &["comes outside and starts", "starts to follow", "mowing"],
         );
+        // Lawn mower ready: comes outside and starts to follow (not takes a close-up)
+        self.add_misconception(
+            &["lawn mower", "ready", "plugs"],
+            "comes outside and takes a clos",
+            &["comes outside and starts", "starts to follow", "mowing"],
+        );
         // Lawn mowing result: grass looks real/natural
         self.add_misconception(
             &["mowing", "lawn", "casually"],
@@ -1206,15 +1212,26 @@ impl TruthChecker {
             "sand the rocks and tops them",
             &["takes a small stone", "stone from", "flowing river"],
         );
-        // Black female with scarf: zoomed in on her
+        // Black female with scarf: zoomed in on her (not misses / not shown)
         self.add_misconception(
             &["black female", "scarf", "room"],
             "are shown as she continues to",
             &["zoomed in on", "then zoomed", "she"],
         );
         self.add_misconception(
+            &["black female", "scarf", "room"],
+            "are shown and she misses",
+            &["zoomed in on", "then zoomed", "she"],
+        );
+        // Black female with scarf: takes spray (not brushes lips)
+        self.add_misconception(
             &["black female", "scarf", "shown"],
             "she is shown making multiple",
+            &["takes some spray", "spray", "it"],
+        );
+        self.add_misconception(
+            &["black female", "scarf", "shown"],
+            "she begins to brush her lips",
             &["takes some spray", "spray", "it"],
         );
         // Brushing teeth: shaving cream is wrong context
