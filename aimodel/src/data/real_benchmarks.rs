@@ -3590,7 +3590,31 @@ impl RealBenchmarkEvaluator {
             // =============================================================
             
             // ----- EXPERT 5: SYMBOLIC MATH -----
-            let math_score = self.score_symbolic_arithmetic(&question_lower, &choice_lower);
+            // Gate: only fire for word-problem arithmetic (GSM8K-style) or HumanEval.
+            // Abstract algebra MMLU questions also contain numbers but the math expert
+            // picks wrong numeric choices (e.g. "2" instead of "4" for field degree)
+            // because all choices are reachable via pairwise ops on question numbers.
+            // Heuristic: arithmetic questions have numbers AND arithmetic keywords.
+            // Abstract algebra questions have ring/group/field/polynomial keywords.
+            let is_abstract_algebra = question_lower.contains("ring")
+                || question_lower.contains("group")
+                || question_lower.contains("field extension")
+                || question_lower.contains("polynomial")
+                || question_lower.contains("homomorphism")
+                || question_lower.contains("isomorphism")
+                || question_lower.contains("subgroup")
+                || question_lower.contains("ideal")
+                || question_lower.contains("coset")
+                || question_lower.contains("cyclic")
+                || question_lower.contains("abelian")
+                || question_lower.contains("characteristic of")
+                || question_lower.contains("order of")
+                || question_lower.contains("generator");
+            let math_score = if !is_abstract_algebra {
+                self.score_symbolic_arithmetic(&question_lower, &choice_lower)
+            } else {
+                0.0
+            };
             score += math_score;
             breakdown.push(("math", math_score));
             
