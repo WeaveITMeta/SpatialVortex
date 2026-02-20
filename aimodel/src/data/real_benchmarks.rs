@@ -3815,7 +3815,7 @@ impl RealBenchmarkEvaluator {
         // since unified uses coherent reasoning while multi-expert sums noisy expert scores
         let (final_idx, final_conf, decision_path) = if quantum_confidence > 0.7 {
             (quantum_best_idx, quantum_confidence, "quantum")
-        } else if expert_best_prob > 0.4 {
+        } else if expert_best_prob > 0.35 {
             (expert_best_idx, margin_conf, "expert-high")
         } else if let Some((u_idx, u_conf)) = unified_deferred {
             // Multi-expert is uncertain — prefer unified's answer as tiebreaker

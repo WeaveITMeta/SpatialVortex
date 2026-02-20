@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-20T02:45:56.830663700+00:00",
+  "timestamp": "2026-02-20T02:51:07.636103900+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -14,20 +14,20 @@
   "task_results": [
     {
       "task": "mmlu",
-      "accuracy": 53.333333333333336,
-      "num_correct": 24,
+      "accuracy": 55.55555555555556,
+      "num_correct": 25,
       "total": 45,
-      "avg_confidence": 0.6472628,
-      "time_secs": 1.2631331000000001,
+      "avg_confidence": 0.6516672,
+      "time_secs": 1.2750626,
       "wrong_samples": []
     },
     {
       "task": "gsm8k",
-      "accuracy": 33.33333333333333,
-      "num_correct": 15,
+      "accuracy": 31.11111111111111,
+      "num_correct": 14,
       "total": 45,
-      "avg_confidence": 0.74935085,
-      "time_secs": 2.6868224,
+      "avg_confidence": 0.7435335,
+      "time_secs": 2.8240476,
       "wrong_samples": []
     },
     {
@@ -35,17 +35,17 @@
       "accuracy": 33.33333333333333,
       "num_correct": 15,
       "total": 45,
-      "avg_confidence": 0.46928275,
-      "time_secs": 4.4323061,
+      "avg_confidence": 0.4912807,
+      "time_secs": 4.4458532,
       "wrong_samples": []
     },
     {
       "task": "truthfulqa",
-      "accuracy": 40.0,
-      "num_correct": 18,
+      "accuracy": 42.22222222222222,
+      "num_correct": 19,
       "total": 45,
-      "avg_confidence": 0.6940376,
-      "time_secs": 2.7914847,
+      "avg_confidence": 0.69674206,
+      "time_secs": 2.8174082,
       "wrong_samples": []
     },
     {
@@ -54,14 +54,14 @@
       "num_correct": 45,
       "total": 45,
       "avg_confidence": 0.9935931,
-      "time_secs": 6.4159078,
+      "time_secs": 6.5792493,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 117,
+    "total_correct": 118,
     "total_questions": 225,
-    "overall_accuracy": 52.0,
-    "total_time_secs": 21.243879
+    "overall_accuracy": 52.44444444444445,
+    "total_time_secs": 21.6127147
   }
 }
