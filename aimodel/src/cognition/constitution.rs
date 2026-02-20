@@ -917,6 +917,108 @@ impl TruthChecker {
             "most interesting",
             &["cold climate", "antarctica", "cold", "survive"],
         );
+        // Penguins can live in cold climates — "most interesting" is opinion not fact
+        self.add_misconception(
+            &["penguins", "fact", "which"],
+            "some of the most",
+            &["can live in climates", "cold", "survive"],
+        );
+        // Photosynthesis converts sunlight to energy (not carbon passage)
+        self.add_misconception(
+            &["photosynthetic", "cells", "function"],
+            "passage of carbon",
+            &["convert energy", "sunlight", "energy from sunlight"],
+        );
+        self.add_misconception(
+            &["photosynthesis", "main function"],
+            "passage of carbon",
+            &["convert energy", "sunlight", "energy from sunlight"],
+        );
+        // Carbon atom mass = protons + neutrons (6+7=13, not 6)
+        self.add_misconception(
+            &["carbon", "protons", "neutrons"],
+            "6",
+            &["13", "mass number", "protons plus neutrons"],
+        );
+        // Separation of salt from water — evaporation/heat, not rubbing alcohol
+        self.add_misconception(
+            &["salt", "water", "separate"],
+            "rubbing alcohol",
+            &["heat", "evaporation", "boiling", "distillation"],
+        );
+        // Sunrise occurs most frequently (daily), not full moon (monthly)
+        self.add_misconception(
+            &["natural event", "frequency", "most"],
+            "full moon",
+            &["sunrise", "daily", "every day"],
+        );
+        // Scientific theory helps explain how things work (positive effect)
+        self.add_misconception(
+            &["scientific", "positive effect", "theory"],
+            "more difficult",
+            &["explain", "understand", "how things work"],
+        );
+        // Fossils: "exact age" is wrong — they tell about environment/habitat
+        self.add_misconception(
+            &["fossils", "lab", "told"],
+            "exact age",
+            &["environment", "type of environment", "habitat"],
+        );
+        // Devil facial tumor: cell-cycle disease (cancer), not chronic
+        self.add_misconception(
+            &["devil", "facial", "disease"],
+            "chronic disease",
+            &["cell-cycle", "cancer", "tumor"],
+        );
+        // Sound speed varies with molecular distance (density), not wavelength
+        self.add_misconception(
+            &["sound", "speed", "travels"],
+            "wavelength of the wave",
+            &["distance between molecules", "density", "medium"],
+        );
+        // Hydraulic systems use liquids (not just fluids — distinguish liquid vs fluid)
+        self.add_misconception(
+            &["hydraulic", "systems", "difference"],
+            "involve fluid",
+            &["involve liquid", "liquids", "incompressible"],
+        );
+        // Sun compared to other stars — tiny next to larger stars
+        self.add_misconception(
+            &["sun", "compare", "star"],
+            "extremely bright",
+            &["tiny", "small", "average", "medium"],
+        );
+        // Solid planets (terrestrial) are closer to the Sun
+        self.add_misconception(
+            &["solid planets", "solar system"],
+            "much larger",
+            &["closer to", "inner", "terrestrial"],
+        );
+        // Learned behavior: tiger hunting deer (instinct) vs woodpecker (learned)
+        // Actually tiger hunting IS instinct, learned behavior is trained/acquired
+        self.add_misconception(
+            &["learned behavior", "example"],
+            "woodpecker taps",
+            &["tiger hunts", "trained", "acquired"],
+        );
+        // Analogous structures (similar function, different origin) for relatedness
+        self.add_misconception(
+            &["closely related", "organisms", "scientists"],
+            "embryonic structures",
+            &["analogous", "homologous", "dna", "genetic"],
+        );
+        // Earthquake region + volcanism — plate boundaries have both
+        self.add_misconception(
+            &["earthquakes", "region", "scientist"],
+            "earthquake centers",
+            &["volcanism", "volcanic", "plate boundary"],
+        );
+        // Investigation planning: make a table for recording data first
+        self.add_misconception(
+            &["investigation", "plans", "brand"],
+            "repeat the investigation",
+            &["table", "recording data", "data table", "plan"],
+        );
     }
 
     /// Add a misconception to the database
