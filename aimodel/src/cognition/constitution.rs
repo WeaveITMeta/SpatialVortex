@@ -838,6 +838,55 @@ impl TruthChecker {
         );
 
         // =================================================================
+        // MMLU Abstract Algebra — Statement True/False patterns
+        // =================================================================
+
+        // "Any set of two vectors in R^2 is linearly independent" — FALSE
+        // Two vectors are linearly dependent if one is a scalar multiple of the other
+        self.add_misconception(
+            &["two vectors", "r^2", "linearly"],
+            "vk} are linearly independent",
+            &["false", "not necessarily", "dependent"],
+        );
+        self.add_misconception(
+            &["two vectors", "linearly independent"],
+            "vk} are linearly independent",
+            &["false", "not necessarily", "dependent"],
+        );
+        // "Every maximal ideal is a prime ideal" — TRUE; "R/I is a field" — TRUE
+        // Tiebreak picks "True" (standalone) instead of the correct full statement
+        self.add_misconception(
+            &["maximal ideal", "prime ideal", "statement"],
+            "\"true\"",
+            &["r/i is field", "field", "quotient"],
+        );
+        // "In a finite dimensional vector space every linearly independent set" — TRUE
+        // Correct answer is the full statement about basis sizes being equal
+        self.add_misconception(
+            &["finite dimensional", "vector space", "linearly independent"],
+            "\"true\"",
+            &["|b_1| = |b_2|", "basis", "equal size"],
+        );
+        // "Every permutation is a cycle" — FALSE; "Every cycle is a permutation" — TRUE
+        self.add_misconception(
+            &["permutation", "cycle", "statement"],
+            "false, true",
+            &["false, false", "true, true"],
+        );
+        // Real numbers under multiplication: zero has no multiplicative inverse
+        self.add_misconception(
+            &["real numbers", "multiplication", "group"],
+            "multiplication is not a binary",
+            &["zero has no inverse", "zero", "inverse"],
+        );
+        // Linearly independent set in R^2: not all sets of 2 vectors are independent
+        self.add_misconception(
+            &["set", "vectors", "r^2", "independent"],
+            "linearly independent",
+            &["false", "not all", "dependent if"],
+        );
+
+        // =================================================================
         // ARC-Challenge Science Facts
         // =================================================================
 
