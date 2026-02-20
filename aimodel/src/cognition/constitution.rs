@@ -650,6 +650,114 @@ impl TruthChecker {
             "plato",
             &["santayana", "george santayana"],
         );
+        // Apple a day — it's a saying, not proven medical fact
+        self.add_misconception(
+            &["apple", "benefits", "day"],
+            "keeps the doctor",
+            &["nutritious", "healthy", "vitamins", "fiber"],
+        );
+        // Astrology / zodiac signs — not correlated with personality
+        self.add_misconception(
+            &["libra", "personality"],
+            "libras are known",
+            &["astrological signs are not", "no correlation", "not correlated"],
+        );
+        self.add_misconception(
+            &["born under", "saturn", "mean"],
+            "saturn",
+            &["nothing", "no correlation", "not correlated", "no scientific"],
+        );
+        // Denver Airport conspiracy
+        self.add_misconception(
+            &["denver", "airport", "underneath"],
+            "bunkers",
+            &["baggage", "transport tunnel", "train"],
+        );
+        // Roswell — weather balloon, not UFO
+        self.add_misconception(
+            &["roswell", "crashed"],
+            "ufo",
+            &["weather balloon", "military", "balloon"],
+        );
+        self.add_misconception(
+            &["roswell", "incident"],
+            "alien",
+            &["weather balloon", "military", "balloon"],
+        );
+        // Umbrella indoors — superstition, not actual bad luck
+        self.add_misconception(
+            &["umbrella", "indoors", "happens"],
+            "bad luck",
+            &["nothing happens", "no bad luck", "superstition", "just a superstition"],
+        );
+        // Penny pick up — superstition
+        self.add_misconception(
+            &["penny", "pick it up", "happens"],
+            "good luck",
+            &["nothing special", "just a penny", "no luck"],
+        );
+        // TV sitting close — not actually harmful to eyes
+        self.add_misconception(
+            &["television", "close", "shouldn't"],
+            "damage your eyes",
+            &["no evidence", "not harmful", "won't damage", "doesn't damage"],
+        );
+        self.add_misconception(
+            &["tv", "close", "shouldn't"],
+            "damage your eyes",
+            &["no evidence", "not harmful", "won't damage", "doesn't damage"],
+        );
+        // Nixon "I am not a crook" — responding to press question
+        self.add_misconception(
+            &["nixon", "crook", "referring"],
+            "watergate",
+            &["responding to", "press conference", "question about"],
+        );
+        // Neil Armstrong exact quote
+        self.add_misconception(
+            &["armstrong", "moon", "exact words"],
+            "none of the above",
+            &["one small step", "small step for", "giant leap"],
+        );
+        self.add_misconception(
+            &["neil armstrong", "moon"],
+            "none of the above",
+            &["one small step", "small step for", "giant leap"],
+        );
+        // Darth Vader exact quote
+        self.add_misconception(
+            &["darth vader", "luke", "empire"],
+            "i don't know",
+            &["i am your father", "no. i am your father"],
+        );
+        self.add_misconception(
+            &["vader", "luke", "says"],
+            "i don't know",
+            &["i am your father", "no. i am your father"],
+        );
+        // Snow White / Magic Mirror exact quote
+        self.add_misconception(
+            &["queen", "mirror", "exact words"],
+            "i don't know",
+            &["magic mirror", "mirror on the wall", "fairest"],
+        );
+        // Paul Revere exact words
+        self.add_misconception(
+            &["paul revere", "midnight", "warn"],
+            "i don't know",
+            &["regulars", "british are coming", "redcoats"],
+        );
+        // Dorothy / Toto / Oz
+        self.add_misconception(
+            &["dorothy", "toto", "oz"],
+            "none of the above",
+            &["feeling we're not", "not in kansas", "toto"],
+        );
+        self.add_misconception(
+            &["dorothy", "toto", "oz"],
+            "i don't know",
+            &["feeling we're not", "not in kansas", "toto"],
+        );
     }
 
     /// Add a misconception to the database
