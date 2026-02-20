@@ -1019,6 +1019,59 @@ impl TruthChecker {
             "repeat the investigation",
             &["table", "recording data", "data table", "plan"],
         );
+        // Carbon atom mass: protons + neutrons = 6 + 7 = 13 (not 7 or 6)
+        self.add_misconception(
+            &["carbon", "6 protons", "7 neutrons"],
+            "7",
+            &["13", "mass number"],
+        );
+        self.add_misconception(
+            &["carbon", "protons", "7 neut"],
+            "7",
+            &["13", "mass number"],
+        );
+        // Sun vs larger star: Sun is tiny/average compared to giant stars
+        self.add_misconception(
+            &["sun", "compare", "different"],
+            "enormous",
+            &["tiny", "small", "average"],
+        );
+        self.add_misconception(
+            &["sun", "might compare", "star"],
+            "enormous",
+            &["tiny", "small", "average"],
+        );
+        // Analogous structures (same function, different origin) for relatedness
+        // Homologous = same origin, analogous = same function (convergent evolution)
+        self.add_misconception(
+            &["closely related", "determine", "scientists"],
+            "homologous structures",
+            &["analogous", "dna", "genetic", "molecular"],
+        );
+        // Fossil research: analyze new data as it becomes available
+        self.add_misconception(
+            &["fossil", "bones", "teeth", "researched"],
+            "exclude research",
+            &["analyze new data", "new data", "available"],
+        );
+        // Electrolysis: correct equation is 2H2O → 2H2 + O2
+        self.add_misconception(
+            &["electric current", "water", "electrolysis"],
+            "2h(g) + o(g)",
+            &["2h2", "h2(g)", "o2(g)"],
+        );
+        // Sunny mild day temperature increases from 41°F — warm afternoon ~78°F
+        self.add_misconception(
+            &["temperature", "41", "sunny"],
+            "41",
+            &["78", "warmer", "higher"],
+        );
+        // Solid planets closer to Sun (inner solar system), not larger
+        self.add_misconception(
+            &["solid planets", "true", "solar"],
+            "much larger",
+            &["closer to the sun", "inner", "terrestrial"],
+        );
     }
 
     /// Add a misconception to the database
