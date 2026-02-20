@@ -1269,8 +1269,11 @@ impl UnifiedInferenceEngine {
         // The multi-expert path (score_symbolic_arithmetic) handles math correctly.
         
         // World knowledge for commonsense questions (PIQA, WinoGrande, etc.)
+        // Threshold raised 0.6→0.75: base score starts at 0.5, so 0.6 fires on just
+        // 2 keyword hits above baseline — too loose for MMLU/TruthfulQA questions.
+        // 0.75 requires stronger physical/commonsense signal before committing.
         if let Some((idx, conf)) = self.reasoning.score_with_world_knowledge(question, choices) {
-            if conf > 0.6 {
+            if conf > 0.75 {
                 return (idx, conf);
             }
         }
