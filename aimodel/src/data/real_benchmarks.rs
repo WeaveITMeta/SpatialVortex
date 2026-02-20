@@ -3609,7 +3609,20 @@ impl RealBenchmarkEvaluator {
                 || question_lower.contains("abelian")
                 || question_lower.contains("characteristic of")
                 || question_lower.contains("order of")
-                || question_lower.contains("generator");
+                || question_lower.contains("order for")
+                || question_lower.contains("maximum possible order")
+                || question_lower.contains("generator")
+                || question_lower.contains("z_")        // Z_n notation (modular arithmetic groups)
+                || question_lower.contains("z_8")
+                || question_lower.contains("z_11")
+                || question_lower.contains("z_15")
+                || question_lower.contains("z_26")
+                || question_lower.contains("linearly ind")
+                || question_lower.contains("linear transformation")
+                || question_lower.contains("vector space")
+                || question_lower.contains("integral domain")
+                || question_lower.contains("splitting field")
+                || question_lower.contains("finite field");
             let math_score = if !is_abstract_algebra {
                 self.score_symbolic_arithmetic(&question_lower, &choice_lower)
             } else {
