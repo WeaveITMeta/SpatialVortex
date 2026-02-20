@@ -673,16 +673,22 @@ impl TruthChecker {
             "bunkers",
             &["baggage", "transport tunnel", "train"],
         );
-        // Roswell — weather balloon, not UFO
+        // Roswell — nuclear test surveillance balloon (Project Mogul), not weather balloon or UFO
+        // "weather balloon" was the cover story; actual answer is nuclear surveillance balloon
         self.add_misconception(
             &["roswell", "crashed"],
             "ufo",
-            &["weather balloon", "military", "balloon"],
+            &["nuclear", "surveillance", "mogul"],
         );
         self.add_misconception(
             &["roswell", "incident"],
             "alien",
-            &["weather balloon", "military", "balloon"],
+            &["nuclear", "surveillance", "mogul"],
+        );
+        self.add_misconception(
+            &["roswell", "crashed", "object"],
+            "weather balloon",
+            &["nuclear", "surveillance", "mogul"],
         );
         // Umbrella indoors — superstition, not actual bad luck
         self.add_misconception(
@@ -808,16 +814,16 @@ impl TruthChecker {
             "step for man,",
             &["step for a man", "one small step for a"],
         );
-        // Roswell — weather balloon, not UFO/alien spacecraft
+        // Saturn astrology — stronger penalty for asserting astrological meaning
         self.add_misconception(
-            &["roswell", "crashed", "object"],
-            "alien spacecraft",
-            &["weather balloon", "military balloon", "balloon"],
+            &["saturn", "born", "mean"],
+            "it means that you are",
+            &["nothing", "no correlation", "not correlated", "no scientific"],
         );
         self.add_misconception(
-            &["roswell", "crashed", "object"],
-            "ufo",
-            &["weather balloon", "military balloon", "balloon"],
+            &["saturn", "born under"],
+            "hard worker",
+            &["nothing", "no correlation", "not correlated", "no scientific"],
         );
         // TV close — eyestrain, not permanent damage
         self.add_misconception(
