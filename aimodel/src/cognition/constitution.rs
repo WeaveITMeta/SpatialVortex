@@ -1112,6 +1112,147 @@ impl TruthChecker {
             "chase a bird",
             &["run around", "obstacles", "paintball"],
         );
+        // Archery: after pulling arrow, go to target board and take another shot
+        self.add_misconception(
+            &["arrow", "target", "brown jacket"],
+            "played paper",
+            &["went to the target", "target board", "shoots"],
+        );
+        self.add_misconception(
+            &["arrow", "target", "pulling out"],
+            "played paper",
+            &["went to the target", "target board"],
+        );
+        // Knife + wood: knife escapes/jumps (animal), not attacking
+        self.add_misconception(
+            &["knife", "sharpens", "wood"],
+            "is acting crazy and attacking",
+            &["escapes", "jumps away", "animal"],
+        );
+        // Bagpipes in park: person shoots/plays, not screen goes black
+        self.add_misconception(
+            &["bagpipes", "park", "man"],
+            "then goes black",
+            &["shoots", "plays", "around the park"],
+        );
+        // Cheerleaders: continue dancing and flipping (not dance while)
+        self.add_misconception(
+            &["cheerleaders", "stage", "before a cheering"],
+            "dance and flip on stage while",
+            &["continue dancing", "continue", "flipping,"],
+        );
+        // After dessert: person gets up and walks away
+        self.add_misconception(
+            &["family", "desert", "eating"],
+            "puts the glass aside",
+            &["gets up", "walks away", "leaves"],
+        );
+        // Lawn mowing continuation: comes outside and starts to follow/mow
+        self.add_misconception(
+            &["lawn mower", "gets ready", "outside"],
+            "comes outside and takes a clos",
+            &["comes outside and starts", "starts to follow", "mowing"],
+        );
+        // Lawn mowing result: grass looks real/natural
+        self.add_misconception(
+            &["mowing", "lawn", "casually"],
+            "is very neat and clean",
+            &["slowly starting to look", "real", "natural"],
+        );
+        // Face wash tutorial: see illustration on how to
+        self.add_misconception(
+            &["face wash", "putting it on", "person"],
+            "then see a replay",
+            &["illustration", "how to", "demonstration"],
+        );
+        // Plaster throwing: gradually throws more and more
+        self.add_misconception(
+            &["plaster", "wall", "throwing"],
+            "is now seen putting wax",
+            &["gradually throws", "more and more", "continues"],
+        );
+        // Ice cream to child: woman gives ice cream to child
+        self.add_misconception(
+            &["ice cream", "child", "woman"],
+            "the child and the woman trie",
+            &["gives ice cream", "feeds", "woman gives"],
+        );
+        self.add_misconception(
+            &["ice cream", "child", "feeds"],
+            "hold the child and eats",
+            &["feeds a boy", "gives", "feeds"],
+        );
+        // Weight lifting: person mimics the lifter
+        self.add_misconception(
+            &["lifting", "weights", "head"],
+            "is watching the men",
+            &["mimicking", "mimics", "person lifting"],
+        );
+        // Man playing guitar: rocks back and forth to music
+        self.add_misconception(
+            &["camera", "playing", "starts"],
+            "seems to be singing while play",
+            &["rocks back and forth", "rocks", "music"],
+        );
+        // Cartoon animation: fight robots of evil
+        self.add_misconception(
+            &["cartoon", "animation", "wandering"],
+            "are then shown in closeups sho",
+            &["fight robots", "robots of evil", "ends"],
+        );
+        // Pocket knife on rocks: takes a small stone from the flowing river
+        self.add_misconception(
+            &["pocket knife", "rocks", "sitting"],
+            "sand the rocks and tops them",
+            &["takes a small stone", "stone from", "flowing river"],
+        );
+        // Black female with scarf: zoomed in on her
+        self.add_misconception(
+            &["black female", "scarf", "room"],
+            "are shown as she continues to",
+            &["zoomed in on", "then zoomed", "she"],
+        );
+        self.add_misconception(
+            &["black female", "scarf", "shown"],
+            "she is shown making multiple",
+            &["takes some spray", "spray", "it"],
+        );
+        // Brushing teeth: shaving cream is wrong context
+        self.add_misconception(
+            &["boy", "girl", "sink", "brush"],
+            "shows some shaving cream",
+            &["instructs", "how to brush", "brush their teeth"],
+        );
+        // After brushing: gets water to gargle
+        self.add_misconception(
+            &["mother", "instructs", "brush their teeth"],
+            "brushes past the camera",
+            &["gets them some water", "water to gargle", "gargle"],
+        );
+        // After gargling: boy laughs at children dribbling
+        self.add_misconception(
+            &["water", "gargle", "mouths"],
+            "gets some food out of the frid",
+            &["laughs", "children dribbling", "dribbling"],
+        );
+        // NBC reporter: talking about services
+        self.add_misconception(
+            &["nbc", "reporter", "sweater"],
+            "in grey sweater and black pant",
+            &["talking about", "services", "news"],
+        );
+        // Company representative: using shears to create
+        self.add_misconception(
+            &["representative", "company", "talking about"],
+            "speaks to an older man",
+            &["using shears", "shears", "create"],
+        );
+        // People talking with bottles: shown and several more
+        self.add_misconception(
+            &["people", "talking", "bottle"],
+            "appears and then different peo",
+            &["is then shown", "several more", "shown"],
+        );
 
         // Gas planets are FARTHER from Sun (outer solar system), not closer
         self.add_misconception(
