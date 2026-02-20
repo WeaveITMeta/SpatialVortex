@@ -3641,6 +3641,7 @@ impl RealBenchmarkEvaluator {
             };
             score += math_score;
             breakdown.push(("math", math_score));
+
             
             // ----- EXPERT 6: KNOWLEDGE LOOKUP (merged one_shot + grounded + commonsense) -----
             let learned_score = self.score_with_learned_knowledge(&question_lower, &choice_lower);
