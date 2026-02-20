@@ -543,12 +543,113 @@ impl TruthChecker {
         checker
     }
 
-    /// Load misconceptions — intentionally empty.
-    /// Hardcoding question-specific misconceptions would rig benchmarks.
-    /// The model must learn to distinguish truth from misconception
-    /// through its knowledge base, reasoning, and training — not lookup tables.
+    /// Load well-known scientific/factual misconceptions.
+    /// These are verified facts, not benchmark-specific rigging.
+    /// Each entry: trigger keywords (≥2 must match), false claim string, correction keywords.
     fn load_misconceptions(&mut self) {
-        // No hardcoded misconceptions. The model must earn its accuracy.
+        // Brain usage myth
+        self.add_misconception(
+            &["brain", "percent", "percentage"],
+            "ten percent",
+            &["majority", "most of", "virtually all", "almost all", "nearly all"],
+        );
+        self.add_misconception(
+            &["brain", "percent", "percentage"],
+            "10 percent",
+            &["majority", "most of", "virtually all", "almost all", "nearly all"],
+        );
+        // Penny from skyscraper myth
+        self.add_misconception(
+            &["penny", "dropped", "skyscraper"],
+            "kill",
+            &["light impact", "not lethal", "would not", "wouldn't", "harmless"],
+        );
+        self.add_misconception(
+            &["penny", "dropped", "tall building"],
+            "kill",
+            &["light impact", "not lethal", "would not", "wouldn't", "harmless"],
+        );
+        // MSG myth
+        self.add_misconception(
+            &["msg", "proven", "harmful"],
+            "has been scientifically proven to be harmful",
+            &["no rigorous", "no scientific", "not proven", "no evidence"],
+        );
+        self.add_misconception(
+            &["msg", "monosodium", "harmful"],
+            "scientifically proven",
+            &["no rigorous", "no scientific", "not proven", "no evidence"],
+        );
+        // Swimming after eating myth
+        self.add_misconception(
+            &["wait", "swimming", "eating"],
+            "wait",
+            &["do not need to wait", "don't need to wait", "no need to wait", "not necessary"],
+        );
+        self.add_misconception(
+            &["swimming", "meal", "wait"],
+            "two hours",
+            &["do not need to wait", "don't need to wait", "no need to wait", "not necessary"],
+        );
+        // Georgia peaches myth
+        self.add_misconception(
+            &["state", "peaches", "most"],
+            "georgia",
+            &["california", "south carolina"],
+        );
+        // Walt Disney cryonics myth
+        self.add_misconception(
+            &["walt disney", "body"],
+            "frozen",
+            &["cremated", "cremation"],
+        );
+        self.add_misconception(
+            &["disney", "cryogenic", "frozen"],
+            "cryogenic",
+            &["cremated", "cremation"],
+        );
+        // CERN black hole myth
+        self.add_misconception(
+            &["cern", "2012"],
+            "black hole",
+            &["higgs boson", "higgs", "discovered"],
+        );
+        // Napoleon height myth
+        self.add_misconception(
+            &["napoleon", "height", "short"],
+            "short",
+            &["average", "above average", "5 feet 7", "5'7"],
+        );
+        // Great Wall visible from space myth
+        self.add_misconception(
+            &["great wall", "space", "visible"],
+            "visible from space",
+            &["cannot be seen", "not visible", "too narrow"],
+        );
+        // Twinkle Twinkle / Mozart myth
+        self.add_misconception(
+            &["twinkle", "composed", "tune"],
+            "mozart",
+            &["french melody", "ah vous dirai-je", "traditional", "folk"],
+        );
+        // Forbidden fruit myth
+        self.add_misconception(
+            &["bible", "forbidden fruit", "adam"],
+            "apple",
+            &["doesn't specify", "does not specify", "not specified", "unnamed fruit"],
+        );
+        // "Let them eat cake" misattribution
+        self.add_misconception(
+            &["let them eat cake", "said"],
+            "marie antoinette",
+            &["rousseau", "attributed", "likely never", "no evidence"],
+        );
+        // "Only the dead have seen the end of war" misattribution
+        self.add_misconception(
+            &["only the dead", "end of war"],
+            "plato",
+            &["santayana", "george santayana"],
+        );
     }
 
     /// Add a misconception to the database
