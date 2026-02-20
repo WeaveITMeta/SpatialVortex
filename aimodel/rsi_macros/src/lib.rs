@@ -1,7 +1,7 @@
 //! RSI Macros - Procedural Macros for Recursive Self-Improvement
 //!
 //! This crate provides compile-time code generation based on RSI state,
-//! enabling the aimodel to optimize itself through recompilation.
+//! enabling the vortex to optimize itself through recompilation.
 //!
 //! ## Key Macros
 //!
@@ -77,7 +77,7 @@ impl Default for ScoringCoefficients {
 
 /// Load RSI state from file (called at compile time)
 fn load_rsi_config() -> RSIConfig {
-    // Try to load from rsi_state.json in the aimodel directory
+    // Try to load from rsi_state.json in the vortex directory
     let config_path = std::env::var("CARGO_MANIFEST_DIR")
         .map(|dir| format!("{}/../rsi_state.json", dir))
         .unwrap_or_else(|_| "rsi_state.json".to_string());

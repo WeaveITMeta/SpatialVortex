@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-02-03T23:04:00.672015800+00:00",
+  "timestamp": "2026-02-20T02:24:34.310813600+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
-    "training_epochs": 100,
-    "gpu_enabled": true,
+    "training_epochs": 0,
+    "gpu_enabled": false,
     "features": [
       "sacred_geometry",
       "vortex_cycles",
@@ -13,28 +13,55 @@
   },
   "task_results": [
     {
-      "task": "humaneval",
-      "accuracy": 76.0,
-      "num_correct": 76,
-      "total": 100,
-      "avg_confidence": 1.0,
-      "time_secs": 164.1779122,
+      "task": "mmlu",
+      "accuracy": 55.55555555555556,
+      "num_correct": 25,
+      "total": 45,
+      "avg_confidence": 0.6629785,
+      "time_secs": 1.0684639,
       "wrong_samples": []
     },
     {
-      "task": "squad",
-      "accuracy": 28.999999999999996,
-      "num_correct": 29,
-      "total": 100,
-      "avg_confidence": 0.32561874,
-      "time_secs": 141.0343745,
+      "task": "gsm8k",
+      "accuracy": 31.11111111111111,
+      "num_correct": 14,
+      "total": 45,
+      "avg_confidence": 0.7952851,
+      "time_secs": 1.7817915,
+      "wrong_samples": []
+    },
+    {
+      "task": "hellaswag",
+      "accuracy": 33.33333333333333,
+      "num_correct": 15,
+      "total": 45,
+      "avg_confidence": 0.49333158,
+      "time_secs": 3.3606986,
+      "wrong_samples": []
+    },
+    {
+      "task": "truthfulqa",
+      "accuracy": 40.0,
+      "num_correct": 18,
+      "total": 45,
+      "avg_confidence": 0.69403833,
+      "time_secs": 2.2602468,
+      "wrong_samples": []
+    },
+    {
+      "task": "humaneval",
+      "accuracy": 97.77777777777777,
+      "num_correct": 44,
+      "total": 45,
+      "avg_confidence": 0.99134105,
+      "time_secs": 5.7420292,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 105,
-    "total_questions": 200,
-    "overall_accuracy": 52.5,
-    "total_time_secs": 446.8726621
+    "total_correct": 116,
+    "total_questions": 225,
+    "overall_accuracy": 51.55555555555556,
+    "total_time_secs": 17.9281645
   }
 }

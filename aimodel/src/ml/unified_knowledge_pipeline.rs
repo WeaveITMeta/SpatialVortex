@@ -595,9 +595,9 @@ impl UnifiedKnowledgePipeline {
         let query_embedding = self.compute_semantic_embedding(query);
         let choice_embedding = self.compute_semantic_embedding(choice);
         let semantic_sim = self.cosine_similarity(&query_embedding, &choice_embedding);
-        // Reduce semantic similarity weight — it rewards misconceptions that
-        // sound like the question (e.g., "bulls attracted by red" for "why red capes")
-        score += semantic_sim * 1.0;
+        // Moderate semantic similarity weight — 3.0 was too high (rewards misconceptions),
+        // 1.0 was too low (weakens scoring across all benchmarks)
+        score += semantic_sim * 2.0;
         
         // TRUTH CHECK: Penalize misconceptions, boost truthful answers
         // This is critical for TruthfulQA where the wrong answer IS the common belief

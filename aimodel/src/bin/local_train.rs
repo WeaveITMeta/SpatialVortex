@@ -12,19 +12,19 @@
 //!   cargo run --bin local_train --release
 //!   cargo run --bin local_train --release --features gpu  # With GPU
 
-use aimodel::storage::{
+use vortex::storage::{
     UnifiedStore, UnifiedStoreConfig, ModelTier, QuantizationLevel,
     StoredEmbedding,
 };
-use aimodel::ml::calm::{CALMEngine, CALMConfig};
-use aimodel::ml::continuous_learning::{ContinuousTrainer, ContinuousLearningConfig};
-use aimodel::ml::huggingface::{RSIState, RSIMetric};
-use aimodel::ml::gpu_trainer::{GPUTrainer, GPUTrainConfig, beams_to_gpu_data};
-use aimodel::cognition::verified_patterning::{
+use vortex::ml::calm::{CALMEngine, CALMConfig};
+use vortex::ml::continuous_learning::{ContinuousTrainer, ContinuousLearningConfig};
+use vortex::ml::huggingface::{RSIState, RSIMetric};
+use vortex::ml::gpu_trainer::{GPUTrainer, GPUTrainConfig, beams_to_gpu_data};
+use vortex::cognition::verified_patterning::{
     VerifiedPatterningEngine, VerificationConfig, BenchmarkResult,
     ContinuousLearningConfig as VPLearningConfig,
 };
-use aimodel::data::{HFDatasetLoader, DatasetLoaderConfig, RealBenchmarkEvaluator};
+use vortex::data::{HFDatasetLoader, DatasetLoaderConfig, RealBenchmarkEvaluator};
 use std::time::Instant;
 
 fn main() {
@@ -131,7 +131,7 @@ fn main() {
     let mut hf_loader = HFDatasetLoader::new(dataset_config);
     
     // Load top priority datasets from registry (top 20)
-    use aimodel::data::get_top_priority_datasets;
+    use vortex::data::get_top_priority_datasets;
     let priority_datasets = get_top_priority_datasets(20);
     
     let mut loaded_count = 0;
@@ -161,8 +161,8 @@ fn main() {
     // Step 5b: Load Entailment & Commonsense Datasets for JEPA
     // =========================================================================
     println!("🧠 Loading Entailment & Commonsense datasets for JEPA...");
-    use aimodel::data::{get_datasets_by_category, DatasetCategory};
-    use aimodel::ml::{JEPAConfig, JEPATrainer};
+    use vortex::data::{get_datasets_by_category, DatasetCategory};
+    use vortex::ml::{JEPAConfig, JEPATrainer};
     
     let entailment_datasets = get_datasets_by_category(DatasetCategory::Entailment);
     let commonsense_datasets = get_datasets_by_category(DatasetCategory::Commonsense);

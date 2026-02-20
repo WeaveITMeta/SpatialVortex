@@ -1188,9 +1188,11 @@ impl RealBenchmarkEvaluator {
         
         // STEP 3: Web learning AFTER HF data - uses knowledge gaps to guide queries
         // This ensures web learning knows what's missing from HF data
-        println!("\n[PHASE 3] Web Learning - Learning from web to fill knowledge gaps...");
-        let web_categories = vec!["commonsense", "piqa", "winogrande"];
-        self.consciousness_learn_for_benchmarks(&web_categories);
+        // TEMPORARILY DISABLED: web crawl is non-deterministic (different pages each run),
+        // causing 3-5% score variance that masks all expert signal. Measuring clean baseline.
+        println!("\n[PHASE 3] Web Learning - DISABLED for deterministic baseline measurement");
+        // let web_categories = vec!["commonsense", "piqa", "winogrande"];
+        // self.consciousness_learn_for_benchmarks(&web_categories);
         
         // STEP 4: Pretrain CALM weights on ALL knowledge (HF + hardcoded + web)
         // This trains the encoder/decoder weights on the complete loaded knowledge
@@ -3642,6 +3644,7 @@ impl RealBenchmarkEvaluator {
             );
             score += truth_score;
             breakdown.push(("truth", truth_score));
+            
             
             logits.push(score);
             debug_breakdowns.push(breakdown);

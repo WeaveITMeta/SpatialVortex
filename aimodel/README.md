@@ -1,61 +1,155 @@
-# AIModel
+# vortex
 
-Distilled SpatialVortex AGI/ASI seed - Sacred geometry + continuous latent generation.
+[![Crates.io](https://img.shields.io/crates/v/vortex.svg)](https://crates.io/crates/vortex)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Distilled SpatialVortex AGI/ASI seed — sacred geometry inference, continuous latent generation, and recursive self-improvement.
 
 ## Overview
 
-This crate contains the distilled, minimal, non-redundant stack from SpatialVortex (Jan 2026). Only the best solver per piece survives.
+`vortex` is a pure-Rust AI inference and training framework built on sacred geometry principles. It provides a complete pipeline from knowledge acquisition (HuggingFace datasets + web crawling) through multi-expert inference with runtime self-improvement.
 
-## Core Components
+**No external LLM required** — all inference is performed locally using learned embeddings, geometric world models, and multi-expert scoring.
 
-### Sacred Geometry (Preserved)
-- **FluxMatrixEngine** - Vortex cycles (1→2→4→8→7→5→1), 3-6-9 anchors, 833:1 compression
-- **VCP (VortexContextPreserver)** - Subspace hallucination detection + sacred interventions
-- **GeometricInferenceEngine** - Bi-directional rule-based + ML enhancement (<500μs)
-- **EBRM (EnergyBasedReasoningModel)** - Global energy for path refinement/scoring
+## Quick Start
 
-### ML Stack
-- **ProductionEngine** - High-throughput autoregressive with CALM integration
-- **VortexModel** - Unified transformer with GQA/RoPE + VCP integration
-- **Burn** - ML training framework with tch-rs backend
+### CLI — Interactive Chat
 
-### AI Orchestration
-- **AIConsensusEngine** - Multi-LLM fusion with weighted confidence
-- **ASIOrchestrator** - Unified intelligence coordinator
+```bash
+# Interactive REPL
+cargo run --bin vortex-cli
 
-## Dependencies (2026 Distilled)
+# Single prompt (plain text or JSON output)
+cargo run --bin vortex-cli -- --prompt "What is sacred geometry?" --json
 
-| Crate | Purpose |
-|-------|---------|
-| `ort` | ONNX Runtime inference (primary) |
-| `burn` | ML training framework |
-| `wtransport` | WebTransport/QUIC networking |
-| `rocksdb` | Hot-path storage |
-| `embedvec` | Vector embeddings |
-| `bevy` | 3D visualization |
+# With reasoning trace
+cargo run --bin vortex-cli -- --prompt "Hello" --reasoning
 
-## Features
-
-```toml
-[features]
-default = ["onnx", "burn-cpu"]
-onnx = ["ort", "tokenizers"]
-burn-cpu = ["burn", "burn-ndarray", "burn-autodiff"]
-burn-gpu = ["burn", "burn-tch", "burn-autodiff"]
-bevy_viz = ["bevy"]
-transport = ["wtransport"]
-storage = ["rocksdb"]
-embeddings = ["embedvec"]
+# Piped input
+echo "Hello" | cargo run --bin vortex-cli
 ```
 
-## Status
+Flags: `--prompt`, `--system`, `--temperature`, `--max-steps`, `--max-cycles`, `--json`, `--reasoning`, `--no-guard`, `--no-memory`
 
-**Work in Progress** - Files copied from SpatialVortex require import path fixes.
+### REST API — OpenAI-Compatible Server
 
-See `docs/IMPLEMENTATION_CHECKLIST.md` for:
-- ✅ Migrated components
-- 🔲 Components to implement (SSO, CALM, VortexDiscovery)
-- 🔧 Import fixes needed
+```bash
+cargo run --bin vortex-api --features web
+```
+
+Endpoints:
+- `POST /v1/chat/completions` — Chat completions (OpenAI-compatible)
+- `GET  /v1/models` — List available models
+- `GET  /health` — Health check
+
+```bash
+curl -X POST http://127.0.0.1:7000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"vortex-0.1","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+Responses include a `vortex` extension with confidence, energy, sacred alignment, full reasoning trace, and safety results.
+
+Configure with env vars: `VORTEX_HOST` (default `127.0.0.1`), `VORTEX_PORT` (default `7000`).
+
+### Library Usage
+
+```toml
+[dependencies]
+vortex = "0.1"
+```
+
+```rust
+use vortex::{VortexEngine, VortexEngineConfig};
+
+let mut engine = VortexEngine::new();
+let response = engine.chat("What is sacred geometry?");
+println!("{} (confidence: {:.0}%)", response.content, response.confidence * 100.0);
+```
+
+### Run Benchmarks
+
+```bash
+cargo run --release --bin spatialvortex-eval --features "gpu,embeddings,web-learning" -- --tasks all
+```
+
+## Architecture
+
+### Inference Pipeline
+
+```
+Question → Pipeline → Unified Inference → Multi-Expert → Answer
+              ↓              ↓                  ↓
+         Knowledge      3-pass MoE         21 experts
+         Retrieval      + World Model      + CALM semantic
+              ↓              ↓                  ↓
+         Dynamic RSI learns which path works best per dataset
+```
+
+### Core Components
+
+| Component | Description |
+|-----------|-------------|
+| `CALMEngine` | Continuous Autoregressive Language Model — semantic encoder/decoder |
+| `UnifiedInferenceEngine` | 3-pass iterative refinement with MoE routing and reasoning layers |
+| `UnifiedKnowledgePipeline` | RETRIEVE → EXTRACT → EMBED → REASON → SCORE |
+| `DynamicRSI` | Runtime self-improving inference strategy per dataset |
+| `SacredMoEModel` | Mixture of Experts with geometric (phi-based) routing |
+| `TransitiveFluxReasoner` | Transitive reasoning via vortex flux matrix ladder index |
+| `GenerativeVortexEngine` | Generative architecture with BPE tokenizer + CALM |
+| `FluxMatrixEngine` | Vortex cycles (1→2→4→8→7→5→1), 3-6-9 sacred anchors |
+| `ConsciousnessLearner` | Dynamic knowledge graph with web learning |
+| `RealBenchmarkEvaluator` | Full eval harness (MMLU, GSM8K, ARC, HellaSwag, TruthfulQA, HumanEval) |
+
+### Knowledge Sources
+
+1. **HuggingFace Datasets** — 125 datasets across 9 categories (commonsense, science, math, code, etc.)
+2. **Web Learning** — High-throughput crawler extracts facts from Wikipedia and educational sites
+3. **EmbedVec Persistence** — One-time download, then loads from local cache (114K+ embeddings)
+4. **Test-Time Training** — Learns from each question during inference
+
+## Feature Flags
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `burn-cpu` | Yes | Burn ML framework with CPU backend |
+| `web-learning` | Yes | Web crawler for knowledge acquisition |
+| `burn-gpu` | No | Burn with PyTorch GPU backend |
+| `gpu` | No | Burn with WebGPU backend |
+| `onnx` | No | ONNX Runtime inference |
+| `embeddings` | No | EmbedVec vector persistence |
+| `web` | No | Actix-web chat API server |
+| `storage` | No | RocksDB hot-path storage |
+| `transport` | No | WebTransport/QUIC networking |
+| `bevy_viz` | No | Bevy 3D visualization |
+
+## Binaries
+
+| Binary | Features Required | Description |
+|--------|-------------------|-------------|
+| `vortex-cli` | — | Interactive CLI chat with single-shot, piped, and REPL modes |
+| `vortex-api` | `web` | OpenAI-compatible REST API server (`/v1/chat/completions`) |
+| `spatialvortex-eval` | — | Full benchmark evaluation harness |
+| `benchmark_crawler` | — | Web knowledge acquisition tool |
+
+## Project Structure
+
+```
+src/
+  lib.rs          — Public API surface
+  error.rs        — Error types
+  data/           — Models, attributes, HF datasets, benchmark loaders
+  core/           — Sacred geometry engines
+  ml/             — ML components (CALM, MoE, inference, RSI, reasoning)
+  ai/             — AI orchestration (consensus, flux reasoning)
+  engine.rs       — Unified VortexEngine (CLI + API entry point)
+  cognition/      — Thinking, memory, RAG, constitution, tools
+  serving/        — Batch scheduler, MoE gate, MCP server, chat API
+  storage/        — Embeddings, RocksDB, unified store
+  transport/      — WebTransport/QUIC
+  bin/            — CLI binaries
+rsi_macros/       — Proc-macro crate for compile-time RSI code generation
+```
 
 ## License
 

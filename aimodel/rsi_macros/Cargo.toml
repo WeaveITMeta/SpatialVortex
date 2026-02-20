@@ -3,6 +3,10 @@ name = "rsi_macros"
 version = "0.1.0"
 edition = "2021"
 description = "Procedural macros for RSI (Recursive Self-Improvement) code generation"
+license = "MIT"
+repository = "https://github.com/WeaveITMeta/SpatialVortex"
+keywords = ["ai", "machine-learning", "macros", "self-improvement"]
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true

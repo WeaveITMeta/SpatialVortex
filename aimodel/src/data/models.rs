@@ -1,4 +1,4 @@
-//! Core Data Models for AIModel
+//! Core Data Models for Vortex
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

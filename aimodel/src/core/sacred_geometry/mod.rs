@@ -11,6 +11,13 @@ pub mod vortex_math;
 pub mod pattern_coherence;
 
 pub use flux_matrix::FluxMatrixEngine;
-pub use geometric_inference::GeometricInferenceEngine;
+pub use geometric_inference::{
+    GeometricInferenceEngine,
+    InferenceObservation as GeometricObservation,
+    ClusterInference,
+    ReducedEmbedding,
+    LearnedWeights,
+    BiDirectionalResult,
+};
 pub use vortex_math::VortexPositioningEngine;
 pub use pattern_coherence::PatternCoherenceTracker;

@@ -3,7 +3,7 @@
 //! Benchmarks the high-throughput web crawler against Wikipedia API baseline.
 //! Run with: cargo run --bin benchmark_crawler --release --features web-learning
 
-use aimodel::ml::{
+use vortex::ml::{
     WebCrawler, CrawlerConfig, 
     FastKnowledgeAcquisition, FastKnowledgeConfig,
 };

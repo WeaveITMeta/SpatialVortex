@@ -1,11 +1,11 @@
-//! Error types for AIModel
+//! Error types for Vortex
 
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, AIModelError>;
+pub type Result<T> = std::result::Result<T, VortexError>;
 
 #[derive(Error, Debug)]
-pub enum AIModelError {
+pub enum VortexError {
     #[error("Invalid flux matrix configuration: {0}")]
     InvalidFluxMatrix(String),
 

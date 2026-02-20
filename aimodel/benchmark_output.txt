@@ -1,0 +1,177 @@
++===============================================================+
+|         SPATIALVORTEX EVALUATION HARNESS                      |
+|         (Rust equivalent of lm-evaluation-harness)            |
++===============================================================+
+| Tasks:        mmlu                                              
+| Data dir:     ../benchmarks/data                                              
+| Batch size:   8                                              
+| Few-shot:     5                                              
+| Limit:        10                                              
+| Debug:        normal                                              
+| Output:       "eval_results.json"                                            
++===============================================================+
+   Loading knowledge from HuggingFace datasets (non-blocking)...
+      Γ£ô Downloaded 500 examples from HF: FineWeb-Edu
+      Γ£ô Downloaded 500 examples from HF: C4
+      Γ£ô Downloaded 500 examples from HF: Wikipedia
+      Γ£ô Downloaded 75 examples from HF: WikiText
+      Γ£ô Downloaded 500 examples from HF: RefinedWeb
+      Γ£ô Downloaded 164 examples from HF: HumanEval
+      Γ£ô Downloaded 120 examples from HF: MBPP
+      Γ£ô Downloaded 500 examples from HF: ARC
+      ΓÜá HF download failed for OpenBookQA: No valid config found for OpenBookQA (tried: ["main", "additional"])
+      Γ£ô Downloaded 500 examples from HF: MMLU
+      ΓÜá HF API error for TruthfulQA with config 'generation': HTTP 404 Not Found
+      ΓÜá HF API error for TruthfulQA with config 'multiple_choice': HTTP 404 Not Found
+      ΓÜá HF download failed for TruthfulQA: No valid config found for TruthfulQA (tried: ["generation", "multiple_choice"])
+      ΓÜá HF download failed for HellaSwag: No valid config found for HellaSwag (tried: ["default"])
+      Γ£ô Downloaded 500 examples from HF: ARC
+      Γ£ô Downloaded 500 examples from HF: WinoGrande
+      Γ£ô Downloaded 500 examples from HF: CommonsenseQA
+      ΓÜá 429 rate limited for HellaSwag, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for HellaSwag, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for HellaSwag, retry 3/3, waiting 8s...
+      ΓÜá HF download failed for HellaSwag: No valid config found for HellaSwag (tried: ["default"])
+      ΓÜá 429 rate limited for OpenBookQA, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for OpenBookQA, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for OpenBookQA, retry 3/3, waiting 8s...
+      ΓÜá 429 rate limited for OpenBookQA, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for OpenBookQA, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for OpenBookQA, retry 3/3, waiting 8s...
+      ΓÜá HF download failed for OpenBookQA: No valid config found for OpenBookQA (tried: ["main", "additional"])
+      ΓÜá 429 rate limited for SNLI, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for SNLI, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for SNLI, retry 3/3, waiting 8s...
+      ΓÜá HF download failed for SNLI: No valid config found for SNLI (tried: ["plain_text"])
+      ΓÜá 429 rate limited for MultiNLI, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for MultiNLI, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for MultiNLI, retry 3/3, waiting 8s...
+      ΓÜá HF download failed for MultiNLI: No valid config found for MultiNLI (tried: ["default"])
+      ΓÜá 429 rate limited for Adversarial NLI, retry 1/3, waiting 2s...
+      Γ£ô Downloaded 500 examples from HF: Adversarial NLI
+      ΓÜá HF API error for SciTail-NLI with config 'default': HTTP 404 Not Found
+      ΓÜá HF API error for SciTail-NLI with config 'main': HTTP 404 Not Found
+      ΓÜá HF API error for SciTail-NLI with config 'plain_text': HTTP 404 Not Found
+      ΓÜá HF download failed for SciTail-NLI: No valid config found for SciTail-NLI (tried: ["default", "main", "plain_text"])
+      ΓÜá HF API error for HANS with config 'default': HTTP 404 Not Found
+      ΓÜá HF API error for HANS with config 'main': HTTP 404 Not Found
+      ΓÜá HF API error for HANS with config 'plain_text': HTTP 404 Not Found
+      ΓÜá HF download failed for HANS: No valid config found for HANS (tried: ["default", "main", "plain_text"])
+      ΓÜá HF API error for DROP with config 'default': HTTP 401 Unauthorized
+      ΓÜá HF download failed for DROP: No valid config found for DROP (tried: ["default"])
+      ΓÜá HF API error for ROPES with config 'default': HTTP 404 Not Found
+      ΓÜá HF API error for ROPES with config 'main': HTTP 404 Not Found
+      ΓÜá HF API error for ROPES with config 'plain_text': HTTP 404 Not Found
+      ΓÜá HF download failed for ROPES: No valid config found for ROPES (tried: ["default", "main", "plain_text"])
+      ΓÜá HF API error for COPA with config 'default': HTTP 401 Unauthorized
+      ΓÜá HF API error for COPA with config 'main': HTTP 401 Unauthorized
+      ΓÜá HF API error for COPA with config 'plain_text': HTTP 401 Unauthorized
+      ΓÜá HF download failed for COPA: No valid config found for COPA (tried: ["default", "main", "plain_text"])
+      ΓÜá HF API error for WSC with config 'default': HTTP 401 Unauthorized
+      ΓÜá HF API error for WSC with config 'main': HTTP 401 Unauthorized
+      ΓÜá HF API error for WSC with config 'plain_text': HTTP 401 Unauthorized
+      ΓÜá HF download failed for WSC: No valid config found for WSC (tried: ["default", "main", "plain_text"])
+      ΓÜá HF API error for PDP with config 'default': HTTP 401 Unauthorized
+      ΓÜá HF API error for PDP with config 'main': HTTP 401 Unauthorized
+      ΓÜá HF API error for PDP with config 'plain_text': HTTP 401 Unauthorized
+      ΓÜá HF download failed for PDP: No valid config found for PDP (tried: ["default", "main", "plain_text"])
+      Γ£ô Downloaded 500 examples from HF: PubMedQA
+      ΓÜá 429 rate limited for MedQA, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for MedQA, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for MedQA, retry 3/3, waiting 8s...
+      Γ£ô Downloaded 100 examples from HF: MedQA
+      ΓÜá 429 rate limited for SciQ, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for SciQ, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for SciQ, retry 3/3, waiting 8s...
+      ΓÜá HF download failed for SciQ: No valid config found for SciQ (tried: ["default"])
+      ΓÜá 429 rate limited for SciTail, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for SciTail, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for SciTail, retry 3/3, waiting 8s...
+      ΓÜá 429 rate limited for SciTail, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for SciTail, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for SciTail, retry 3/3, waiting 8s...
+      ΓÜá HF download failed for SciTail: No valid config found for SciTail (tried: ["snli_format", "tsv_format"])
+      ΓÜá 429 rate limited for QASC, retry 1/3, waiting 2s...
+      ΓÜá 429 rate limited for QASC, retry 2/3, waiting 4s...
+      ΓÜá 429 rate limited for QASC, retry 3/3, waiting 8s...
+      ΓÜá 429 rate limited for QASC, retry 1/3, waiting 2s...
+      ΓÜá HF API error for QASC with config 'main': HTTP 404 Not Found
+      ΓÜá HF API error for QASC with config 'plain_text': HTTP 404 Not Found
+      ΓÜá HF download failed for QASC: No valid config found for QASC (tried: ["default", "main", "plain_text"])
+      Γ£ô Downloaded 500 examples from HF: SQuAD
+      Γ£ô Downloaded 500 examples from HF: BoolQ
+      ΓÜá HF API error for ReCoRD with config 'default': HTTP 401 Unauthorized
+      ΓÜá HF API error for ReCoRD with config 'main': HTTP 401 Unauthorized
+      ΓÜá HF API error for ReCoRD with config 'plain_text': HTTP 401 Unauthorized
+      ΓÜá HF download failed for ReCoRD: No valid config found for ReCoRD (tried: ["default", "main", "plain_text"])
+      ΓÜá HF API error for HotpotQA with config 'distractor': HTTP 404 Not Found
+      ΓÜá HF API error for HotpotQA with config 'fullwiki': HTTP 404 Not Found
+      ΓÜá HF download failed for HotpotQA: No valid config found for HotpotQA (tried: ["distractor", "fullwiki"])
+      ΓÜá HF API error for TriviaQA with config 'rc': HTTP 404 Not Found
+      ΓÜá HF API error for TriviaQA with config 'unfiltered': HTTP 404 Not Found
+      ΓÜá HF download failed for TriviaQA: No valid config found for TriviaQA (tried: ["rc", "unfiltered"])
+      Γ£ô Downloaded 500 examples from HF: GSM8K
+      Γ£ô Downloaded 500 examples from HF: Orca-Math
+   Extracting knowledge from 15919 HF examples...
+   Processed 5000/15919 examples, 95179 embeddings, 10185 entity-attrs, 2705 causal patterns
+   Processed 10000/15919 examples, 99879 embeddings, 12356 entity-attrs, 3383 causal patterns
+   Processed 15000/15919 examples, 107086 embeddings, 16584 entity-attrs, 3827 causal patterns
+   Synced 108620 embeddings to CALM engine
+   Synced to RAG engine: 20133 topics, 78711 facts
+   Γ£ô Loaded 17419 examples from 45 HF datasets in 235.6s (0 failed)
+   Knowledge: 108620 embeddings, 18525 entity-attrs, 3948 causal patterns
+[Vortex] Pre-seeded from HF: 18482 subjects, 119110 attrs, 53614 relations (health=90.4%) in 16.64s
+   RAG engine knowledge from datasets: 20133 topics, 78711 facts
+
+[PHASE 3] Web Learning - Learning from web to fill knowledge gaps...
++=======================================================================+
+|        CONSCIOUSNESS WEB LEARNING PHASE - Pre-Benchmark               |
+|   Learning from the web with critical thinking before benchmarks      |
++=======================================================================+
+   [DEBUG] Categories: ["commonsense", "piqa", "winogrande"]
+   [DEBUG] Category 'commonsense' generated 4 queries
+   [DEBUG] Category 'piqa' generated 2 queries
+   [DEBUG] Category 'winogrande' generated 2 queries
+   [DEBUG] Improvement queries generated: 25
+   [Web Learning] Starting with 33 queries...
+   [Web Learning] Using custom WebCrawler for 33 queries
+   [Web Learning] Crawling 66 seed URLs...
+   [Web Learning] Crawled 77 pages
+   [Web Learning] ≡ƒÜÇ COMPLETED: 77 pages from 33 queries in 13.25s
+   [Web Learning] ≡ƒôè THROUGHPUT: 5.8 pages/sec | 2576 facts from 18 domains
++=======================================================================+
+|  WEB LEARNING STATISTICS                                              |
++=======================================================================+
+|  Queries Generated:           33                                       |
+|  Web Searches:                33                                       |
+|  Websites Referenced:         77  (5.3/sec)                          |
+|  Unique Domains:               0                                       |
++=======================================================================+
+|  KNOWLEDGE EXTRACTION                                                 |
++=======================================================================+
+|  Facts Extracted:           2576                                       |
+|  Facts Verified:               0                                       |
+|  Facts Integrated:          2576                                       |
+|  Subjects Created:         18641                                       |
++=======================================================================+
+|  Total Learning Time:      14529ms (14.53s)                            |
++=======================================================================+
+[Consciousness] Synced 18641 subjects to RAG engine
+[Vortex] Gap-fill: +1460 attrs, +29554 relations across 18641 subjects
+
+[Consciousness] Knowledge Health Score: 97.5%
+[Consciousness] Learning complete in 16.76s - 77 websites referenced from 0 unique domains
+[CALM] Pretraining CALM weights...
+Pre-training CALM weights on 10000 texts for 5 epochs...
+   [BPE] Merge 1/1000: 't' + 'h' ΓåÆ 'th' (freq=14868)
+   [BPE] Merge 2/1000: 'i' + 's' ΓåÆ 'is' (freq=10926)
+   [BPE] Merge 3/1000: 'th' + 'e' ΓåÆ 'the' (freq=10466)
+   [BPE] Merge 4/1000: 'e' + 'r' ΓåÆ 'er' (freq=8371)
+   [BPE] Merge 5/1000: 'i' + 'n' ΓåÆ 'in' (freq=7536)
+   [BPE] Merge 200/1000: 'et' + 'er' ΓåÆ 'eter' (freq=389)
+   [BPE] Merge 400/1000: '-' + 'year' ΓåÆ '-year' (freq=173)
+   [BPE] Merge 600/1000: 'ad' + 'e' ΓåÆ 'ade' (freq=104)
+   [BPE] Merge 800/1000: 'mo' + 'ther' ΓåÆ 'mother' (freq=72)
+   [BPE] Merge 1000/1000: 'y' + 'o' ΓåÆ 'yo' (freq=56)
+   [BPE] Learned 1000 merges, vocab size: 1079
+  Pre-computing 10000 embeddings...

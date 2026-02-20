@@ -1,7 +1,7 @@
 //! Test script to demonstrate consciousness web learning
-//! Run with: cargo run --manifest-path aimodel/Cargo.toml --bin test_web_learning
+//! Run with: cargo run --manifest-path vortex/Cargo.toml --bin test_web_learning
 
-use aimodel::data::RealBenchmarkEvaluator;
+use vortex::data::RealBenchmarkEvaluator;
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════════════════╗");

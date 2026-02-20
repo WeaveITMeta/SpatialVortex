@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use anyhow::Result;
 
-use aimodel::ml::calm::LatentState;
-use aimodel::data::models::BeamTensor;
-use aimodel::cognition::vortex_runner::VortexRunner;
+use vortex::ml::calm::LatentState;
+use vortex::data::models::BeamTensor;
+use vortex::cognition::vortex_runner::VortexRunner;
 
 // =============================================================================
 // Request/Response Types
@@ -129,7 +129,7 @@ fn beams_to_text(beams: &[BeamTensor]) -> String {
         .join(" ")
 }
 
-fn generate_response(input: &str, latent: &aimodel::ml::calm::LatentState) -> String {
+fn generate_response(input: &str, latent: &vortex::ml::calm::LatentState) -> String {
     let input_lower = input.to_lowercase();
     
     // Pattern-based responses using latent energy

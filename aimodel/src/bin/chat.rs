@@ -1,4 +1,4 @@
-//! AIModel CLI Chat - Interactive Reasoning Demo
+//! Vortex CLI Chat - Interactive Reasoning Demo
 //!
 //! Run with: cargo run --bin chat
 //!
@@ -8,7 +8,7 @@
 //! - Constitutional AI guard
 //! - RAG context retrieval
 
-use aimodel::cognition::{
+use vortex::cognition::{
     ThinkingEngine, ThinkingConfig, ThoughtType,
     MemoryStore, Memory, MemoryType, MemoryQuery,
     Constitution, ConstitutionalGuard,
@@ -18,7 +18,7 @@ use std::io::{self, Write};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║         AIModel Chat - Sacred Geometry Reasoning             ║");
+    println!("║         Vortex Chat - Sacred Geometry Reasoning              ║");
     println!("║                                                              ║");
     println!("║  Commands:                                                   ║");
     println!("║    /help     - Show commands                                 ║");
@@ -40,7 +40,7 @@ fn main() {
     // Seed some initial knowledge
     seed_knowledge(&mut rag, &mut memory);
 
-    let mut last_chain: Option<aimodel::cognition::ThoughtChain> = None;
+    let mut last_chain: Option<vortex::cognition::ThoughtChain> = None;
 
     loop {
         print!("\n🌀 You: ");
@@ -144,7 +144,7 @@ fn main() {
             }
             
             // Display response
-            println!("\n🤖 AIModel:");
+            println!("\n🤖 Vortex:");
             println!("{}", response);
         }
 
@@ -248,7 +248,7 @@ fn print_memories(memory: &MemoryStore) {
     }
 }
 
-fn print_thought_chain(chain: &Option<aimodel::cognition::ThoughtChain>) {
+fn print_thought_chain(chain: &Option<vortex::cognition::ThoughtChain>) {
     match chain {
         Some(c) => {
             println!("\n🧠 Last Thought Chain:");
@@ -274,13 +274,13 @@ fn print_constitution(constitution: &Constitution) {
     
     for (i, p) in constitution.principles.iter().enumerate() {
         let cat = match p.category {
-            aimodel::cognition::constitution::PrincipleCategory::Helpfulness => "HELP",
-            aimodel::cognition::constitution::PrincipleCategory::Harmlessness => "SAFE",
-            aimodel::cognition::constitution::PrincipleCategory::Honesty => "TRUE",
-            aimodel::cognition::constitution::PrincipleCategory::Safety => "PROT",
-            aimodel::cognition::constitution::PrincipleCategory::Privacy => "PRIV",
-            aimodel::cognition::constitution::PrincipleCategory::Fairness => "FAIR",
-            aimodel::cognition::constitution::PrincipleCategory::Autonomy => "AUTO",
+            vortex::cognition::constitution::PrincipleCategory::Helpfulness => "HELP",
+            vortex::cognition::constitution::PrincipleCategory::Harmlessness => "SAFE",
+            vortex::cognition::constitution::PrincipleCategory::Honesty => "TRUE",
+            vortex::cognition::constitution::PrincipleCategory::Safety => "PROT",
+            vortex::cognition::constitution::PrincipleCategory::Privacy => "PRIV",
+            vortex::cognition::constitution::PrincipleCategory::Fairness => "FAIR",
+            vortex::cognition::constitution::PrincipleCategory::Autonomy => "AUTO",
         };
         println!("  {}. [{}] {} (weight:{:.1})", i + 1, cat, p.name, p.weight);
     }

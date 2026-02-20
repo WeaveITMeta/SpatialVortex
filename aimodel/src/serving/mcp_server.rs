@@ -39,7 +39,7 @@ pub struct MCPServerConfig {
 impl Default for MCPServerConfig {
     fn default() -> Self {
         Self {
-            name: "aimodel-mcp".to_string(),
+            name: "vortex-mcp".to_string(),
             version: "0.1.0".to_string(),
             host: "127.0.0.1".to_string(),
             port: 8765,

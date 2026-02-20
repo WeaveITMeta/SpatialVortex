@@ -1,4 +1,4 @@
-use aimodel::ml::web_knowledge::{DuckDuckGoScraper, WebScraperConfig};
+use vortex::ml::web_knowledge::{DuckDuckGoScraper, WebScraperConfig};
 
 #[tokio::main]
 async fn main() {
