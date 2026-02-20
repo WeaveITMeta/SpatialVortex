@@ -1072,6 +1072,47 @@ impl TruthChecker {
             "much larger",
             &["closer to the sun", "inner", "terrestrial"],
         );
+        // =================================================================
+        // HellaSwag Activity Continuation Facts
+        // =================================================================
+
+        // Knife sharpening on stone: grind/sharpen, not cut stone in half
+        self.add_misconception(
+            &["knife", "stone", "smash"],
+            "cuts the center stone in half",
+            &["grind", "sharpen", "sharpens"],
+        );
+        // Archery: after pulling arrow from target, go back to shoot again
+        self.add_misconception(
+            &["arrow", "target", "pulling"],
+            "have his bow",
+            &["went to the target", "shoots", "pulls back"],
+        );
+        // Lawn mower: mowing = going over grass, not driving through it
+        self.add_misconception(
+            &["lawn mower", "mowing", "grass"],
+            "drives through the grass",
+            &["mowing", "casually", "going over"],
+        );
+        // Cheerleaders: get into formation first, then cheer
+        self.add_misconception(
+            &["cheerleaders", "stage", "cheering"],
+            "perform a cheer routine before",
+            &["get into formation", "formation", "begin"],
+        );
+        // Brushing teeth: mother instructs/helps children
+        self.add_misconception(
+            &["boy", "girl", "sink", "mother"],
+            "washes the boy",
+            &["instructs", "helps", "brush", "brushing"],
+        );
+        // Paintball: run around obstacles
+        self.add_misconception(
+            &["helicopter", "paintball", "playing"],
+            "chase a bird",
+            &["run around", "obstacles", "paintball"],
+        );
+
         // Gas planets are FARTHER from Sun (outer solar system), not closer
         self.add_misconception(
             &["gas planets", "solar system", "true"],
