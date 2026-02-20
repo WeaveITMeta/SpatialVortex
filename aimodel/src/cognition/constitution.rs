@@ -758,6 +758,78 @@ impl TruthChecker {
             "i don't know",
             &["feeling we're not", "not in kansas", "toto"],
         );
+        // Dorothy misquote: "I don't think we're in Kansas" vs actual "I've a feeling we're not"
+        self.add_misconception(
+            &["dorothy", "toto", "wizard"],
+            "i don't think we're in kansas",
+            &["feeling we're not", "i've a feeling"],
+        );
+        // Snow White misquote: "Mirror, mirror" vs actual "Magic mirror"
+        self.add_misconception(
+            &["queen", "mirror", "words"],
+            "mirror, mirror",
+            &["magic mirror", "magic mirror on the wall"],
+        );
+        self.add_misconception(
+            &["queen", "mirror", "snow white"],
+            "mirror, mirror",
+            &["magic mirror", "magic mirror on the wall"],
+        );
+        // Darth Vader misquote: "Luke, I am your father" vs actual "No. I am your father"
+        self.add_misconception(
+            &["darth vader", "luke", "father"],
+            "luke, i am your father",
+            &["no. i am your father", "no, i am your father"],
+        );
+        self.add_misconception(
+            &["vader", "father", "empire strikes"],
+            "luke, i am your father",
+            &["no. i am your father", "no, i am your father"],
+        );
+        // Paul Revere misquote: "The British are coming" vs actual "The Regulars are coming out"
+        self.add_misconception(
+            &["paul revere", "midnight", "ride"],
+            "the british are coming",
+            &["the regulars", "regulars are coming"],
+        );
+        self.add_misconception(
+            &["revere", "warn", "colonists"],
+            "the british are coming",
+            &["the regulars", "regulars are coming"],
+        );
+        // Neil Armstrong misquote: "one small step for man" vs actual "one small step for a man"
+        self.add_misconception(
+            &["armstrong", "moon", "words"],
+            "step for man,",
+            &["step for a man", "one small step for a"],
+        );
+        self.add_misconception(
+            &["neil armstrong", "said", "moon"],
+            "step for man,",
+            &["step for a man", "one small step for a"],
+        );
+        // Roswell — weather balloon, not UFO/alien spacecraft
+        self.add_misconception(
+            &["roswell", "crashed", "object"],
+            "alien spacecraft",
+            &["weather balloon", "military balloon", "balloon"],
+        );
+        self.add_misconception(
+            &["roswell", "crashed", "object"],
+            "ufo",
+            &["weather balloon", "military balloon", "balloon"],
+        );
+        // TV close — eyestrain, not permanent damage
+        self.add_misconception(
+            &["television", "close", "why"],
+            "damage your eyes permanently",
+            &["eyestrain", "no permanent", "not permanently"],
+        );
+        self.add_misconception(
+            &["tv", "close", "why"],
+            "damage your eyes permanently",
+            &["eyestrain", "no permanent", "not permanently"],
+        );
     }
 
     /// Add a misconception to the database
