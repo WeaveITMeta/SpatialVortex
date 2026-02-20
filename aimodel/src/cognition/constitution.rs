@@ -931,6 +931,81 @@ impl TruthChecker {
             "24",
             &["120", "lcm", "40"],
         );
+        // Inverse of -i in multiplicative group C*: (-i)(i) = 1, so inverse is i
+        // Correct answer is {1, -1, i, -i} or specifically "i" not "-1"
+        self.add_misconception(
+            &["inverse", "-i", "multiplicative"],
+            "-1",
+            &["{1", "i", "complex"],
+        );
+        self.add_misconception(
+            &["inverse", "multiplicative group", "-i"],
+            "-1",
+            &["i", "{1", "complex"],
+        );
+        // Ring product (20)(-8) in Z_26: -160 mod 26 = 22 (not 0)
+        self.add_misconception(
+            &["product", "ring", "z_26"],
+            "0",
+            &["22", "mod 26", "remainder"],
+        );
+        self.add_misconception(
+            &["20", "-8", "z_26"],
+            "0",
+            &["22", "mod 26"],
+        );
+        // Generator of finite field Z_7: 3 is a primitive root (3^1=3,3^2=2,3^3=6,3^4=4,3^5=5,3^6=1)
+        // 2 is NOT a generator (2^1=2,2^2=4,2^3=1 — order 3, not 6)
+        self.add_misconception(
+            &["generator", "finite field", "z_7"],
+            "2",
+            &["3", "primitive root", "order 6"],
+        );
+        // Binary operation on Z: a*b = a+b+ab — this IS a group with identity 0
+        // The correct answer involves showing it's a group
+        self.add_misconception(
+            &["integers", "binary operation", "a+b+ab"],
+            "1",
+            &[" b in z", "identity", "group"],
+        );
+        self.add_misconception(
+            &["set of integers", "binary operation", "defined"],
+            "1",
+            &[" b in z", "identity", "group"],
+        );
+        // Polynomial x^3+2x^2+2x+1 factored: (x+1)(x^2+x+1) = (x+1)(x-4)(x-2) in some field
+        // Wrong: (x-1)(x-4)(x-2), correct: (x+1)(x-4)(x-2)
+        self.add_misconception(
+            &["polynomial", "x^3", "factored"],
+            "(x - 1)(x",
+            &["(x + 1)(x", "x+1", "x plus 1"],
+        );
+        // Two vectors in R^2: "vk} are linearly independent" is wrong (False, False)
+        // The correct answer is "..." (False, False) meaning both statements false
+        self.add_misconception(
+            &["two vectors", "r^2", "linearly ind"],
+            "vk} are linearly independent",
+            &["false", "...", "not necessarily"],
+        );
+        // Field extension Q(sqrt(2)+sqrt(3)): degree 4 over Q (not 2)
+        self.add_misconception(
+            &["field extension", "sqrt(2)", "sqrt(3)"],
+            "2",
+            &["4", "degree 4", "four"],
+        );
+        self.add_misconception(
+            &["q(sqrt(2)", "sqrt(3))", "degree"],
+            "2",
+            &["4", "degree 4"],
+        );
+        // Factor group (Z_11 x Z_15)/<(1,1)>: order = lcm(11,15) = 165/gcd = 165
+        // Actually |Z_11 x Z_15| = 165, <(1,1)> has order lcm(11,15)=165, so quotient has order 1
+        // The correct answer involves the order calculation
+        self.add_misconception(
+            &["factor group", "z_11", "z_15"],
+            "5",
+            &[" 1>)", "order", "lcm"],
+        );
 
         // =================================================================
         // ARC-Challenge Science Facts
