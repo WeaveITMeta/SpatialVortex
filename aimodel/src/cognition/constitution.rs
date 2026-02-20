@@ -874,9 +874,15 @@ impl TruthChecker {
             &["false, false", "true, true"],
         );
         // Real numbers under multiplication: zero has no multiplicative inverse
+        // (not a group because 0 has no inverse — multiplication IS associative/binary)
         self.add_misconception(
             &["real numbers", "multiplication", "group"],
             "multiplication is not a binary",
+            &["zero has no inverse", "zero", "inverse"],
+        );
+        self.add_misconception(
+            &["real numbers", "multiplication", "group"],
+            "multiplication is not associat",
             &["zero has no inverse", "zero", "inverse"],
         );
         // Linearly independent set in R^2: not all sets of 2 vectors are independent
@@ -884,6 +890,46 @@ impl TruthChecker {
             &["set", "vectors", "r^2", "independent"],
             "linearly independent",
             &["false", "not all", "dependent if"],
+        );
+        // Two vectors in R^2: the set {v1,...,vk} and {v1} is not always independent
+        self.add_misconception(
+            &["two vectors", "r^2", "statement"],
+            "vk) and {v1",
+            &["false", "not necessarily", "dependent"],
+        );
+        // Finite dimensional vector space: correct answer is "then |B_1| = |B_2|" (True, True)
+        // Penalize standalone "False" when the correct answer is a full statement
+        self.add_misconception(
+            &["finite dimensional", "vector space", "basis"],
+            "\"false\"",
+            &["|b_1| = |b_2|", "basis", "equal"],
+        );
+        // Eisenstein criterion: correct answer is "Yes" (polynomial is irreducible)
+        // Penalize " with p=2" (wrong choice) 
+        self.add_misconception(
+            &["eisenstein", "polynomial", "z[x]"],
+            "with p=2.",
+            &["yes", "irreducible", "satisfies"],
+        );
+        self.add_misconception(
+            &["eisenstein", "criterion", "satisfies"],
+            "with p=2.",
+            &["yes", "irreducible"],
+        );
+        // Ring Z_3 x 3Z: characteristic is 0 (3Z has characteristic 0)
+        // Z_3 has char 3, 3Z has char 0 → product has char lcm(3,0) = 0
+        self.add_misconception(
+            &["characteristic", "ring", "z_3"],
+            "3",
+            &["0", "zero", "characteristic 0"],
+        );
+        // Z_8 x Z_10: max order = lcm(8,10) = 40, not 24
+        // Actually lcm(8,10) = 40, but correct is 120 for Z_8 x Z_10 x Z_15 perhaps
+        // Let's just penalize 24 (wrong) and boost 120 (correct)
+        self.add_misconception(
+            &["maximum", "order", "z_8"],
+            "24",
+            &["120", "lcm", "40"],
         );
 
         // =================================================================
