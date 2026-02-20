@@ -3651,7 +3651,7 @@ impl RealBenchmarkEvaluator {
             );
             score += truth_score;
             breakdown.push(("truth", truth_score));
-            
+
             
             logits.push(score);
             debug_breakdowns.push(breakdown);
