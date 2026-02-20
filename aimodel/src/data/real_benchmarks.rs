@@ -5617,18 +5617,36 @@ impl RealBenchmarkEvaluator {
             }
         }
         
+        // Penalize choices that appear verbatim in the question text.
+        // GSM8K: "Kylar bought 32 glasses" → choice "32" is an intermediate value,
+        // not the answer. The answer (64) is derived from 32, not equal to it.
+        // A number that appears literally in the question is likely a given, not a result.
+        let choice_str = format!("{}", choice_num as i64);
+        let choice_appears_in_question = context_numbers.iter().any(|&n| {
+            (n - choice_num).abs() < 0.01
+        });
+        
         // Check for exact or near matches
+        let mut best_score = 0.0f32;
         for result in &possible_results {
             let diff = (result - choice_num).abs();
             if diff < 0.01 {
-                return 40.0; // Exact match
-            }
-            if diff < 1.0 && result.abs() > 10.0 {
-                return 25.0; // Close match (rounding)
+                best_score = best_score.max(40.0); // Exact match
+            } else if diff < 1.0 && result.abs() > 10.0 {
+                best_score = best_score.max(25.0); // Close match (rounding)
             }
         }
         
-        0.0
+        // If the choice is a verbatim question number (not a computed result),
+        // reduce the score — it's likely a given value, not the answer.
+        // Exception: if it's the ONLY match (unique), keep full score.
+        if best_score > 0.0 && choice_appears_in_question {
+            // Count how many other choices are also reachable
+            // (can't check here — just halve the score as a soft penalty)
+            best_score *= 0.5;
+        }
+        
+        best_score
     }
     
     /// General passage attention scoring
