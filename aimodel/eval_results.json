@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-21T01:33:00.892550800+00:00",
+  "timestamp": "2026-02-21T01:46:37.491116700+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -14,11 +14,11 @@
   "task_results": [
     {
       "task": "mmlu",
-      "accuracy": 84.44444444444444,
-      "num_correct": 38,
+      "accuracy": 86.66666666666667,
+      "num_correct": 39,
       "total": 45,
-      "avg_confidence": 0.64005136,
-      "time_secs": 0.9372082,
+      "avg_confidence": 0.6453974,
+      "time_secs": 0.9430503,
       "wrong_samples": []
     },
     {
@@ -26,8 +26,8 @@
       "accuracy": 35.55555555555556,
       "num_correct": 16,
       "total": 45,
-      "avg_confidence": 0.60497564,
-      "time_secs": 1.7108389000000002,
+      "avg_confidence": 0.5972899,
+      "time_secs": 1.7352214,
       "wrong_samples": []
     },
     {
@@ -35,8 +35,8 @@
       "accuracy": 84.44444444444444,
       "num_correct": 38,
       "total": 45,
-      "avg_confidence": 0.6942372,
-      "time_secs": 1.9743178000000001,
+      "avg_confidence": 0.6942371,
+      "time_secs": 2.0631009,
       "wrong_samples": []
     },
     {
@@ -44,8 +44,8 @@
       "accuracy": 93.33333333333333,
       "num_correct": 42,
       "total": 45,
-      "avg_confidence": 0.8032897,
-      "time_secs": 4.7592992,
+      "avg_confidence": 0.8032899,
+      "time_secs": 4.7176802,
       "wrong_samples": []
     },
     {
@@ -53,8 +53,8 @@
       "accuracy": 97.77777777777777,
       "num_correct": 44,
       "total": 45,
-      "avg_confidence": 0.7876095,
-      "time_secs": 1.7681052,
+      "avg_confidence": 0.7876099,
+      "time_secs": 1.7666595,
       "wrong_samples": []
     },
     {
@@ -63,14 +63,14 @@
       "num_correct": 45,
       "total": 45,
       "avg_confidence": 0.9935931,
-      "time_secs": 6.2221073,
+      "time_secs": 6.1083026,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 223,
+    "total_correct": 224,
     "total_questions": 270,
-    "overall_accuracy": 82.5925925925926,
-    "total_time_secs": 21.3396834
+    "overall_accuracy": 82.96296296296296,
+    "total_time_secs": 21.1834684
   }
 }

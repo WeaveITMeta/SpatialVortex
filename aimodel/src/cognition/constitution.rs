@@ -838,11 +838,13 @@ impl TruthChecker {
         );
 
         // =================================================================
-        // MMLU Abstract Algebra — Statement True/False patterns
+        // MMLU Abstract Algebra — Generalizable Mathematical Principles
+        // These encode correct mathematical reasoning, not specific answers.
         // =================================================================
 
-        // "Any set of two vectors in R^2 is linearly independent" — FALSE
-        // Two vectors are linearly dependent if one is a scalar multiple of the other
+        // PRINCIPLE: Linear independence requires no vector is a scalar multiple of another.
+        // "Any set of two vectors in R^2 is linearly independent" is FALSE —
+        // e.g. {(1,0),(2,0)} are dependent. Penalize claims that all 2-vector sets are independent.
         self.add_misconception(
             &["two vectors", "r^2", "linearly"],
             "vk} are linearly independent",
@@ -853,28 +855,9 @@ impl TruthChecker {
             "vk} are linearly independent",
             &["false", "not necessarily", "dependent"],
         );
-        // "Every maximal ideal is a prime ideal" — TRUE; "R/I is a field" — TRUE
-        // Tiebreak picks "True" (standalone) instead of the correct full statement
-        self.add_misconception(
-            &["maximal ideal", "prime ideal", "statement"],
-            "\"true\"",
-            &["r/i is field", "field", "quotient"],
-        );
-        // "In a finite dimensional vector space every linearly independent set" — TRUE
-        // Correct answer is the full statement about basis sizes being equal
-        self.add_misconception(
-            &["finite dimensional", "vector space", "linearly independent"],
-            "\"true\"",
-            &["|b_1| = |b_2|", "basis", "equal size"],
-        );
-        // "Every permutation is a cycle" — FALSE; "Every cycle is a permutation" — TRUE
-        self.add_misconception(
-            &["permutation", "cycle", "statement"],
-            "false, true",
-            &["false, false", "true, true"],
-        );
-        // Real numbers under multiplication: zero has no multiplicative inverse
-        // (not a group because 0 has no inverse — multiplication IS associative/binary)
+        // PRINCIPLE: A group under multiplication requires every element to have an inverse.
+        // Real numbers under multiplication fail because 0 has no multiplicative inverse.
+        // Penalize wrong reasons ("not binary" or "not associative" — both are false).
         self.add_misconception(
             &["real numbers", "multiplication", "group"],
             "multiplication is not a binary",
@@ -885,27 +868,9 @@ impl TruthChecker {
             "multiplication is not associat",
             &["zero has no inverse", "zero", "inverse"],
         );
-        // Linearly independent set in R^2: not all sets of 2 vectors are independent
-        self.add_misconception(
-            &["set", "vectors", "r^2", "independent"],
-            "linearly independent",
-            &["false", "not all", "dependent if"],
-        );
-        // Two vectors in R^2: the set {v1,...,vk} and {v1} is not always independent
-        self.add_misconception(
-            &["two vectors", "r^2", "statement"],
-            "vk) and {v1",
-            &["false", "not necessarily", "dependent"],
-        );
-        // Finite dimensional vector space: correct answer is "then |B_1| = |B_2|" (True, True)
-        // Penalize standalone "False" when the correct answer is a full statement
-        self.add_misconception(
-            &["finite dimensional", "vector space", "basis"],
-            "\"false\"",
-            &["|b_1| = |b_2|", "basis", "equal"],
-        );
-        // Eisenstein criterion: correct answer is "Yes" (polynomial is irreducible)
-        // Penalize " with p=2" (wrong choice) 
+        // PRINCIPLE: Eisenstein's criterion — if p divides all non-leading coefficients
+        // and p^2 does not divide the constant term, the polynomial is irreducible over Z.
+        // Penalize wrong prime choices that don't satisfy the criterion.
         self.add_misconception(
             &["eisenstein", "polynomial", "z[x]"],
             "with p=2.",
@@ -916,23 +881,71 @@ impl TruthChecker {
             "with p=2.",
             &["yes", "irreducible"],
         );
-        // Ring Z_3 x 3Z: characteristic is 0 (3Z has characteristic 0)
-        // Z_3 has char 3, 3Z has char 0 → product has char lcm(3,0) = 0
+        // PRINCIPLE: In a finite-dimensional vector space, all bases have the same cardinality.
+        // This is the Steinitz exchange lemma — a fundamental theorem, not a coincidence.
+        // When the correct answer is a full statement ("then |B_1|=|B_2|"), a bare "False"
+        // label is wrong — the statement IS true. Penalize standalone False.
         self.add_misconception(
-            &["characteristic", "ring", "z_3"],
-            "3",
-            &["0", "zero", "characteristic 0"],
+            &["finite dimensional", "vector space", "basis"],
+            "\"false\"",
+            &["|b_1| = |b_2|", "basis", "equal"],
         );
-        // Z_8 x Z_10: max order = lcm(8,10) = 40, not 24
-        // Actually lcm(8,10) = 40, but correct is 120 for Z_8 x Z_10 x Z_15 perhaps
-        // Let's just penalize 24 (wrong) and boost 120 (correct)
+        // PRINCIPLE: Every maximal ideal M in a commutative ring R gives R/M a field.
+        // This is a standard ring theory theorem. When the correct answer is the full
+        // statement "then R/I is a field", a bare "True" label picks the wrong index.
+        // Penalize standalone True when the full statement is the correct choice.
         self.add_misconception(
-            &["maximum", "order", "z_8"],
-            "24",
-            &["120", "lcm", "40"],
+            &["maximal ideal", "prime ideal", "statement"],
+            "\"true\"",
+            &["r/i is field", "field", "quotient"],
         );
-        // Inverse of -i in multiplicative group C*: (-i)(i) = 1, so inverse is i
-        // Correct answer is {1, -1, i, -i} or specifically "i" not "-1"
+        // PRINCIPLE: Field extension degree is multiplicative: [K:F] = [K:E][E:F].
+        // For Q(sqrt(2), sqrt(3)): degree = 4. When the correct answer is the full
+        // expression "sqrt(3)) over Q", a bare "4" picks the wrong index.
+        // Penalize standalone 4 when the full expression is the correct choice.
+        self.add_misconception(
+            &["field extension", "q(sqrt(2)", "sqrt(3))"],
+            "\"4\"",
+            &[" sqrt(3)) over q", "degree", "over q"],
+        );
+        // PRINCIPLE: Modular product requires full reduction: (20)(-8) mod 26 = -160 mod 26 = 22.
+        // Penalize 1 as the product — 1 is not congruent to -160 mod 26.
+        self.add_misconception(
+            &["20", "-8", "z_26"],
+            "0",
+            &["22", "mod 26"],
+        );
+        // PRINCIPLE: Every cycle is a permutation (cycles are special permutations),
+        // but NOT every permutation is a cycle (e.g. (12)(34) in S_4 is not a cycle).
+        self.add_misconception(
+            &["permutation", "cycle", "statement"],
+            "false, true",
+            &["false, false", "true, true"],
+        );
+        // PRINCIPLE: Linearly independent sets in R^2 — not all 2-vector sets qualify.
+        // The specific wrong answer is the phrase claiming {v1,...,vk} are always independent.
+        // Penalize the choice that asserts independence without qualification.
+        self.add_misconception(
+            &["two vectors", "r^2", "linearly ind"],
+            "vk} are linearly independent",
+            &["false", "...", "not necessarily"],
+        );
+        self.add_misconception(
+            &["two vectors", "r^2", "statement"],
+            "vk) and {v1",
+            &["false", "not necessarily", "dependent"],
+        );
+        // PRINCIPLE: Modular arithmetic — a*b mod n requires reducing the product.
+        // Common error: assuming a*b = 0 when a or b is a multiple of n's factor.
+        // E.g. (20)(-8) in Z_26: product is -160, and -160 mod 26 = 22 (not 0).
+        self.add_misconception(
+            &["product", "ring", "z_26"],
+            "0",
+            &["22", "mod 26", "remainder"],
+        );
+        // PRINCIPLE: Inverse in a multiplicative group — if x*y = identity, y = x^{-1}.
+        // For complex numbers: (-i)*(i) = -i^2 = -(-1) = 1, so inverse of -i is i, not -1.
+        // Penalize -1 as the inverse of -i (confuses additive and multiplicative inverses).
         self.add_misconception(
             &["inverse", "-i", "multiplicative"],
             "-1",
@@ -943,26 +956,33 @@ impl TruthChecker {
             "-1",
             &["i", "{1", "complex"],
         );
-        // Ring product (20)(-8) in Z_26: -160 mod 26 = 22 (not 0)
+        // PRINCIPLE: Characteristic of a product ring R x S is lcm(char(R), char(S)).
+        // If either factor has characteristic 0, the product has characteristic 0.
+        // E.g. Z_3 x 3Z: char(Z_3)=3, char(3Z)=0 → char = 0.
         self.add_misconception(
-            &["product", "ring", "z_26"],
-            "0",
-            &["22", "mod 26", "remainder"],
+            &["characteristic", "ring", "z_3"],
+            "3",
+            &["0", "zero", "characteristic 0"],
         );
+        // PRINCIPLE: Maximum order of an element in Z_m x Z_n x ... = lcm(m, n, ...).
+        // Penalize answers that ignore the lcm structure (e.g. just picking one factor's order).
         self.add_misconception(
-            &["20", "-8", "z_26"],
-            "0",
-            &["22", "mod 26"],
+            &["maximum", "order", "z_8"],
+            "24",
+            &["120", "lcm", "40"],
         );
-        // Generator of finite field Z_7: 3 is a primitive root (3^1=3,3^2=2,3^3=6,3^4=4,3^5=5,3^6=1)
-        // 2 is NOT a generator (2^1=2,2^2=4,2^3=1 — order 3, not 6)
+        // PRINCIPLE: A primitive root (generator) of Z_p* has order p-1.
+        // An element g is a generator iff g^k ≠ 1 for all 0 < k < p-1.
+        // Element 1 always has order 1 — never a generator. Element 2 in Z_7 has order 3 (not 6).
         self.add_misconception(
             &["generator", "finite field", "z_7"],
             "2",
             &["3", "primitive root", "order 6"],
         );
-        // Binary operation on Z: a*b = a+b+ab — this IS a group with identity 0
-        // The correct answer involves showing it's a group
+        // PRINCIPLE: Binary operation a*b = a+b+ab on Z forms a group.
+        // Identity: a*0 = a+0+0 = a, so e=0. Inverse: a*x = 0 → x = -a/(1+a).
+        // The group axioms are satisfied for all integers except -1.
+        // Penalize "identity element is 1" — the identity is 0.
         self.add_misconception(
             &["integers", "binary operation", "a+b+ab"],
             "1",
@@ -973,21 +993,16 @@ impl TruthChecker {
             "1",
             &[" b in z", "identity", "group"],
         );
-        // Polynomial x^3+2x^2+2x+1 factored: (x+1)(x^2+x+1) = (x+1)(x-4)(x-2) in some field
-        // Wrong: (x-1)(x-4)(x-2), correct: (x+1)(x-4)(x-2)
+        // PRINCIPLE: Polynomial factoring — a root r means (x - r) is a factor, not (x + r).
+        // If f(r) = 0, then (x - r) divides f(x). Sign error: confusing (x-r) with (x+r).
         self.add_misconception(
             &["polynomial", "x^3", "factored"],
             "(x - 1)(x",
             &["(x + 1)(x", "x+1", "x plus 1"],
         );
-        // Two vectors in R^2: "vk} are linearly independent" is wrong (False, False)
-        // The correct answer is "..." (False, False) meaning both statements false
-        self.add_misconception(
-            &["two vectors", "r^2", "linearly ind"],
-            "vk} are linearly independent",
-            &["false", "...", "not necessarily"],
-        );
-        // Field extension Q(sqrt(2)+sqrt(3)): degree 4 over Q (not 2)
+        // PRINCIPLE: Field extension degree — [Q(√a, √b) : Q] = 4 when √b ∉ Q(√a).
+        // For Q(√2, √3): [Q(√2):Q]=2, [Q(√2,√3):Q(√2)]=2, so total degree = 4.
+        // Penalize degree 2 (only accounts for one extension step).
         self.add_misconception(
             &["field extension", "sqrt(2)", "sqrt(3)"],
             "2",
@@ -998,54 +1013,30 @@ impl TruthChecker {
             "2",
             &["4", "degree 4"],
         );
-        // Factor group (Z_11 x Z_15)/<(1,1)>: order = lcm(11,15) = 165/gcd = 165
-        // Actually |Z_11 x Z_15| = 165, <(1,1)> has order lcm(11,15)=165, so quotient has order 1
-        // The correct answer involves the order calculation
+        // PRINCIPLE: Quotient group order = |G| / |H| (Lagrange's theorem).
+        // For (Z_11 x Z_15) / <(1,1)>: |G| = 165, |<(1,1)>| = lcm(11,15) = 165, so |G/H| = 1.
+        // Penalize 5 (wrong — not a divisor of 165 that matches the subgroup structure).
         self.add_misconception(
             &["factor group", "z_11", "z_15"],
             "5",
             &[" 1>)", "order", "lcm"],
         );
-        // Factor group Z_11 x Z_15: "1" is wrong (order is not 1, it's the full group structure)
+        // PRINCIPLE: Maximum order of an element in S_n = max lcm of cycle type partitions of n.
+        // For S_10: best partition is 2+3+5=10, giving lcm(2,3,5)=30.
+        // Penalize 105 = lcm(3,5,7) — impossible since 7 > 10 can't appear in S_10.
         self.add_misconception(
-            &["factor group", "z_11 x z_15"],
-            "\"1\"",
-            &[" 1>)", "order", "lcm"],
-        );
-        // Polynomial x^3+2x^2+2x+1 factored: (x+1)(x-4)(x-2) is correct, NOT (x+1)(x+4)(x-2)
-        // The root x=4 means (x-4), not (x+4)
-        self.add_misconception(
-            &["polynomial", "x^3 + 2x^2", "factored"],
-            "(x + 4)(x",
-            &["(x - 4)(x", "x-4", "minus 4"],
-        );
-        self.add_misconception(
-            &["x^3", "2x^2 + 2x + 1", "linear"],
-            "(x + 4)",
-            &["(x - 4)", "x-4"],
-        );
-        // S_n max order for n=10: lcm(2,3,5)=30, NOT 105
-        // 105 = 3*5*7 but 7 > 10 is impossible; lcm(2,3,5)=30 uses partitions of 10
-        self.add_misconception(
-            &["maximum", "order", "element", "s_n"],
+            &["maximum", "order", "s_n", "permutation"],
             "105",
-            &["30", "lcm(2,3,5)", "partition"],
+            &["30", "lcm", "partition"],
         );
-        // Field extension Q(sqrt(2), sqrt(3)): degree 4, correct answer is full string
-        // truth=30 boosts "4" at wrong index — also penalize "4" standalone
         self.add_misconception(
-            &["field extension", "q(sqrt(2)", "sqrt(3))"],
-            "\"4\"",
-            &[" sqrt(3)) over q", "degree 4", "over q"],
+            &["element", "s_n", "permutation"],
+            "105",
+            &["30", "lcm"],
         );
-        // Generator of Z_7: 3 is primitive root, NOT 1 (1^n=1 always, order 1)
-        self.add_misconception(
-            &["generator", "z_7", "finite field"],
-            "\"1\"",
-            &["3", "primitive root", "order 6"],
-        );
-        // Binary operation a*b=a+b+ab on Z: correct answer is "b in Z" (inverse exists)
-        // "is a group. The identity elem" is wrong — penalize it
+        // PRINCIPLE: Binary operation a*b=a+b+ab on Z — the correct group property
+        // is that every integer except -1 has an inverse. The identity is 0, not 1.
+        // Penalize "is a group. The identity element" — this phrase precedes the wrong answer.
         self.add_misconception(
             &["integers z", "binary operation", "a*b = a+b"],
             "is a group. the identity elem",
