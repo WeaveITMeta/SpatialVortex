@@ -5632,7 +5632,45 @@ impl RealBenchmarkEvaluator {
                             possible_results.push((a - b) * c);
                             possible_results.push(a + b + c);
                             possible_results.push(a + b - c);
+                            // PRINCIPLE: Split-group pricing (e.g. "every second item costs X%")
+                            // Half of quantity at full price + half at discounted price
+                            possible_results.push((a / 2.0) * b + (a / 2.0) * c);
+                            possible_results.push((a / 2.0) * (b + c));
+                            // PRINCIPLE: Rate × time or unit × count with two rates
+                            possible_results.push(a * b + a * c);
                         }
+                    }
+                }
+            }
+        }
+        
+        // PRINCIPLE: Percentage-based pricing patterns common in word problems.
+        // "Every second item costs X% of the price" → half at full, half at X%
+        // Detect percentage numbers (between 1 and 100) and apply them
+        let pct_numbers: Vec<f64> = context_numbers.iter()
+            .cloned()
+            .filter(|&n| n > 0.0 && n <= 100.0 && (n - n.floor()).abs() < 0.01)
+            .collect();
+        let count_numbers: Vec<f64> = context_numbers.iter()
+            .cloned()
+            .filter(|&n| n > 1.0 && n == n.floor() && n <= 1000.0)
+            .collect();
+        let price_numbers: Vec<f64> = context_numbers.iter()
+            .cloned()
+            .filter(|&n| n > 0.0 && n < 1000.0)
+            .collect();
+        for &pct in &pct_numbers {
+            for &cnt in &count_numbers {
+                for &price in &price_numbers {
+                    if (pct - cnt).abs() > 0.01 && (pct - price).abs() > 0.01 {
+                        let half = (cnt / 2.0).floor();
+                        let discounted = price * pct / 100.0;
+                        // half full price + half discounted
+                        possible_results.push(half * price + half * discounted);
+                        // all at discounted
+                        possible_results.push(cnt * discounted);
+                        // all at full + some at discounted
+                        possible_results.push(cnt * price + half * discounted);
                     }
                 }
             }
