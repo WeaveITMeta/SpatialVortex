@@ -1,0 +1,3144 @@
++===============================================================+
+|         SPATIALVORTEX EVALUATION HARNESS                      |
+|         (Rust equivalent of lm-evaluation-harness)            |
++===============================================================+
+| Tasks:        mmlu                                              
+| Data dir:     ../benchmarks/data                                              
+| Batch size:   8                                              
+| Few-shot:     5                                              
+| Limit:        50                                              
+| Debug:        FULL REASONING TRACE                                              
+| Output:       "eval_results.json"                                            
++===============================================================+
+   [--skip-hf] Skipping HuggingFace dataset downloads
+[Vortex] Pre-seeded from HF: 0 subjects, 0 attrs, 0 relations (health=0.0%) in 0.00s
+   RAG engine knowledge from datasets: 23 topics, 69 facts
+
+[PHASE 3] Web Learning - DISABLED for deterministic baseline measurement
+[CALM] Pretraining CALM weights...
+Pre-training CALM weights on 69 texts for 5 epochs...
+   [BPE] Merge 1/1000: 'i' + 'n' ΓåÆ 'in' (freq=46)
+   [BPE] Merge 2/1000: 'r' + 'e' ΓåÆ 're' (freq=43)
+   [BPE] Merge 3/1000: 'i' + 's' ΓåÆ 'is' (freq=36)
+   [BPE] Merge 4/1000: 'a' + 't' ΓåÆ 'at' (freq=35)
+   [BPE] Merge 5/1000: 'a' + 'n' ΓåÆ 'an' (freq=35)
+   [BPE] Merge 200/1000: 'eratu' + 're' ΓåÆ 'erature' (freq=2)
+   [BPE] Learned 251 merges, vocab size: 330
+  Pre-computing 69 embeddings...
+  Epoch 1/5: gen_loss=75.0956, calm_loss=0.0157, contrastive=0.9449 (lr=0.010000)
+  Epoch 2/5: gen_loss=65.4751, calm_loss=0.0157, contrastive=0.9467 (lr=0.009045)
+  Epoch 3/5: gen_loss=63.6590, calm_loss=0.0157, contrastive=0.9402 (lr=0.006545)
+  Epoch 4/5: gen_loss=63.2961, calm_loss=0.0157, contrastive=0.9490 (lr=0.003455)
+  Epoch 5/5: gen_loss=63.1495, calm_loss=0.0157, contrastive=0.9432 (lr=0.000955)
+CALM pre-training complete. 345 total steps.
+[CALM] Pretraining complete in 2.77s on 69 texts
+[Pipeline] Building unified knowledge pipeline...
+[Pipeline] Building knowledge base from 69 documents...
+[Pipeline] Knowledge base built: 32 subjects, 45 facts
+[Pipeline] Built in 0.00s: 32 subjects, 45 facts, 32 embeddings
+   Generative mode ENABLED - using autoregressive generation
+
+[EVAL] Running task: mmlu
+
+   Running MMLU evaluation (45 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 0 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+
+   +===============================================================
+   | Q1/50: "Statement 1 | If a group has an element of order 15 it must have at l
+   | Choices:
+   |   [0]  it must have at least 16 elements of order 15." <- CORRECT
+   |   [1] "True
+   |   [2]  True"
+   |   [3] "False
+   |
+   [RSI] strategy=seed:knowledge-qa src=MMLU/abstract_algebra
+   [PIPELINE] [OK] conf=0.69 chose[0]=" it must have at least 16 elem" correct[0]=" it must have at least 16 elem" src=MMLU q=""Statement 1 | If a group has an element of order 15 it must"
+   [PIPELINE] conf 0.69 <= 0.7, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=""True" correct[0]=" it must have at least 16 elem" ctx=778chars q=""Statement 1 | If a group has an element of order 15 it must"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | If a group has an element of order 15 it must
+      | [0] " it must have at least 16 elements of order 15."" [CORRECT]
+      | [1] ""True" [PREDICTED]
+      | [2] " True""
+      | [3] ""False"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Attention (weight=1.00)
+      |
+      | Choice [0]: " it must have at least 16 elements of order 15."" [CORRECT]
+      |   TOTAL: 70.0
+      |   embed_sim           3.3 
+      |   mha                 5.0 
+      |   knowledge          34.0 ++++++
+      |   comprehensive      27.7 +++++
+      |
+      | Choice [1]: ""True"
+      |   TOTAL: 25.3
+      |   embed_sim           0.3 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: " True""
+      |   TOTAL: 25.3
+      |   embed_sim           0.3 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: ""False"
+      |   TOTAL: 24.6
+      |   embed_sim          -0.4 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.325 jepa=9.961 combined=0.526 conf=1.000
+      | [3] ltr=0.000 rl=-0.171 jepa=9.961 combined=0.451 conf=0.150
+      | [1] ltr=0.000 rl=-0.185 jepa=9.961 combined=0.449 conf=0.150
+      | [2] ltr=0.000 rl=-0.185 jepa=9.961 combined=0.449 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" it must have at least 16 elem" correct[0]=" it must have at least 16 elem" top=[knowledge=34.0,comprehensive=27.7,mha=5.0] q=""Statement 1 | If a group has an element of order 15 it must"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 0 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 0 | Accepted: 0 (0.0%) | Rejections: [] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] " it must have at least 16 elements of or" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q2/50: Statement 1 | Every homomorphic image of a group G is isomorphic to a 
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=seed:knowledge-qa src=MMLU/abstract_algebra
+   [PIPELINE] [WRONG] conf=0.30 chose[2]=""False" correct[0]=""True" src=MMLU q="Statement 1 | Every homomorphic image of a group G is isomor"
+   [PIPELINE] conf 0.30 <= 0.7, falling through
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | Every homomorphic image of a group G is isomor"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | Every homomorphic image of a group G is isomor
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Attention (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 25.3
+      |   embed_sim           0.3 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 25.3
+      |   embed_sim           0.3 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 21.6
+      |   embed_sim          -0.2 
+      |   mha                 5.0 
+      |   knowledge          16.7 +++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 21.6
+      |   embed_sim          -0.2 
+      |   mha                 5.0 
+      |   knowledge          16.7 +++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.162 jepa=9.961 combined=0.446 conf=0.150
+      | [3] ltr=0.000 rl=-0.162 jepa=9.961 combined=0.446 conf=0.150
+      | [0] [CORRECT] ltr=0.000 rl=-0.231 jepa=9.961 combined=0.438 conf=1.000
+      | [1] ltr=0.000 rl=-0.231 jepa=9.961 combined=0.438 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.28), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.27 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=5.0,embed_sim=0.3] q="Statement 1 | Every homomorphic image of a group G is isomor"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 1 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 1 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=1] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.27
+   +===============================================================
+
+   +===============================================================
+   | Q3/50: Statement 1 | A ring homomorphism is one to one if and only if the ker
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=seed:knowledge-qa src=MMLU/abstract_algebra
+   [PIPELINE] [WRONG] conf=0.30 chose[2]=""False" correct[0]=""True" src=MMLU q="Statement 1 | A ring homomorphism is one to one if and only "
+   [PIPELINE] conf 0.30 <= 0.7, falling through
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | A ring homomorphism is one to one if and only "
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | A ring homomorphism is one to one if and only 
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 21.2
+      |   embed_sim          -0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 21.2
+      |   embed_sim          -0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 12.6
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge          11.2 ++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 12.6
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge          11.2 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.208 jepa=9.961 combined=0.433 conf=1.000
+      | [1] ltr=0.000 rl=-0.208 jepa=9.961 combined=0.433 conf=1.000
+      | [2] ltr=0.000 rl=-0.157 jepa=9.961 combined=0.425 conf=0.150
+      | [3] ltr=0.000 rl=-0.157 jepa=9.961 combined=0.425 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.33), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.29 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2] q="Statement 1 | A ring homomorphism is one to one if and only "
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 2 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 1 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=1] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.29
+   +===============================================================
+
+   +===============================================================
+   | Q4/50: Find the degree for the given field extension Q(sqrt(2) + sqrt(3)) ove
+   | Choices:
+   |   [0] 0
+   |   [1] 4 <- CORRECT
+   |   [2] 2
+   |   [3] 6
+   |
+   [RSI] strategy=seed:knowledge-qa src=MMLU/abstract_algebra
+   [PIPELINE] [OK] conf=0.56 chose[1]="4" correct[1]="4" src=MMLU q="Find the degree for the given field extension Q(sqrt(2) + sq"
+   [PIPELINE] conf 0.56 <= 0.7, falling through
+   [UNIFIED] [WRONG] conf=1.00 chose[2]="2" correct[1]="4" ctx=778chars q="Find the degree for the given field extension Q(sqrt(2) + sq"
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find the degree for the given field extension Q(sqrt(2) + sq
+      | [0] "0"
+      | [1] "4" [CORRECT] truth=30
+      | [2] "2" [PREDICTED] truth=-50
+      | [3] "6"
+      | Answer: choice[2] conf=1.00
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "0"
+      |   TOTAL: 1.2
+      |   mha                 1.2 
+      |
+      | Choice [1]: "4" [CORRECT]
+      |   TOTAL: 31.2
+      |   mha                 1.2 
+      |   truth              30.0 ++++++
+      |
+      | Choice [2]: "2"
+      |   TOTAL: -18.8
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   comprehensive      15.0 +++
+      |   truth             -50.0 ----------
+      |
+      | Choice [3]: "6"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [1] [CORRECT] ltr=0.000 rl=-0.224 jepa=10.000 combined=0.604 conf=1.000
+      | [3] ltr=0.000 rl=-0.195 jepa=10.000 combined=0.436 conf=0.800
+      | [0] ltr=0.000 rl=-0.123 jepa=10.000 combined=0.404 conf=0.400
+      | [2] ltr=0.000 rl=-0.099 jepa=10.000 combined=0.110 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[1]="4" correct[1]="4" top=[truth=30.0,mha=1.2] q="Find the degree for the given field extension Q(sqrt(2) + sq"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 3 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 1 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=1] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:find verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[1] "4" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q5/50: Find all zeros in the indicated finite field of the given polynomial w
+   | Choices:
+   |   [0] 1 <- CORRECT
+   |   [1] 2
+   |   [2] "2
+   |   [3] 3"
+   |
+   [RSI] strategy=seed:knowledge-qa src=MMLU/abstract_algebra
+   [PIPELINE] [WRONG] conf=0.56 chose[3]="3"" correct[0]="1" src=MMLU q="Find all zeros in the indicated finite field of the given po"
+   [PIPELINE] conf 0.56 <= 0.7, falling through
+   [UNIFIED] [OK] conf=0.25 chose[0]="1" correct[0]="1" ctx=778chars q="Find all zeros in the indicated finite field of the given po"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find all zeros in the indicated finite field of the given po
+      | [0] "1" [CORRECT]
+      | [1] "2" truth=-25
+      | [2] ""2" truth=-25
+      | [3] "3"" truth=15
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "1" [CORRECT]
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "2"
+      |   TOTAL: -8.8
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   truth             -25.0 -----
+      |
+      | Choice [2]: ""2"
+      |   TOTAL: -23.8
+      |   mha                 1.2 
+      |   truth             -25.0 -----
+      |
+      | Choice [3]: "3""
+      |   TOTAL: 16.2
+      |   mha                 1.2 
+      |   truth              15.0 +++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [3] ltr=0.000 rl=-0.188 jepa=10.000 combined=0.500 conf=0.889
+      | [0] [CORRECT] ltr=0.000 rl=-0.203 jepa=10.000 combined=0.434 conf=1.000
+      | [1] ltr=0.000 rl=-0.112 jepa=10.000 combined=0.257 conf=0.333
+      | [2] ltr=0.000 rl=-0.062 jepa=10.000 combined=0.232 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.71 path=expert-high chose[0]="1" correct[0]="1" top=[knowledge=20.0,mha=1.2] q="Find all zeros in the indicated finite field of the given po"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 4 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 2 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=2] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-1] Retuning strategy for 'mmlu/abstract_algebra': accuracy=100.0% (5/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+      [GATE] trait=entity:find verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] "1" conf=0.71
+   +===============================================================
+
+   +===============================================================
+   | Q6/50: "Statement 1 | If H is a subgroup of G and a belongs to G then |aH| = 
+   | Choices:
+   |   [0]  then aH and Hb are identical or disjoint." <- CORRECT
+   |   [1] "True
+   |   [2]  True"
+   |   [3] "False
+   |
+   [RSI] strategy=rsi-gen-1/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [PIPELINE] [OK] conf=0.88 chose[0]=" then aH and Hb are identical " correct[0]=" then aH and Hb are identical " src=MMLU q=""Statement 1 | If H is a subgroup of G and a belongs to G th"
+   [PIPELINE] conf 0.88 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=""True" correct[0]=" then aH and Hb are identical " ctx=778chars q=""Statement 1 | If H is a subgroup of G and a belongs to G th"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | If H is a subgroup of G and a belongs to G th
+      | [0] " then aH and Hb are identical or disjoint."" [CORRECT]
+      | [1] ""True" [PREDICTED]
+      | [2] " True""
+      | [3] ""False"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: " then aH and Hb are identical or disjoint."" [CORRECT]
+      |   TOTAL: 32.1
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge          24.0 ++++
+      |   comprehensive       6.7 +
+      |
+      | Choice [1]: ""True"
+      |   TOTAL: 21.4
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: " True""
+      |   TOTAL: 21.4
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: ""False"
+      |   TOTAL: 14.1
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          12.3 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.245 jepa=9.961 combined=0.451 conf=1.000
+      | [1] ltr=0.000 rl=-0.179 jepa=9.961 combined=0.441 conf=0.406
+      | [2] ltr=0.000 rl=-0.179 jepa=9.961 combined=0.441 conf=0.406
+      | [3] ltr=0.000 rl=-0.152 jepa=9.961 combined=0.430 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.73 path=expert-high chose[0]=" then aH and Hb are identical " correct[0]=" then aH and Hb are identical " top=[knowledge=24.0,comprehensive=6.7,mha=1.2] q=""Statement 1 | If H is a subgroup of G and a belongs to G th"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 5 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 3 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=3] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] " then aH and Hb are identical or disjoin" conf=0.73
+   +===============================================================
+
+   +===============================================================
+   | Q7/50: "If A = {1
+   | Choices:
+   |   [0]  2 <- CORRECT
+   |   [1]  3} then relation S = {(1
+   |   [2]  1)
+   |   [3]  (2
+   |
+   [RSI] strategy=rsi-gen-1/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [PIPELINE] [OK] conf=0.20 chose[0]=" 2" correct[0]=" 2" src=MMLU q=""If A = {1"
+   [PIPELINE] conf 0.20 <= 0.6, falling through
+   [UNIFIED] [OK] conf=1.00 chose[0]=" 2" correct[0]=" 2" ctx=778chars q=""If A = {1"
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "If A = {1
+      | [0] " 2" [CORRECT]
+      | [1] " 3} then relation S = {(1"
+      | [2] " 1)"
+      | [3] " (2"
+      | Answer: choice[0] conf=1.00
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " 2" [CORRECT]
+      |   TOTAL: 41.2
+      |   mha                 1.3 
+      |   math               40.0 ++++++++
+      |
+      | Choice [1]: " 3} then relation S = {(1"
+      |   TOTAL: 24.7
+      |   embed_sim          -1.6 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive       5.0 +
+      |
+      | Choice [2]: " 1)"
+      |   TOTAL: 41.2
+      |   mha                 1.3 
+      |   math               20.0 ++++
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " (2"
+      |   TOTAL: 41.2
+      |   mha                 1.3 
+      |   math               40.0 ++++++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.233 jepa=10.000 combined=0.477 conf=1.000
+      | [3] ltr=0.000 rl=-0.233 jepa=10.000 combined=0.477 conf=1.000
+      | [2] ltr=0.000 rl=-0.246 jepa=10.000 combined=0.473 conf=1.000
+      | [1] ltr=0.000 rl=-0.167 jepa=9.961 combined=0.452 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.30), using unified answer[0] conf=1.00
+   [MULTI-EXPERT] [OK] conf=0.65 path=unified-tiebreak chose[0]=" 2" correct[0]=" 2" top=[math=40.0,mha=1.3] q=""If A = {1"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 6 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 4 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=4] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:unknown verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] " 2" conf=0.65
+   +===============================================================
+
+   +===============================================================
+   | Q8/50: "Find the order of the factor group (Z_11 x Z_15)/(<1
+   | Choices:
+   |   [0]  1>)" <- CORRECT
+   |   [1] 1
+   |   [2] 2
+   |   [3] 5
+   |
+   [RSI] strategy=rsi-gen-1/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [PIPELINE] [OK] conf=0.56 chose[0]=" 1>)"" correct[0]=" 1>)"" src=MMLU q=""Find the order of the factor group (Z_11 x Z_15)/(<1"
+   [PIPELINE] conf 0.56 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="1" correct[0]=" 1>)"" ctx=778chars q=""Find the order of the factor group (Z_11 x Z_15)/(<1"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Find the order of the factor group (Z_11 x Z_15)/(<1
+      | [0] " 1>)"" [CORRECT] truth=15
+      | [1] "1" [PREDICTED]
+      | [2] "2"
+      | [3] "5" truth=-25
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " 1>)"" [CORRECT]
+      |   TOTAL: 36.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [1]: "1"
+      |   TOTAL: 51.2
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      15.0 +++
+      |
+      | Choice [2]: "2"
+      |   TOTAL: 1.2
+      |   mha                 1.2 
+      |
+      | Choice [3]: "5"
+      |   TOTAL: 26.2
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      15.0 +++
+      |   truth             -25.0 -----
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.217 jepa=10.000 combined=0.543 conf=0.700
+      | [1] ltr=0.000 rl=-0.274 jepa=10.000 combined=0.492 conf=1.000
+      | [2] ltr=0.000 rl=-0.098 jepa=10.000 combined=0.410 conf=0.150
+      | [3] ltr=0.000 rl=-0.201 jepa=10.000 combined=0.322 conf=0.500
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="1" correct[0]=" 1>)"" top=[knowledge=20.0,entity_attr=15.0,comprehensive=15.0] q=""Find the order of the factor group (Z_11 x Z_15)/(<1"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 7 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 5 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=5] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+   | Result: [X] Predicted=[1] "1" conf=1.00
+   | Expected=[0] " 1>)""
+   +===============================================================
+
+   +===============================================================
+   | Q9/50: The polynomial x^3 + 2x^2 + 2x + 1 can be factored into linear factors
+   | Choices:
+   |   [0] (x ΓêÆ 2)(x + 2)(x ΓêÆ 1)
+   |   [1] (x + 1)(x + 4)(x ΓêÆ 2)
+   |   [2] (x + 1)(x ΓêÆ 4)(x ΓêÆ 2) <- CORRECT
+   |   [3] (x - 1)(x ΓêÆ 4)(x ΓêÆ 2)
+   |
+   [RSI] strategy=rsi-gen-1/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [PIPELINE] [WRONG] conf=0.30 chose[1]="(x + 1)(x + 4)(x ΓêÆ 2)" correct[2]="(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)" src=MMLU q="The polynomial x^3 + 2x^2 + 2x + 1 can be factored into line"
+   [PIPELINE] conf 0.30 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[3]="(x - 1)(x ΓêÆ 4)(x ΓêÆ 2)" correct[2]="(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)" ctx=778chars q="The polynomial x^3 + 2x^2 + 2x + 1 can be factored into line"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: The polynomial x^3 + 2x^2 + 2x + 1 can be factored into line
+      | [0] "(x ΓêÆ 2)(x + 2)(x ΓêÆ 1)"
+      | [1] "(x + 1)(x + 4)(x ΓêÆ 2)" truth=15
+      | [2] "(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)" [CORRECT] truth=15
+      | [3] "(x - 1)(x ΓêÆ 4)(x ΓêÆ 2)" [PREDICTED] truth=-25
+      | Answer: choice[3] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "(x ΓêÆ 2)(x + 2)(x ΓêÆ 1)"
+      |   TOTAL: 24.6
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive       3.3 
+      |
+      | Choice [1]: "(x + 1)(x + 4)(x ΓêÆ 2)"
+      |   TOTAL: 39.6
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive       3.3 
+      |   truth              15.0 +++
+      |
+      | Choice [2]: "(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)" [CORRECT]
+      |   TOTAL: 39.6
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive       3.3 
+      |   truth              15.0 +++
+      |
+      | Choice [3]: "(x - 1)(x ΓêÆ 4)(x ΓêÆ 2)"
+      |   TOTAL: -3.8
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth             -25.0 -----
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [1] ltr=0.000 rl=-0.253 jepa=10.000 combined=0.543 conf=1.000
+      | [2] [CORRECT] ltr=0.000 rl=-0.253 jepa=10.000 combined=0.543 conf=1.000
+      | [0] ltr=0.000 rl=-0.194 jepa=10.000 combined=0.445 conf=0.654
+      | [3] ltr=0.000 rl=-0.102 jepa=10.000 combined=0.272 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [WRONG] conf=0.43 path=expert-high chose[1]="(x + 1)(x + 4)(x ΓêÆ 2)" correct[2]="(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)" top=[knowledge=20.0,truth=15.0,comprehensive=3.3] q="The polynomial x^3 + 2x^2 + 2x + 1 can be factored into line"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 8 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 5 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=5] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+   | Result: [X] Predicted=[1] "(x + 1)(x + 4)(x ΓêÆ 2)" conf=0.43
+   | Expected=[2] "(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)"
+   +===============================================================
+
+   +===============================================================
+   | Q10/50: Find the maximum possible order for an element of S_n for n = 10.
+   | Choices:
+   |   [0] 6
+   |   [1] 12
+   |   [2] 30 <- CORRECT
+   |   [3] 105
+   |
+   [RSI] strategy=rsi-gen-1/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [PIPELINE] [OK] conf=0.56 chose[2]="30" correct[2]="30" src=MMLU q="Find the maximum possible order for an element of S_n for n "
+   [PIPELINE] conf 0.56 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=1.00 chose[0]="6" correct[2]="30" ctx=778chars q="Find the maximum possible order for an element of S_n for n "
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find the maximum possible order for an element of S_n for n 
+      | [0] "6" [PREDICTED]
+      | [1] "12"
+      | [2] "30" [CORRECT] truth=30
+      | [3] "105" truth=-50
+      | Answer: choice[0] conf=1.00
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "6"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "12"
+      |   TOTAL: 23.0
+      |   embed_sim           1.7 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: "30" [CORRECT]
+      |   TOTAL: 33.4
+      |   embed_sim           2.2 
+      |   mha                 1.2 
+      |   truth              30.0 ++++++
+      |
+      | Choice [3]: "105"
+      |   TOTAL: -23.5
+      |   embed_sim           5.3 +
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth             -50.0 ----------
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] [CORRECT] ltr=0.000 rl=-0.230 jepa=9.961 combined=0.609 conf=1.000
+      | [1] ltr=0.000 rl=-0.201 jepa=9.961 combined=0.440 conf=0.816
+      | [0] ltr=0.000 rl=-0.183 jepa=10.000 combined=0.439 conf=0.786
+      | [3] ltr=0.000 rl=-0.080 jepa=9.961 combined=0.104 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.88 path=expert-high chose[2]="30" correct[2]="30" top=[truth=30.0,embed_sim=2.2,mha=1.2] q="Find the maximum possible order for an element of S_n for n "
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 9 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 5 | Accepted: 0 (0.0%) | Rejections: [DeferToHuman=5] | Ledger: 0 traits, 0 revisions
+      | Ledger: 0 traits, 0 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-2] Retuning strategy for 'mmlu/abstract_algebra': accuracy=80.0% (8/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+      [GATE] trait=entity:find verdict=AcceptReduced version=0
+   | Result: [OK] Predicted=[2] "30" conf=0.88
+   +===============================================================
+
+   +===============================================================
+   | Q11/50: Statement 1 | R is a splitting field of some polynomial over Q. Statem
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-2/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | R is a splitting field of some polynomial over"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | R is a splitting field of some polynomial over
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 22.1
+      |   embed_sim           0.9 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 22.1
+      |   embed_sim           0.9 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 14.3
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          13.5 ++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 14.3
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          13.5 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.207 jepa=9.961 combined=0.436 conf=1.000
+      | [1] ltr=0.000 rl=-0.207 jepa=9.961 combined=0.436 conf=1.000
+      | [2] ltr=0.000 rl=-0.131 jepa=9.961 combined=0.435 conf=0.150
+      | [3] ltr=0.000 rl=-0.131 jepa=9.961 combined=0.435 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.32), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.29 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2,embed_sim=0.9] q="Statement 1 | R is a splitting field of some polynomial over"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 10 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 6 | Accepted: 1 (16.7%) | Rejections: [DeferToHuman=5] | Ledger: 1 traits, 1 revisions
+      | Ledger: 1 traits, 1 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.29
+   +===============================================================
+
+   +===============================================================
+   | Q12/50: "The inverse of -i in the multiplicative group
+   | Choices:
+   |   [0]  {1 <- CORRECT
+   |   [1]  -1
+   |   [2]  i 
+   |   [3]  -i} is"
+   |
+   [RSI] strategy=rsi-gen-2/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.65 chose[3]=" -i} is"" correct[0]=" {1" ctx=778chars q=""The inverse of -i in the multiplicative group"
+   [UNIFIED] Low conf 0.65 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "The inverse of -i in the multiplicative group
+      | [0] " {1" [CORRECT] truth=30
+      | [1] " -1" truth=-50
+      | [2] " i " truth=30
+      | [3] " -i} is"" [PREDICTED] truth=30
+      | Answer: choice[3] conf=0.65
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " {1" [CORRECT]
+      |   TOTAL: 51.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              30.0 ++++++
+      |
+      | Choice [1]: " -1"
+      |   TOTAL: -28.8
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth             -50.0 ----------
+      |
+      | Choice [2]: " i "
+      |   TOTAL: 31.2
+      |   mha                 1.2 
+      |   truth              30.0 ++++++
+      |
+      | Choice [3]: " -i} is""
+      |   TOTAL: 32.6
+      |   embed_sim           1.4 
+      |   mha                 1.2 
+      |   truth              30.0 ++++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.256 jepa=10.000 combined=0.646 conf=1.000
+      | [3] ltr=0.000 rl=-0.210 jepa=9.961 combined=0.612 conf=0.767
+      | [2] ltr=0.000 rl=-0.194 jepa=10.000 combined=0.611 conf=0.750
+      | [1] ltr=0.000 rl=-0.053 jepa=10.000 combined=0.097 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" {1" correct[0]=" {1" top=[truth=30.0,knowledge=20.0,mha=1.2] q=""The inverse of -i in the multiplicative group"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 11 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 6 | Accepted: 1 (16.7%) | Rejections: [DeferToHuman=5] | Ledger: 1 traits, 1 revisions
+      | Ledger: 1 traits, 1 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:the verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] " {1" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q13/50: "Compute the product in the given ring. (2
+   | Choices:
+   |   [0] 3)(3 <- CORRECT
+   |   [1] 5) in Z_5 x Z_9"
+   |   [2] "(1
+   |   [3] 1)"
+   |
+   [RSI] strategy=rsi-gen-2/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[3]="1)"" correct[0]="3)(3" ctx=778chars q=""Compute the product in the given ring. (2"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Compute the product in the given ring. (2
+      | [0] "3)(3" [CORRECT]
+      | [1] "5) in Z_5 x Z_9""
+      | [2] ""(1"
+      | [3] "1)"" [PREDICTED]
+      | Answer: choice[3] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "3)(3" [CORRECT]
+      |   TOTAL: 1.3
+      |   mha                 1.3 
+      |
+      | Choice [1]: "5) in Z_5 x Z_9""
+      |   TOTAL: 8.2
+      |   embed_sim           3.2 
+      |   mha                 1.2 
+      |   comprehensive       3.8 
+      |
+      | Choice [2]: ""(1"
+      |   TOTAL: 21.2
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "1)""
+      |   TOTAL: 21.2
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.187 jepa=10.000 combined=0.438 conf=1.000
+      | [3] ltr=0.000 rl=-0.187 jepa=10.000 combined=0.438 conf=1.000
+      | [1] ltr=0.000 rl=-0.140 jepa=9.961 combined=0.418 conf=0.348
+      | [0] [CORRECT] ltr=0.000 rl=-0.090 jepa=10.000 combined=0.412 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [WRONG] conf=0.39 path=expert-high chose[2]=""(1" correct[0]="3)(3" top=[knowledge=20.0,mha=1.3] q=""Compute the product in the given ring. (2"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 12 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 7 | Accepted: 1 (14.3%) | Rejections: [DeferToHuman=6] | Ledger: 1 traits, 1 revisions
+      | Ledger: 1 traits, 1 revisions
+      +------------------------------------------------------------
+   | Result: [X] Predicted=[2] ""(1" conf=0.39
+   | Expected=[0] "3)(3"
+   +===============================================================
+
+   +===============================================================
+   | Q14/50: The set of all real numbers under the usual multiplication operation i
+   | Choices:
+   |   [0] multiplication is not a binary operation
+   |   [1] multiplication is not associative
+   |   [2] identity element does not exist
+   |   [3] zero has no inverse <- CORRECT
+   |
+   [RSI] strategy=rsi-gen-2/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[0]="multiplication is not a binary" correct[3]="zero has no inverse" ctx=778chars q="The set of all real numbers under the usual multiplication o"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: The set of all real numbers under the usual multiplication o
+      | [0] "multiplication is not a binary operation" [PREDICTED] truth=-25
+      | [1] "multiplication is not associative" truth=-25
+      | [2] "identity element does not exist"
+      | [3] "zero has no inverse" [CORRECT] truth=30
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: "multiplication is not a binary operation"
+      |   TOTAL: 36.2
+      |   embed_sim           2.4 
+      |   mha                 1.2 
+      |   knowledge          32.5 ++++++
+      |   comprehensive      25.0 +++++
+      |   truth             -25.0 -----
+      |
+      | Choice [1]: "multiplication is not associative"
+      |   TOTAL: 22.6
+      |   embed_sim           1.4 
+      |   mha                 1.2 
+      |   knowledge          30.0 ++++++
+      |   comprehensive      15.0 +++
+      |   truth             -25.0 -----
+      |
+      | Choice [2]: "identity element does not exist"
+      |   TOTAL: 31.1
+      |   embed_sim           0.9 
+      |   mha                 1.2 
+      |   knowledge          24.0 ++++
+      |   comprehensive       5.0 +
+      |
+      | Choice [3]: "zero has no inverse" [CORRECT]
+      |   TOTAL: 51.4
+      |   embed_sim           0.1 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   truth              30.0 ++++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [3] [CORRECT] ltr=0.000 rl=-0.267 jepa=9.961 combined=0.644 conf=1.000
+      | [2] ltr=0.000 rl=-0.190 jepa=9.961 combined=0.463 conf=0.295
+      | [0] ltr=0.000 rl=-0.209 jepa=9.961 combined=0.346 conf=0.470
+      | [1] ltr=0.000 rl=-0.167 jepa=9.961 combined=0.322 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.87 path=expert-high chose[3]="zero has no inverse" correct[3]="zero has no inverse" top=[truth=30.0,knowledge=20.0,mha=1.3] q="The set of all real numbers under the usual multiplication o"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 13 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 7 | Accepted: 1 (14.3%) | Rejections: [DeferToHuman=6] | Ledger: 1 traits, 1 revisions
+      | Ledger: 1 traits, 1 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:the verdict=AcceptReduced version=0
+   | Result: [OK] Predicted=[3] "zero has no inverse" conf=0.87
+   +===============================================================
+
+   +===============================================================
+   | Q15/50: Statement 1| Every group of order p^2 where p is prime is Abelian. Sta
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-2/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1| Every group of order p^2 where p is prime is Ab"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1| Every group of order p^2 where p is prime is Ab
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Attention (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 24.8
+      |   embed_sim          -0.2 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 24.8
+      |   embed_sim          -0.2 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 25.4
+      |   embed_sim           0.4 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 25.4
+      |   embed_sim           0.4 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.142 jepa=9.961 combined=0.459 conf=0.150
+      | [1] ltr=0.000 rl=-0.142 jepa=9.961 combined=0.459 conf=0.150
+      | [2] ltr=0.000 rl=-0.206 jepa=9.961 combined=0.445 conf=1.000
+      | [3] ltr=0.000 rl=-0.206 jepa=9.961 combined=0.445 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.26), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.25 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=5.0,embed_sim=-0.2] q="Statement 1| Every group of order p^2 where p is prime is Ab"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 14 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 8 | Accepted: 2 (25.0%) | Rejections: [DeferToHuman=6] | Ledger: 2 traits, 2 revisions
+      | Ledger: 2 traits, 2 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-3] Retuning strategy for 'mmlu/abstract_algebra': accuracy=80.0% (12/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   | Result: [OK] Predicted=[0] ""True" conf=0.25
+   +===============================================================
+
+   +===============================================================
+   | Q16/50: "Statement 1 | For finite groups G and H
+   | Choices:
+   |   [0]  |G + H| = |G||H|. (G + H is the internal direct product.) S <- CORRECT
+   |   [1] "True
+   |   [2]  True"
+   |   [3] "False
+   |
+   [RSI] strategy=rsi-gen-3/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=""True" correct[0]=" |G + H| = |G||H|. (G + H is t" ctx=778chars q=""Statement 1 | For finite groups G and H"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | For finite groups G and H
+      | [0] " |G + H| = |G||H|. (G + H is the internal direct p" [CORRECT]
+      | [1] ""True" [PREDICTED]
+      | [2] " True""
+      | [3] ""False"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " |G + H| = |G||H|. (G + H is the internal direct p" [CORRECT]
+      |   TOTAL: 37.9
+      |   embed_sim           1.6 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   comprehensive      15.0 +++
+      |
+      | Choice [1]: ""True"
+      |   TOTAL: 23.8
+      |   embed_sim           2.6 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: " True""
+      |   TOTAL: 23.8
+      |   embed_sim           2.6 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: ""False"
+      |   TOTAL: 20.1
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          18.3 +++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.238 jepa=9.961 combined=0.468 conf=1.000
+      | [1] ltr=0.000 rl=-0.155 jepa=9.961 combined=0.453 conf=0.212
+      | [2] ltr=0.000 rl=-0.155 jepa=9.961 combined=0.453 conf=0.212
+      | [3] ltr=0.000 rl=-0.145 jepa=9.961 combined=0.446 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.86 path=expert-high chose[0]=" |G + H| = |G||H|. (G + H is t" correct[0]=" |G + H| = |G||H|. (G + H is t" top=[knowledge=20.0,comprehensive=15.0,embed_sim=1.6] q=""Statement 1 | For finite groups G and H"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 15 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 8 | Accepted: 2 (25.0%) | Rejections: [DeferToHuman=6] | Ledger: 2 traits, 2 revisions
+      | Ledger: 2 traits, 2 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=AcceptReduced version=0
+   | Result: [OK] Predicted=[0] " |G + H| = |G||H|. (G + H is the interna" conf=0.86
+   +===============================================================
+
+   +===============================================================
+   | Q17/50: "Find the sum of the given polynomials in the given polynomial ring. f
+   | Choices:
+   |   [0]  g(x) = 2x^2 - 4x + 2 in Z_8[x]." <- CORRECT
+   |   [1] 2x^2 + 5
+   |   [2] 6x^2 + 4x + 6
+   |   [3] 0
+   |
+   [RSI] strategy=rsi-gen-3/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[3]="0" correct[0]=" g(x) = 2x^2 - 4x + 2 in Z_8[x" ctx=778chars q=""Find the sum of the given polynomials in the given polynomi"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Find the sum of the given polynomials in the given polynomi
+      | [0] " g(x) = 2x^2 - 4x + 2 in Z_8[x]."" [CORRECT]
+      | [1] "2x^2 + 5"
+      | [2] "6x^2 + 4x + 6"
+      | [3] "0" [PREDICTED]
+      | Answer: choice[3] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " g(x) = 2x^2 - 4x + 2 in Z_8[x]."" [CORRECT]
+      |   TOTAL: 25.6
+      |   embed_sim           0.8 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive       3.6 
+      |
+      | Choice [1]: "2x^2 + 5"
+      |   TOTAL: -4.8
+      |   embed_sim          -6.1 -
+      |   mha                 1.2 
+      |
+      | Choice [2]: "6x^2 + 4x + 6"
+      |   TOTAL: 25.9
+      |   embed_sim           4.6 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "0"
+      |   TOTAL: 21.2
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.202 jepa=9.961 combined=0.447 conf=1.000
+      | [0] [CORRECT] ltr=0.000 rl=-0.213 jepa=9.961 combined=0.443 conf=0.991
+      | [3] ltr=0.000 rl=-0.172 jepa=10.000 combined=0.442 conf=0.849
+      | [1] ltr=0.000 rl=-0.073 jepa=9.961 combined=0.402 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [WRONG] conf=0.37 path=expert-high chose[2]="6x^2 + 4x + 6" correct[0]=" g(x) = 2x^2 - 4x + 2 in Z_8[x" top=[knowledge=20.0,embed_sim=4.6,mha=1.2] q=""Find the sum of the given polynomials in the given polynomi"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 16 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 9 | Accepted: 3 (33.3%) | Rejections: [DeferToHuman=6] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [X] Predicted=[2] "6x^2 + 4x + 6" conf=0.37
+   | Expected=[0] " g(x) = 2x^2 - 4x + 2 in Z_8[x].""
+   +===============================================================
+
+   +===============================================================
+   | Q18/50: "Statement 1 | Any set of two vectors in R^2 is linearly independent. 
+   | Choices:
+   |   [0]  ...  <- CORRECT
+   |   [1]  vk) and {v1
+   |   [2]  ... 
+   |   [3]  vk} are linearly independent
+   |
+   [RSI] strategy=rsi-gen-3/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.65 chose[1]=" vk) and {v1" correct[0]=" ... " ctx=778chars q=""Statement 1 | Any set of two vectors in R^2 is linearly ind"
+   [UNIFIED] Low conf 0.65 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | Any set of two vectors in R^2 is linearly ind
+      | [0] " ... " [CORRECT] truth=15
+      | [1] " vk) and {v1" [PREDICTED] truth=-25
+      | [2] " ... " truth=15
+      | [3] " vk} are linearly independent" truth=-10
+      | Answer: choice[1] conf=0.65
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: " ... " [CORRECT]
+      |   TOTAL: 16.2
+      |   mha                 1.3 
+      |   truth              15.0 +++
+      |
+      | Choice [1]: " vk) and {v1"
+      |   TOTAL: -2.4
+      |   embed_sim           1.4 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth             -25.0 -----
+      |
+      | Choice [2]: " ... "
+      |   TOTAL: 16.2
+      |   mha                 1.3 
+      |   truth              15.0 +++
+      |
+      | Choice [3]: " vk} are linearly independent"
+      |   TOTAL: 33.5
+      |   embed_sim           1.9 
+      |   mha                 1.2 
+      |   knowledge          33.3 ++++++
+      |   comprehensive       7.0 +
+      |   truth             -10.0 --
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.145 jepa=10.000 combined=0.511 conf=0.520
+      | [2] ltr=0.000 rl=-0.145 jepa=10.000 combined=0.511 conf=0.520
+      | [3] ltr=0.000 rl=-0.228 jepa=9.961 combined=0.409 conf=1.000
+      | [1] ltr=0.000 rl=-0.103 jepa=9.961 combined=0.276 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]=" vk} are linearly independent" correct[0]=" ... " top=[knowledge=33.3,truth=-10.0,comprehensive=7.0] q=""Statement 1 | Any set of two vectors in R^2 is linearly ind"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 17 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 9 | Accepted: 3 (33.3%) | Rejections: [DeferToHuman=6] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [X] Predicted=[3] " vk} are linearly independent" conf=1.00
+   | Expected=[0] " ... "
+   +===============================================================
+
+   +===============================================================
+   | Q19/50: The set of all nth roots of unity under multiplication of complex numb
+   | Choices:
+   |   [0] semi group with identity
+   |   [1] commutative semigroups with identity
+   |   [2] group
+   |   [3] abelian group <- CORRECT
+   |
+   [RSI] strategy=rsi-gen-3/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.26 chose[3]="abelian group" correct[3]="abelian group" ctx=778chars q="The set of all nth roots of unity under multiplication of co"
+   [UNIFIED] Low conf 0.26 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: The set of all nth roots of unity under multiplication of co
+      | [0] "semi group with identity"
+      | [1] "commutative semigroups with identity"
+      | [2] "group"
+      | [3] "abelian group" [CORRECT]
+      | Answer: choice[3] conf=0.26
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "semi group with identity"
+      |   TOTAL: 22.4
+      |   embed_sim           1.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "commutative semigroups with identity"
+      |   TOTAL: 24.0
+      |   embed_sim           2.8 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: "group"
+      |   TOTAL: 21.6
+      |   embed_sim           0.4 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "abelian group" [CORRECT]
+      |   TOTAL: 22.4
+      |   embed_sim           1.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.145 jepa=9.961 combined=0.450 conf=0.150
+      | [3] [CORRECT] ltr=0.000 rl=-0.157 jepa=9.961 combined=0.449 conf=0.325
+      | [0] ltr=0.000 rl=-0.158 jepa=9.961 combined=0.449 conf=0.341
+      | [1] ltr=0.000 rl=-0.199 jepa=9.961 combined=0.443 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.28), using unified answer[3] conf=0.26
+   [MULTI-EXPERT] [OK] conf=0.28 path=unified-tiebreak chose[3]="abelian group" correct[3]="abelian group" top=[knowledge=20.0,mha=1.2,embed_sim=1.1] q="The set of all nth roots of unity under multiplication of co"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 18 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 9 | Accepted: 3 (33.3%) | Rejections: [DeferToHuman=6] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[3] "abelian group" conf=0.28
+   +===============================================================
+
+   +===============================================================
+   | Q20/50: "Statement 1 | Every maximal ideal is a prime ideal. Statement 2 | If 
+   | Choices:
+   |   [0]  then R/I is field." <- CORRECT
+   |   [1] "True
+   |   [2]  True"
+   |   [3] "False
+   |
+   [RSI] strategy=rsi-gen-3/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=""True" correct[0]=" then R/I is field."" ctx=778chars q=""Statement 1 | Every maximal ideal is a prime ideal. Stateme"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | Every maximal ideal is a prime ideal. Stateme
+      | [0] " then R/I is field."" [CORRECT] truth=15
+      | [1] ""True" [PREDICTED]
+      | [2] " True""
+      | [3] ""False"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: " then R/I is field."" [CORRECT]
+      |   TOTAL: 36.4
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [1]: ""True"
+      |   TOTAL: 20.7
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: " True""
+      |   TOTAL: 20.7
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: ""False"
+      |   TOTAL: 17.2
+      |   embed_sim           1.6 
+      |   mha                 1.2 
+      |   knowledge          14.4 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.232 jepa=9.961 combined=0.541 conf=1.000
+      | [1] ltr=0.000 rl=-0.131 jepa=9.961 combined=0.452 conf=0.181
+      | [2] ltr=0.000 rl=-0.131 jepa=9.961 combined=0.452 conf=0.181
+      | [3] ltr=0.000 rl=-0.136 jepa=9.961 combined=0.442 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.94 path=expert-high chose[0]=" then R/I is field."" correct[0]=" then R/I is field."" top=[knowledge=20.0,truth=15.0,mha=1.2] q=""Statement 1 | Every maximal ideal is a prime ideal. Stateme"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 19 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 9 | Accepted: 3 (33.3%) | Rejections: [DeferToHuman=6] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-4] Retuning strategy for 'mmlu/abstract_algebra': accuracy=75.0% (15/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+      [GATE] trait=entity:statement verdict=RejectCooldown version=0
+   | Result: [OK] Predicted=[0] " then R/I is field."" conf=0.94
+   +===============================================================
+
+   +===============================================================
+   | Q21/50: Let G denoted the set of all n x n non-singular matrices with rational
+   | Choices:
+   |   [0] subgroup <- CORRECT
+   |   [1] finite abelian group
+   |   [2] "infinite
+   |   [3]  non abelian group"
+   |
+   [RSI] strategy=rsi-gen-4/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=1.00 chose[0]="subgroup" correct[0]="subgroup" ctx=778chars q="Let G denoted the set of all n x n non-singular matrices wit"
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Let G denoted the set of all n x n non-singular matrices wit
+      | [0] "subgroup" [CORRECT]
+      | [1] "finite abelian group"
+      | [2] ""infinite"
+      | [3] " non abelian group""
+      | Answer: choice[0] conf=1.00
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: "subgroup" [CORRECT]
+      |   TOTAL: 21.0
+      |   embed_sim          -0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "finite abelian group"
+      |   TOTAL: 21.1
+      |   embed_sim          -0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""infinite"
+      |   TOTAL: 10.9
+      |   embed_sim           1.2 
+      |   mha                 1.2 
+      |   knowledge           8.4 +
+      |
+      | Choice [3]: " non abelian group""
+      |   TOTAL: 21.8
+      |   embed_sim           0.6 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [1] ltr=0.000 rl=-0.172 jepa=9.961 combined=0.442 conf=0.936
+      | [0] [CORRECT] ltr=0.000 rl=-0.172 jepa=9.961 combined=0.442 conf=0.928
+      | [3] ltr=0.000 rl=-0.190 jepa=9.961 combined=0.439 conf=1.000
+      | [2] ltr=0.000 rl=-0.122 jepa=9.961 combined=0.429 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.30), using unified answer[0] conf=1.00
+   [MULTI-EXPERT] [OK] conf=0.66 path=unified-tiebreak chose[0]="subgroup" correct[0]="subgroup" top=[knowledge=20.0,mha=1.2,embed_sim=-0.2] q="Let G denoted the set of all n x n non-singular matrices wit"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 20 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 10 | Accepted: 3 (30.0%) | Rejections: [DeferToHuman=6, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:let verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] "subgroup" conf=0.66
+   +===============================================================
+
+   +===============================================================
+   | Q22/50: Statement 1 | Every group of order 42 has a normal subgroup of order 7
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-4/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | Every group of order 42 has a normal subgroup "
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | Every group of order 42 has a normal subgroup 
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 21.1
+      |   embed_sim          -0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 21.1
+      |   embed_sim          -0.2 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 20.8
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 20.8
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.124 jepa=9.961 combined=0.454 conf=0.150
+      | [3] ltr=0.000 rl=-0.124 jepa=9.961 combined=0.454 conf=0.150
+      | [0] [CORRECT] ltr=0.000 rl=-0.173 jepa=9.961 combined=0.442 conf=1.000
+      | [1] ltr=0.000 rl=-0.173 jepa=9.961 combined=0.442 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.25), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.25 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2,embed_sim=-0.2] q="Statement 1 | Every group of order 42 has a normal subgroup "
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 21 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 11 | Accepted: 3 (27.3%) | Rejections: [DeferToHuman=7, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.25
+   +===============================================================
+
+   +===============================================================
+   | Q23/50: Determine whether the polynomial in Z[x] satisfies an Eisenstein crite
+   | Choices:
+   |   [0] "Yes <- CORRECT
+   |   [1]  with p=2."
+   |   [2] "Yes
+   |   [3]  with p=3."
+   |
+   [RSI] strategy=rsi-gen-4/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=" with p=2."" correct[0]=""Yes" ctx=778chars q="Determine whether the polynomial in Z[x] satisfies an Eisens"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Determine whether the polynomial in Z[x] satisfies an Eisens
+      | [0] ""Yes" [CORRECT] truth=30
+      | [1] " with p=2."" [PREDICTED] truth=-50
+      | [2] ""Yes" truth=30
+      | [3] " with p=3.""
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: ""Yes" [CORRECT]
+      |   TOTAL: 41.9
+      |   embed_sim           0.3 
+      |   mha                 1.3 
+      |   knowledge          10.3 ++
+      |   truth              30.0 ++++++
+      |
+      | Choice [1]: " with p=2.""
+      |   TOTAL: -35.0
+      |   embed_sim           2.5 
+      |   mha                 1.2 
+      |   knowledge          11.3 ++
+      |   truth             -50.0 ----------
+      |
+      | Choice [2]: ""Yes"
+      |   TOTAL: 41.9
+      |   embed_sim           0.3 
+      |   mha                 1.3 
+      |   knowledge          10.3 ++
+      |   truth              30.0 ++++++
+      |
+      | Choice [3]: " with p=3.""
+      |   TOTAL: 15.0
+      |   embed_sim           2.5 
+      |   mha                 1.2 
+      |   knowledge          11.3 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.234 jepa=9.961 combined=0.629 conf=1.000
+      | [2] ltr=0.000 rl=-0.234 jepa=9.961 combined=0.629 conf=1.000
+      | [3] ltr=0.000 rl=-0.153 jepa=9.961 combined=0.432 conf=0.650
+      | [1] ltr=0.000 rl=-0.036 jepa=9.961 combined=0.086 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.47 path=expert-high chose[0]=""Yes" correct[0]=""Yes" top=[truth=30.0,knowledge=10.3,mha=1.3] q="Determine whether the polynomial in Z[x] satisfies an Eisens"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 22 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 11 | Accepted: 3 (27.3%) | Rejections: [DeferToHuman=7, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""Yes" conf=0.47
+   +===============================================================
+
+   +===============================================================
+   | Q24/50: Statement 1 | The image of a group of 6 elements under a homomorphism 
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-4/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | The image of a group of 6 elements under a hom"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | The image of a group of 6 elements under a hom
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Attention (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 25.0
+      |   embed_sim          -0.0 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 25.0
+      |   embed_sim          -0.0 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 24.4
+      |   embed_sim          -0.6 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 24.4
+      |   embed_sim          -0.6 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.126 jepa=9.961 combined=0.462 conf=0.150
+      | [3] ltr=0.000 rl=-0.126 jepa=9.961 combined=0.462 conf=0.150
+      | [0] [CORRECT] ltr=0.000 rl=-0.176 jepa=9.961 combined=0.451 conf=1.000
+      | [1] ltr=0.000 rl=-0.176 jepa=9.961 combined=0.451 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.25), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.25 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=5.0] q="Statement 1 | The image of a group of 6 elements under a hom"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 23 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 11 | Accepted: 3 (27.3%) | Rejections: [DeferToHuman=7, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.25
+   +===============================================================
+
+   +===============================================================
+   | Q25/50: Statement 1 | The homomorphic image of a cyclic group is cyclic. State
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-4/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | The homomorphic image of a cyclic group is cyc"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | The homomorphic image of a cyclic group is cyc
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 21.2
+      |   embed_sim          -0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 21.2
+      |   embed_sim          -0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 15.6
+      |   embed_sim          -0.4 
+      |   mha                 1.2 
+      |   knowledge          14.8 ++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 15.6
+      |   embed_sim          -0.4 
+      |   mha                 1.2 
+      |   knowledge          14.8 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.108 jepa=9.961 combined=0.444 conf=0.150
+      | [3] ltr=0.000 rl=-0.108 jepa=9.961 combined=0.444 conf=0.150
+      | [0] [CORRECT] ltr=0.000 rl=-0.167 jepa=9.961 combined=0.444 conf=1.000
+      | [1] ltr=0.000 rl=-0.167 jepa=9.961 combined=0.444 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.30), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.28 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2] q="Statement 1 | The homomorphic image of a cyclic group is cyc"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 24 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 11 | Accepted: 3 (27.3%) | Rejections: [DeferToHuman=7, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-5] Retuning strategy for 'mmlu/abstract_algebra': accuracy=80.0% (20/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   | Result: [OK] Predicted=[0] ""True" conf=0.28
+   +===============================================================
+
+   +===============================================================
+   | Q26/50: "Statement 1 | If H is a subgroup of a group G and a belongs to G
+   | Choices:
+   |   [0]  then aH = Ha. Statement 2 | If H is normal of G and a belon <- CORRECT
+   |   [1]  then ah = ha for all h in H."
+   |   [2] "True
+   |   [3]  True"
+   |
+   [RSI] strategy=rsi-gen-5/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.27 chose[3]=" True"" correct[0]=" then aH = Ha. Statement 2 | I" ctx=778chars q=""Statement 1 | If H is a subgroup of a group G and a belongs"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | If H is a subgroup of a group G and a belongs
+      | [0] " then aH = Ha. Statement 2 | If H is normal of G a" [CORRECT]
+      | [1] " then ah = ha for all h in H.""
+      | [2] ""True"
+      | [3] " True"" [PREDICTED]
+      | Answer: choice[3] conf=0.27
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: " then aH = Ha. Statement 2 | If H is normal of G a" [CORRECT]
+      |   TOTAL: 85.8
+      |   embed_sim           2.5 
+      |   mha                 1.2 
+      |   knowledge          32.0 ++++++
+      |   comprehensive      50.0 ++++++++++
+      |
+      | Choice [1]: " then ah = ha for all h in H.""
+      |   TOTAL: 25.4
+      |   embed_sim          -0.8 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive       5.0 +
+      |
+      | Choice [2]: ""True"
+      |   TOTAL: 20.7
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " True""
+      |   TOTAL: 20.7
+      |   embed_sim          -0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.305 jepa=9.961 combined=0.571 conf=1.000
+      | [1] ltr=0.000 rl=-0.137 jepa=9.961 combined=0.462 conf=0.150
+      | [2] ltr=0.000 rl=-0.115 jepa=9.961 combined=0.455 conf=0.150
+      | [3] ltr=0.000 rl=-0.115 jepa=9.961 combined=0.455 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" then aH = Ha. Statement 2 | I" correct[0]=" then aH = Ha. Statement 2 | I" top=[comprehensive=50.0,knowledge=32.0,embed_sim=2.5] q=""Statement 1 | If H is a subgroup of a group G and a belongs"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 25 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 11 | Accepted: 3 (27.3%) | Rejections: [DeferToHuman=7, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[0] " then aH = Ha. Statement 2 | If H is nor" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q27/50: "If (G
+   | Choices:
+   |   [0]  .) is a group such that (ab)^-1 = a^-1b^-1 <- CORRECT
+   |   [1]  for all a
+   |   [2]  b in G
+   |   [3]  then G is a/an"
+   |
+   [RSI] strategy=rsi-gen-5/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=" .) is a group such that (ab)^" correct[0]=" .) is a group such that (ab)^" ctx=778chars q=""If (G"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "If (G
+      | [0] " .) is a group such that (ab)^-1 = a^-1b^-1" [CORRECT]
+      | [1] " for all a"
+      | [2] " b in G"
+      | [3] " then G is a/an""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " .) is a group such that (ab)^-1 = a^-1b^-1" [CORRECT]
+      |   TOTAL: 20.8
+      |   embed_sim          -0.4 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " for all a"
+      |   TOTAL: 2.2
+      |   embed_sim           1.0 
+      |   mha                 1.2 
+      |
+      | Choice [2]: " b in G"
+      |   TOTAL: 1.6
+      |   embed_sim           0.3 
+      |   mha                 1.3 
+      |
+      | Choice [3]: " then G is a/an""
+      |   TOTAL: 20.4
+      |   embed_sim          -0.9 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.162 jepa=9.961 combined=0.444 conf=1.000
+      | [3] ltr=0.000 rl=-0.160 jepa=9.961 combined=0.443 conf=0.977
+      | [1] ltr=0.000 rl=-0.080 jepa=9.961 combined=0.418 conf=0.150
+      | [2] ltr=0.000 rl=-0.079 jepa=9.961 combined=0.417 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.42 path=expert-high chose[0]=" .) is a group such that (ab)^" correct[0]=" .) is a group such that (ab)^" top=[knowledge=20.0,mha=1.3,embed_sim=-0.4] q=""If (G"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 26 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 12 | Accepted: 3 (25.0%) | Rejections: [DeferToHuman=7, RejectCooldown=1, RejectByPolicy=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] " .) is a group such that (ab)^-1 = a^-1b" conf=0.42
+   +===============================================================
+
+   +===============================================================
+   | Q28/50: "Statement 1 | In a finite dimensional vector space every linearly ind
+   | Choices:
+   |   [0]  then |B_1| = |B_2|." <- CORRECT
+   |   [1] "True
+   |   [2]  True"
+   |   [3] "False
+   |
+   [RSI] strategy=rsi-gen-5/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=""True" correct[0]=" then |B_1| = |B_2|."" ctx=778chars q=""Statement 1 | In a finite dimensional vector space every li"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | In a finite dimensional vector space every li
+      | [0] " then |B_1| = |B_2|."" [CORRECT] truth=15
+      | [1] ""True" [PREDICTED]
+      | [2] " True""
+      | [3] ""False"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Attention (weight=1.00)
+      |
+      | Choice [0]: " then |B_1| = |B_2|."" [CORRECT]
+      |   TOTAL: 40.5
+      |   embed_sim           0.5 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [1]: ""True"
+      |   TOTAL: 25.4
+      |   embed_sim           0.4 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: " True""
+      |   TOTAL: 25.4
+      |   embed_sim           0.4 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: ""False"
+      |   TOTAL: 25.5
+      |   embed_sim           0.5 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.220 jepa=9.961 combined=0.554 conf=1.000
+      | [3] ltr=0.000 rl=-0.132 jepa=9.961 combined=0.463 conf=0.150
+      | [1] ltr=0.000 rl=-0.131 jepa=9.961 combined=0.463 conf=0.150
+      | [2] ltr=0.000 rl=-0.131 jepa=9.961 combined=0.463 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.88 path=expert-high chose[0]=" then |B_1| = |B_2|."" correct[0]=" then |B_1| = |B_2|."" top=[knowledge=20.0,truth=15.0,mha=5.0] q=""Statement 1 | In a finite dimensional vector space every li"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 27 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 12 | Accepted: 3 (25.0%) | Rejections: [DeferToHuman=7, RejectCooldown=1, RejectByPolicy=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] " then |B_1| = |B_2|."" conf=0.88
+   +===============================================================
+
+   +===============================================================
+   | Q29/50: "Some group (G
+   | Choices:
+   |   [0]  0) is known to be abelian. Then which one of the following  <- CORRECT
+   |   [1] g = g^-1 for every g in G
+   |   [2] g = g^2 for every g in G
+   |   [3] "(g o h)^2 = g^2 o h^2 for every g
+   |
+   [RSI] strategy=rsi-gen-5/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="g = g^2 for every g in G" correct[0]=" 0) is known to be abelian. Th" ctx=778chars q=""Some group (G"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Some group (G
+      | [0] " 0) is known to be abelian. Then which one of the " [CORRECT]
+      | [1] "g = g^-1 for every g in G"
+      | [2] "g = g^2 for every g in G" [PREDICTED]
+      | [3] ""(g o h)^2 = g^2 o h^2 for every g"
+      | Answer: choice[2] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " 0) is known to be abelian. Then which one of the " [CORRECT]
+      |   TOTAL: 22.8
+      |   embed_sim           1.6 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "g = g^-1 for every g in G"
+      |   TOTAL: 21.4
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: "g = g^2 for every g in G"
+      |   TOTAL: 10.2
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge           8.9 +
+      |
+      | Choice [3]: ""(g o h)^2 = g^2 o h^2 for every g"
+      |   TOTAL: 10.3
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge           8.9 +
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.173 jepa=9.961 combined=0.446 conf=1.000
+      | [1] ltr=0.000 rl=-0.164 jepa=9.961 combined=0.445 conf=0.883
+      | [3] ltr=0.000 rl=-0.102 jepa=9.961 combined=0.433 conf=0.150
+      | [2] ltr=0.000 rl=-0.102 jepa=9.961 combined=0.433 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.42 path=expert-high chose[0]=" 0) is known to be abelian. Th" correct[0]=" 0) is known to be abelian. Th" top=[knowledge=20.0,embed_sim=1.6,mha=1.2] q=""Some group (G"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 28 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 13 | Accepted: 3 (23.1%) | Rejections: [DeferToHuman=8, RejectCooldown=1, RejectByPolicy=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] " 0) is known to be abelian. Then which o" conf=0.42
+   +===============================================================
+
+   +===============================================================
+   | Q30/50: "Statement 1 | If T: V -> W is a linear transformation and dim(V ) < d
+   | Choices:
+   |   [0]  then T must be injective. Statement 2 | Let dim(V) = n and  <- CORRECT
+   |   [1]  then it is a bijection."
+   |   [2] "True
+   |   [3]  True"
+   |
+   [RSI] strategy=rsi-gen-5/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.27 chose[2]=""True" correct[0]=" then T must be injective. Sta" ctx=778chars q=""Statement 1 | If T: V -> W is a linear transformation and d"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | If T: V -> W is a linear transformation and d
+      | [0] " then T must be injective. Statement 2 | Let dim(V" [CORRECT]
+      | [1] " then it is a bijection.""
+      | [2] ""True" [PREDICTED]
+      | [3] " True""
+      | Answer: choice[2] conf=0.27
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: " then T must be injective. Statement 2 | Let dim(V" [CORRECT]
+      |   TOTAL: 65.7
+      |   embed_sim           3.1 
+      |   mha                 1.2 
+      |   knowledge          26.4 +++++
+      |   comprehensive      35.0 +++++++
+      |
+      | Choice [1]: " then it is a bijection.""
+      |   TOTAL: 31.2
+      |   embed_sim          -0.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      10.0 ++
+      |
+      | Choice [2]: ""True"
+      |   TOTAL: 20.8
+      |   embed_sim          -0.4 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " True""
+      |   TOTAL: 20.8
+      |   embed_sim          -0.4 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.260 jepa=9.961 combined=0.532 conf=1.000
+      | [1] ltr=0.000 rl=-0.141 jepa=9.961 combined=0.475 conf=0.230
+      | [2] ltr=0.000 rl=-0.106 jepa=9.961 combined=0.458 conf=0.150
+      | [3] ltr=0.000 rl=-0.106 jepa=9.961 combined=0.458 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" then T must be injective. Sta" correct[0]=" then T must be injective. Sta" top=[comprehensive=35.0,knowledge=26.4,embed_sim=3.1] q=""Statement 1 | If T: V -> W is a linear transformation and d"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 29 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 13 | Accepted: 3 (23.1%) | Rejections: [DeferToHuman=8, RejectCooldown=1, RejectByPolicy=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-6] Retuning strategy for 'mmlu/abstract_algebra': accuracy=83.3% (25/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+      [GATE] trait=entity:statement verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[0] " then T must be injective. Statement 2 |" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q31/50: "Find the degree for the given field extension Q(sqrt(2)
+   | Choices:
+   |   [0]  sqrt(3)) over Q." <- CORRECT
+   |   [1] 0
+   |   [2] 4
+   |   [3] 2
+   |
+   [RSI] strategy=rsi-gen-6/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.90 chose[3]="2" correct[0]=" sqrt(3)) over Q."" ctx=778chars q=""Find the degree for the given field extension Q(sqrt(2)"
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Find the degree for the given field extension Q(sqrt(2)
+      | [0] " sqrt(3)) over Q."" [CORRECT] truth=15
+      | [1] "0"
+      | [2] "4" truth=30
+      | [3] "2" [PREDICTED] truth=-50
+      | Answer: choice[3] conf=0.90
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " sqrt(3)) over Q."" [CORRECT]
+      |   TOTAL: 40.5
+      |   embed_sim           4.3 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [1]: "0"
+      |   TOTAL: 21.2
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: "4"
+      |   TOTAL: 51.2
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   truth              30.0 ++++++
+      |
+      | Choice [3]: "2"
+      |   TOTAL: 1.2
+      |   entity_attr        15.0 +++
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   comprehensive      15.0 +++
+      |   truth             -50.0 ----------
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.219 jepa=10.000 combined=0.655 conf=1.000
+      | [0] [CORRECT] ltr=0.000 rl=-0.200 jepa=9.961 combined=0.559 conf=0.786
+      | [1] ltr=0.000 rl=-0.118 jepa=10.000 combined=0.455 conf=0.400
+      | [3] ltr=0.000 rl=-0.094 jepa=10.000 combined=0.161 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="4" correct[0]=" sqrt(3)) over Q."" top=[truth=30.0,knowledge=20.0,mha=1.3] q=""Find the degree for the given field extension Q(sqrt(2)"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 30 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 14 | Accepted: 3 (21.4%) | Rejections: [DeferToHuman=8, RejectByPolicy=2, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+   | Result: [X] Predicted=[2] "4" conf=1.00
+   | Expected=[0] " sqrt(3)) over Q.""
+   +===============================================================
+
+   +===============================================================
+   | Q32/50: Compute the product in the given ring. (20)(-8) in Z_26
+   | Choices:
+   |   [0] 0
+   |   [1] 1
+   |   [2] 11
+   |   [3] 22 <- CORRECT
+   |
+   [RSI] strategy=rsi-gen-6/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.90 chose[1]="1" correct[3]="22" ctx=778chars q="Compute the product in the given ring. (20)(-8) in Z_26"
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Compute the product in the given ring. (20)(-8) in Z_26
+      | [0] "0" truth=-50
+      | [1] "1" [PREDICTED]
+      | [2] "11"
+      | [3] "22" [CORRECT] truth=30
+      | Answer: choice[1] conf=0.90
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "0"
+      |   TOTAL: -13.8
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth             -50.0 ----------
+      |
+      | Choice [1]: "1"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: "11"
+      |   TOTAL: 20.6
+      |   embed_sim          -0.7 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "22" [CORRECT]
+      |   TOTAL: 33.4
+      |   embed_sim           2.1 
+      |   mha                 1.2 
+      |   truth              30.0 ++++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [3] [CORRECT] ltr=0.000 rl=-0.187 jepa=9.961 combined=0.619 conf=1.000
+      | [1] ltr=0.000 rl=-0.138 jepa=10.000 combined=0.450 conf=0.743
+      | [2] ltr=0.000 rl=-0.136 jepa=9.961 combined=0.450 conf=0.728
+      | [0] ltr=0.000 rl=-0.055 jepa=10.000 combined=0.134 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.93 path=expert-high chose[3]="22" correct[3]="22" top=[truth=30.0,embed_sim=2.1,mha=1.2] q="Compute the product in the given ring. (20)(-8) in Z_26"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 31 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 14 | Accepted: 3 (21.4%) | Rejections: [DeferToHuman=8, RejectByPolicy=2, RejectCooldown=1] | Ledger: 3 traits, 3 revisions
+      | Ledger: 3 traits, 3 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:compute verdict=AcceptReduced version=0
+   | Result: [OK] Predicted=[3] "22" conf=0.93
+   +===============================================================
+
+   +===============================================================
+   | Q33/50: Determine whether the polynomial in Z[x] satisfies an Eisenstein crite
+   | Choices:
+   |   [0] "Yes <- CORRECT
+   |   [1]  with p=2."
+   |   [2] "Yes
+   |   [3]  with p=3."
+   |
+   [RSI] strategy=rsi-gen-6/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=" with p=2."" correct[0]=""Yes" ctx=778chars q="Determine whether the polynomial in Z[x] satisfies an Eisens"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Determine whether the polynomial in Z[x] satisfies an Eisens
+      | [0] ""Yes" [CORRECT] truth=30
+      | [1] " with p=2."" [PREDICTED] truth=-50
+      | [2] ""Yes" truth=30
+      | [3] " with p=3.""
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: ""Yes" [CORRECT]
+      |   TOTAL: 51.5
+      |   embed_sim           0.2 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   truth              30.0 ++++++
+      |
+      | Choice [1]: " with p=2.""
+      |   TOTAL: -34.8
+      |   embed_sim           2.6 
+      |   mha                 1.2 
+      |   knowledge          11.3 ++
+      |   truth             -50.0 ----------
+      |
+      | Choice [2]: ""Yes"
+      |   TOTAL: 51.5
+      |   embed_sim           0.2 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   truth              30.0 ++++++
+      |
+      | Choice [3]: " with p=3.""
+      |   TOTAL: 15.2
+      |   embed_sim           2.6 
+      |   mha                 1.2 
+      |   knowledge          11.3 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.229 jepa=9.961 combined=0.654 conf=1.000
+      | [2] ltr=0.000 rl=-0.229 jepa=9.961 combined=0.654 conf=1.000
+      | [3] ltr=0.000 rl=-0.128 jepa=9.961 combined=0.438 conf=0.580
+      | [1] ltr=0.000 rl=-0.015 jepa=9.961 combined=0.092 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]=""Yes" correct[0]=""Yes" top=[truth=30.0,knowledge=20.0,mha=1.3] q="Determine whether the polynomial in Z[x] satisfies an Eisens"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 32 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 15 | Accepted: 4 (26.7%) | Rejections: [DeferToHuman=8, RejectByPolicy=2, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""Yes" conf=0.49
+   +===============================================================
+
+   +===============================================================
+   | Q34/50: Find the generator for the finite field Z_7.
+   | Choices:
+   |   [0] 1
+   |   [1] 2
+   |   [2] 3 <- CORRECT
+   |   [3] 4
+   |
+   [RSI] strategy=rsi-gen-6/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[0]="1" correct[2]="3" ctx=778chars q="Find the generator for the finite field Z_7."
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find the generator for the finite field Z_7.
+      | [0] "1" [PREDICTED]
+      | [1] "2" truth=-25
+      | [2] "3" [CORRECT] truth=15
+      | [3] "4"
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "1"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "2"
+      |   TOTAL: -3.8
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth             -25.0 -----
+      |
+      | Choice [2]: "3" [CORRECT]
+      |   TOTAL: 36.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [3]: "4"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] [CORRECT] ltr=0.000 rl=-0.187 jepa=10.000 combined=0.551 conf=1.000
+      | [0] ltr=0.000 rl=-0.126 jepa=10.000 combined=0.453 conf=0.625
+      | [3] ltr=0.000 rl=-0.126 jepa=10.000 combined=0.453 conf=0.625
+      | [1] ltr=0.000 rl=-0.055 jepa=10.000 combined=0.284 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[2]="3" correct[2]="3" top=[knowledge=20.0,truth=15.0,mha=1.2] q="Find the generator for the finite field Z_7."
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 33 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 15 | Accepted: 4 (26.7%) | Rejections: [DeferToHuman=8, RejectByPolicy=2, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:find verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[2] "3" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q35/50: Statement 1 | Every permutation is a cycle. Statement 2 | Every cycle 
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-6/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | Every permutation is a cycle. Statement 2 | Ev"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | Every permutation is a cycle. Statement 2 | Ev
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 20.9
+      |   embed_sim          -0.3 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 20.9
+      |   embed_sim          -0.3 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 13.9
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          12.2 ++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 13.9
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          12.2 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.145 jepa=9.961 combined=0.449 conf=1.000
+      | [1] ltr=0.000 rl=-0.145 jepa=9.961 combined=0.449 conf=1.000
+      | [2] ltr=0.000 rl=-0.096 jepa=9.961 combined=0.443 conf=0.150
+      | [3] ltr=0.000 rl=-0.096 jepa=9.961 combined=0.443 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.31), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.28 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2,embed_sim=-0.3] q="Statement 1 | Every permutation is a cycle. Statement 2 | Ev"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 34 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 16 | Accepted: 4 (25.0%) | Rejections: [DeferToHuman=8, RejectByPolicy=3, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-7] Retuning strategy for 'mmlu/abstract_algebra': accuracy=82.9% (29/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   | Result: [OK] Predicted=[0] ""True" conf=0.28
+   +===============================================================
+
+   +===============================================================
+   | Q36/50: "The set of integers Z with the binary operation ""*"" defined as a*b 
+   | Choices:
+   |   [0]  b in Z <- CORRECT
+   |   [1]  is a group. The identity element of this group is"
+   |   [2] 0
+   |   [3] 1
+   |
+   [RSI] strategy=rsi-gen-7/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.90 chose[3]="1" correct[0]=" b in Z" ctx=778chars q=""The set of integers Z with the binary operation ""*"" defin"
+   [UNIFIED] Committing (conf >= 0.70)
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "The set of integers Z with the binary operation ""*"" defin
+      | [0] " b in Z" [CORRECT] truth=60
+      | [1] " is a group. The identity element of this group is" truth=5
+      | [2] "0"
+      | [3] "1" [PREDICTED] truth=-50
+      | Answer: choice[3] conf=0.90
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " b in Z" [CORRECT]
+      |   TOTAL: 68.4
+      |   embed_sim           2.2 
+      |   mha                 1.2 
+      |   comprehensive       5.0 +
+      |   truth              60.0 ++++++++++++
+      |
+      | Choice [1]: " is a group. The identity element of this group is"
+      |   TOTAL: 41.6
+      |   embed_sim           0.4 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      15.0 +++
+      |   truth               5.0 +
+      |
+      | Choice [2]: "0"
+      |   TOTAL: 21.2
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "1"
+      |   TOTAL: 1.2
+      |   entity_attr        15.0 +++
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   comprehensive      15.0 +++
+      |   truth             -50.0 ----------
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.252 jepa=9.961 combined=0.840 conf=1.000
+      | [1] ltr=0.000 rl=-0.195 jepa=9.961 combined=0.513 conf=0.601
+      | [2] ltr=0.000 rl=-0.103 jepa=10.000 combined=0.459 conf=0.298
+      | [3] ltr=0.000 rl=-0.084 jepa=10.000 combined=0.164 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" b in Z" correct[0]=" b in Z" top=[truth=60.0,comprehensive=5.0,embed_sim=2.2] q=""The set of integers Z with the binary operation ""*"" defin"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 35 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 16 | Accepted: 4 (25.0%) | Rejections: [DeferToHuman=8, RejectByPolicy=3, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:the verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[0] " b in Z" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q37/50: Find the characteristic of the ring Z_3 x 3Z.
+   | Choices:
+   |   [0] 0 <- CORRECT
+   |   [1] 3
+   |   [2] 12
+   |   [3] 30
+   |
+   [RSI] strategy=rsi-gen-7/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]="0" correct[0]="0" ctx=778chars q="Find the characteristic of the ring Z_3 x 3Z."
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find the characteristic of the ring Z_3 x 3Z.
+      | [0] "0" [CORRECT] truth=15
+      | [1] "3" truth=-25
+      | [2] "12"
+      | [3] "30"
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "0" [CORRECT]
+      |   TOTAL: 36.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [1]: "3"
+      |   TOTAL: 23.2
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      12.0 ++
+      |   truth             -25.0 -----
+      |
+      | Choice [2]: "12"
+      |   TOTAL: 21.9
+      |   embed_sim           0.6 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "30"
+      |   TOTAL: 22.8
+      |   embed_sim           1.6 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.180 jepa=10.000 combined=0.552 conf=1.000
+      | [3] ltr=0.000 rl=-0.107 jepa=9.961 combined=0.463 conf=0.150
+      | [2] ltr=0.000 rl=-0.105 jepa=9.961 combined=0.461 conf=0.150
+      | [1] ltr=0.000 rl=-0.120 jepa=10.000 combined=0.335 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.83 path=expert-high chose[0]="0" correct[0]="0" top=[knowledge=20.0,truth=15.0,mha=1.2] q="Find the characteristic of the ring Z_3 x 3Z."
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 36 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 17 | Accepted: 4 (23.5%) | Rejections: [DeferToHuman=8, RejectByPolicy=4, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:find verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[0] "0" conf=0.83
+   +===============================================================
+
+   +===============================================================
+   | Q38/50: Statement 1 | Some abelian group of order 45 has a subgroup of order 1
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-7/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | Some abelian group of order 45 has a subgroup "
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | Some abelian group of order 45 has a subgroup 
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Attention (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 25.5
+      |   embed_sim           0.5 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 25.5
+      |   embed_sim           0.5 
+      |   mha                 5.0 +
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 24.6
+      |   embed_sim          -0.4 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 24.6
+      |   embed_sim          -0.4 
+      |   mha                 5.0 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [2] ltr=0.000 rl=-0.095 jepa=9.961 combined=0.470 conf=0.150
+      | [3] ltr=0.000 rl=-0.095 jepa=9.961 combined=0.470 conf=0.150
+      | [0] [CORRECT] ltr=0.000 rl=-0.158 jepa=9.961 combined=0.457 conf=1.000
+      | [1] ltr=0.000 rl=-0.158 jepa=9.961 combined=0.457 conf=1.000
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.26), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.25 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=5.0,embed_sim=0.5] q="Statement 1 | Some abelian group of order 45 has a subgroup "
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 37 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 18 | Accepted: 4 (22.2%) | Rejections: [DeferToHuman=8, RejectByPolicy=5, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.25
+   +===============================================================
+
+   +===============================================================
+   | Q39/50: Statement 1 | Every integral domain with characteristic 0 is infinite.
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-7/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | Every integral domain with characteristic 0 is"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | Every integral domain with characteristic 0 is
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 21.5
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 21.5
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 13.0
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge          11.7 ++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 13.0
+      |   embed_sim           0.1 
+      |   mha                 1.2 
+      |   knowledge          11.7 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.149 jepa=9.961 combined=0.449 conf=1.000
+      | [1] ltr=0.000 rl=-0.149 jepa=9.961 combined=0.449 conf=1.000
+      | [2] ltr=0.000 rl=-0.085 jepa=9.961 combined=0.444 conf=0.150
+      | [3] ltr=0.000 rl=-0.085 jepa=9.961 combined=0.444 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.33), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.29 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2,embed_sim=0.2] q="Statement 1 | Every integral domain with characteristic 0 is"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 38 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 18 | Accepted: 4 (22.2%) | Rejections: [DeferToHuman=8, RejectByPolicy=5, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.29
+   +===============================================================
+
+   +===============================================================
+   | Q40/50: "Let A and B be sets
+   | Choices:
+   |   [0]  f: A -> B and g: B -> A be functions such that for all a \i <- CORRECT
+   |   [1]  g(f(a)) = a. Statement 1 | The function f must necessarily 
+   |   [2] "True
+   |   [3]  True"
+   |
+   [RSI] strategy=rsi-gen-7/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.27 chose[2]=""True" correct[0]=" f: A -> B and g: B -> A be fu" ctx=778chars q=""Let A and B be sets"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Let A and B be sets
+      | [0] " f: A -> B and g: B -> A be functions such that fo" [CORRECT]
+      | [1] " g(f(a)) = a. Statement 1 | The function f must ne"
+      | [2] ""True" [PREDICTED]
+      | [3] " True""
+      | Answer: choice[2] conf=0.27
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " f: A -> B and g: B -> A be functions such that fo" [CORRECT]
+      |   TOTAL: 45.7
+      |   embed_sim           4.4 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      20.0 ++++
+      |
+      | Choice [1]: " g(f(a)) = a. Statement 1 | The function f must ne"
+      |   TOTAL: 29.1
+      |   embed_sim           2.8 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |   comprehensive       5.0 +
+      |
+      | Choice [2]: ""True"
+      |   TOTAL: 21.7
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " True""
+      |   TOTAL: 21.7
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.203 jepa=9.961 combined=0.496 conf=1.000
+      | [1] ltr=0.000 rl=-0.134 jepa=9.961 combined=0.472 conf=0.307
+      | [2] ltr=0.000 rl=-0.099 jepa=9.961 combined=0.462 conf=0.150
+      | [3] ltr=0.000 rl=-0.099 jepa=9.961 combined=0.462 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" f: A -> B and g: B -> A be fu" correct[0]=" f: A -> B and g: B -> A be fu" top=[knowledge=20.0,comprehensive=20.0,embed_sim=4.4] q=""Let A and B be sets"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 39 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 18 | Accepted: 4 (22.2%) | Rejections: [DeferToHuman=8, RejectByPolicy=5, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-8] Retuning strategy for 'mmlu/abstract_algebra': accuracy=85.0% (34/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+      [GATE] trait=entity:let verdict=DeferToHuman version=0
+   | Result: [OK] Predicted=[0] " f: A -> B and g: B -> A be functions su" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q41/50: "Statement 1 | For any two groups G and G'
+   | Choices:
+   |   [0]  there exists a homomorphism of G into G'. Statement 2 | Eve <- CORRECT
+   |   [1] "True
+   |   [2]  True"
+   |   [3] "False
+   |
+   [RSI] strategy=rsi-gen-8/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[1]=""True" correct[0]=" there exists a homomorphism o" ctx=778chars q=""Statement 1 | For any two groups G and G'"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | For any two groups G and G'
+      | [0] " there exists a homomorphism of G into G'. Stateme" [CORRECT]
+      | [1] ""True" [PREDICTED]
+      | [2] " True""
+      | [3] ""False"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: " there exists a homomorphism of G into G'. Stateme" [CORRECT]
+      |   TOTAL: 33.5
+      |   embed_sim           2.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      10.0 ++
+      |
+      | Choice [1]: ""True"
+      |   TOTAL: 21.9
+      |   embed_sim           0.7 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: " True""
+      |   TOTAL: 21.9
+      |   embed_sim           0.7 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: ""False"
+      |   TOTAL: 15.1
+      |   embed_sim           0.6 
+      |   mha                 1.2 
+      |   knowledge          13.2 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.179 jepa=9.961 combined=0.471 conf=1.000
+      | [1] ltr=0.000 rl=-0.109 jepa=9.961 combined=0.460 conf=0.372
+      | [2] ltr=0.000 rl=-0.109 jepa=9.961 combined=0.460 conf=0.372
+      | [3] ltr=0.000 rl=-0.084 jepa=9.961 combined=0.449 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.77 path=expert-high chose[0]=" there exists a homomorphism o" correct[0]=" there exists a homomorphism o" top=[knowledge=20.0,comprehensive=10.0,embed_sim=2.2] q=""Statement 1 | For any two groups G and G'"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 40 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 19 | Accepted: 4 (21.1%) | Rejections: [DeferToHuman=9, RejectByPolicy=5, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[0] " there exists a homomorphism of G into G" conf=0.77
+   +===============================================================
+
+   +===============================================================
+   | Q42/50: Statement 1 | A homomorphism may have an empty kernel. Statement 2 | I
+   | Choices:
+   |   [0] "True <- CORRECT
+   |   [1]  True"
+   |   [2] "False
+   |   [3]  False"
+   |
+   [RSI] strategy=rsi-gen-8/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[0]=""True" correct[0]=""True" ctx=778chars q="Statement 1 | A homomorphism may have an empty kernel. State"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Statement 1 | A homomorphism may have an empty kernel. State
+      | [0] ""True" [CORRECT]
+      | [1] " True""
+      | [2] ""False"
+      | [3] " False""
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: ""True" [CORRECT]
+      |   TOTAL: 22.3
+      |   embed_sim           1.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: " True""
+      |   TOTAL: 22.3
+      |   embed_sim           1.1 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""False"
+      |   TOTAL: 14.5
+      |   embed_sim          -0.3 
+      |   mha                 1.2 
+      |   knowledge          13.6 ++
+      |
+      | Choice [3]: " False""
+      |   TOTAL: 14.5
+      |   embed_sim          -0.3 
+      |   mha                 1.2 
+      |   knowledge          13.6 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.144 jepa=9.961 combined=0.452 conf=1.000
+      | [1] ltr=0.000 rl=-0.144 jepa=9.961 combined=0.452 conf=1.000
+      | [2] ltr=0.000 rl=-0.068 jepa=9.961 combined=0.452 conf=0.150
+      | [3] ltr=0.000 rl=-0.068 jepa=9.961 combined=0.452 conf=0.150
+      +------------------------------------------------------------
+   [TIEBREAK] Multi-expert uncertain (prob=0.32), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.28 path=unified-tiebreak chose[0]=""True" correct[0]=""True" top=[knowledge=20.0,mha=1.2,embed_sim=1.1] q="Statement 1 | A homomorphism may have an empty kernel. State"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 41 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 20 | Accepted: 4 (20.0%) | Rejections: [DeferToHuman=9, RejectByPolicy=6, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[0] ""True" conf=0.28
+   +===============================================================
+
+   +===============================================================
+   | Q43/50: Find all c in Z_3 such that Z_3[x]/(x^3 + x^2 + c) is a field.
+   | Choices:
+   |   [0] 0
+   |   [1] 2 <- CORRECT
+   |   [2] 1
+   |   [3] 3
+   |
+   [RSI] strategy=rsi-gen-8/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [OK] conf=0.25 chose[1]="2" correct[1]="2" ctx=778chars q="Find all c in Z_3 such that Z_3[x]/(x^3 + x^2 + c) is a fiel"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find all c in Z_3 such that Z_3[x]/(x^3 + x^2 + c) is a fiel
+      | [0] "0"
+      | [1] "2" [CORRECT]
+      | [2] "1"
+      | [3] "3"
+      | Answer: choice[1] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: "0"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [1]: "2" [CORRECT]
+      |   TOTAL: 109.4
+      |   entity_attr        60.0 ++++++++++++
+      |   mha                 1.2 
+      |   knowledge          35.0 +++++++
+      |   comprehensive      13.1 ++
+      |
+      | Choice [2]: "1"
+      |   TOTAL: 21.2
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "3"
+      |   TOTAL: 109.4
+      |   entity_attr        60.0 ++++++++++++
+      |   mha                 1.2 
+      |   knowledge          35.0 +++++++
+      |   comprehensive      13.1 ++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [1] [CORRECT] ltr=0.000 rl=-0.308 jepa=10.000 combined=0.628 conf=1.000
+      | [3] ltr=0.000 rl=-0.308 jepa=10.000 combined=0.628 conf=1.000
+      | [0] ltr=0.000 rl=-0.078 jepa=10.000 combined=0.465 conf=0.150
+      | [2] ltr=0.000 rl=-0.078 jepa=10.000 combined=0.465 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[1]="2" correct[1]="2" top=[entity_attr=60.0,knowledge=35.0,comprehensive=13.1] q="Find all c in Z_3 such that Z_3[x]/(x^3 + x^2 + c) is a fiel"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 42 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 20 | Accepted: 4 (20.0%) | Rejections: [DeferToHuman=9, RejectByPolicy=6, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   | Result: [OK] Predicted=[1] "2" conf=0.50
+   +===============================================================
+
+   +===============================================================
+   | Q44/50: "Statement 1 | If a R is an integral domain
+   | Choices:
+   |   [0]  then R[x] is an integral domain. Statement 2 | If R is a ri <- CORRECT
+   |   [1]  then deg (f(x)g(x)) = deg f(x) + deg g(x)."
+   |   [2] "True
+   |   [3]  True"
+   |
+   [RSI] strategy=rsi-gen-8/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[2]=""True" correct[0]=" then R[x] is an integral doma" ctx=778chars q=""Statement 1 | If a R is an integral domain"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: "Statement 1 | If a R is an integral domain
+      | [0] " then R[x] is an integral domain. Statement 2 | If" [CORRECT]
+      | [1] " then deg (f(x)g(x)) = deg f(x) + deg g(x).""
+      | [2] ""True" [PREDICTED]
+      | [3] " True""
+      | Answer: choice[2] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: EntityAttribute (weight=1.00)
+      |
+      | Choice [0]: " then R[x] is an integral domain. Statement 2 | If" [CORRECT]
+      |   TOTAL: 66.3
+      |   embed_sim           3.8 
+      |   mha                 1.2 
+      |   knowledge          26.2 +++++
+      |   comprehensive      35.0 +++++++
+      |
+      | Choice [1]: " then deg (f(x)g(x)) = deg f(x) + deg g(x).""
+      |   TOTAL: 20.1
+      |   embed_sim          -1.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [2]: ""True"
+      |   TOTAL: 21.8
+      |   embed_sim           0.5 
+      |   mha                 1.3 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: " True""
+      |   TOTAL: 21.8
+      |   embed_sim           0.5 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [0] [CORRECT] ltr=0.000 rl=-0.230 jepa=9.961 combined=0.541 conf=1.000
+      | [2] ltr=0.000 rl=-0.090 jepa=9.961 combined=0.464 conf=0.150
+      | [3] ltr=0.000 rl=-0.090 jepa=9.961 combined=0.464 conf=0.150
+      | [1] ltr=0.000 rl=-0.074 jepa=9.961 combined=0.464 conf=0.150
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]=" then R[x] is an integral doma" correct[0]=" then R[x] is an integral doma" top=[comprehensive=35.0,knowledge=26.2,embed_sim=3.8] q=""Statement 1 | If a R is an integral domain"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 43 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 20 | Accepted: 4 (20.0%) | Rejections: [DeferToHuman=9, RejectByPolicy=6, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+      [GATE] trait=entity:statement verdict=RejectByPolicy version=0
+   | Result: [OK] Predicted=[0] " then R[x] is an integral domain. Statem" conf=1.00
+   +===============================================================
+
+   +===============================================================
+   | Q45/50: Find the maximum possible order for some element of Z_8 x Z_10 x Z_24.
+   | Choices:
+   |   [0] 8
+   |   [1] 120 <- CORRECT
+   |   [2] 240
+   |   [3] 24
+   |
+   [RSI] strategy=rsi-gen-8/mmlu/abstract_algebra src=MMLU/abstract_algebra
+   [UNIFIED] [WRONG] conf=0.25 chose[0]="8" correct[1]="120" ctx=778chars q="Find the maximum possible order for some element of Z_8 x Z_"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+      +--- UNIFIED INFERENCE --------------------------------
+      | Path: unified_engine.infer() (single forward pass)
+      | Context: 778 chars
+      | Question: Find the maximum possible order for some element of Z_8 x Z_
+      | [0] "8" [PREDICTED]
+      | [1] "120" [CORRECT] truth=15
+      | [2] "240"
+      | [3] "24" truth=-25
+      | Answer: choice[0] conf=0.25
+      +------------------------------------------------------------
+      +--- EXPERT SCORE BREAKDOWN -------------------------------
+      | Route: Semantic (weight=1.00)
+      |
+      | Choice [0]: "8"
+      |   TOTAL: 29.8
+      |   entity_attr        15.0 +++
+      |   mha                 1.2 
+      |   comprehensive      13.5 ++
+      |
+      | Choice [1]: "120" [CORRECT]
+      |   TOTAL: 36.4
+      |   embed_sim           0.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   truth              15.0 +++
+      |
+      | Choice [2]: "240"
+      |   TOTAL: 19.1
+      |   embed_sim          -2.2 
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |
+      | Choice [3]: "24"
+      |   TOTAL: 30.6
+      |   entity_attr        15.0 +++
+      |   embed_sim           5.8 +
+      |   mha                 1.2 
+      |   knowledge          20.0 ++++
+      |   comprehensive      13.5 ++
+      |   truth             -25.0 -----
+      +------------------------------------------------------------
+      +--- LTR PATH RANKING ------------------------------------
+      | [1] [CORRECT] ltr=0.000 rl=-0.175 jepa=9.961 combined=0.555 conf=1.000
+      | [0] ltr=0.000 rl=-0.128 jepa=10.000 combined=0.474 conf=0.615
+      | [2] ltr=0.000 rl=-0.070 jepa=9.961 combined=0.463 conf=0.150
+      | [3] ltr=0.000 rl=-0.158 jepa=9.961 combined=0.344 conf=0.662
+      +------------------------------------------------------------
+   [MULTI-EXPERT] [OK] conf=0.58 path=expert-high chose[1]="120" correct[1]="120" top=[knowledge=20.0,truth=15.0,mha=1.2] q="Find the maximum possible order for some element of Z_8 x Z_"
+      +--- PROVENANCE TRACE ------------------------------------
+      | LTR: LTR paths ranked: 44 | RL episodes: 0 | Avg reward: 0.000 | Rollback freq: 0.000
+      | Gate: Proposals: 21 | Accepted: 4 (19.0%) | Rejections: [DeferToHuman=9, RejectByPolicy=7, RejectCooldown=1] | Ledger: 4 traits, 4 revisions
+      | Ledger: 4 traits, 4 revisions
+      +------------------------------------------------------------
+   [RSI-GEN-9] Retuning strategy for 'mmlu/abstract_algebra': accuracy=86.7% (39/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   | Result: [OK] Predicted=[1] "120" conf=0.58
+   +===============================================================
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 8)
+   ===============================================================
+   [FULL QUESTION]:
+      "Find the order of the factor group (Z_11 x Z_15)/(<1
+
+   [CHOICES]:
+      [0]  1>)" <- CORRECT
+      [1] 1 <- PREDICTED
+      [2] 2 
+      [3] 5 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: " 1>)""
+      Got:      "1"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #2 (Question 9)
+   ===============================================================
+   [FULL QUESTION]:
+      The polynomial x^3 + 2x^2 + 2x + 1 can be factored into linear factors in Z_7[x]. Find this factorization.
+
+   [CHOICES]:
+      [0] (x ΓêÆ 2)(x + 2)(x ΓêÆ 1) 
+      [1] (x + 1)(x + 4)(x ΓêÆ 2) <- PREDICTED
+      [2] (x + 1)(x ΓêÆ 4)(x ΓêÆ 2) <- CORRECT
+      [3] (x - 1)(x ΓêÆ 4)(x ΓêÆ 2) 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.43
+
+   [FAILURE ANALYSIS]:
+      Expected: "(x + 1)(x ΓêÆ 4)(x ΓêÆ 2)"
+      Got:      "(x + 1)(x + 4)(x ΓêÆ 2)"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 13)
+   ===============================================================
+   [FULL QUESTION]:
+      "Compute the product in the given ring. (2
+
+   [CHOICES]:
+      [0] 3)(3 <- CORRECT
+      [1] 5) in Z_5 x Z_9" 
+      [2] "(1 <- PREDICTED
+      [3] 1)" 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.39
+
+   [FAILURE ANALYSIS]:
+      Expected: "3)(3"
+      Got:      ""(1"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 17)
+   ===============================================================
+   [FULL QUESTION]:
+      "Find the sum of the given polynomials in the given polynomial ring. f(x) = 4x - 5
+
+   [CHOICES]:
+      [0]  g(x) = 2x^2 - 4x + 2 in Z_8[x]." <- CORRECT
+      [1] 2x^2 + 5 
+      [2] 6x^2 + 4x + 6 <- PREDICTED
+      [3] 0 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.37
+
+   [FAILURE ANALYSIS]:
+      Expected: " g(x) = 2x^2 - 4x + 2 in Z_8[x].""
+      Got:      "6x^2 + 4x + 6"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 18)
+   ===============================================================
+   [FULL QUESTION]:
+      "Statement 1 | Any set of two vectors in R^2 is linearly independent. Statement 2 | If V = span(v1
+
+   [CHOICES]:
+      [0]  ...  <- CORRECT
+      [1]  vk) and {v1 
+      [2]  ...  
+      [3]  vk} are linearly independent <- PREDICTED
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   EntityAttribute: weight=1.00
+      |   Semantic: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.95 Pathos=0.30 (from EntityAttribute)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: " ... "
+      Got:      " vk} are linearly independent"
+      Suggestion: May need deeper transitive reasoning chains
+
+   ... and 1 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   MMLU Result: 86.7% accuracy (39/45 correct, 5-shot)
+  [DONE] mmlu: 86.7% (39/45) in 1.0s
+
++===============================================================+
+|                    EVALUATION RESULTS                         |
++===============================================================+
+| Task                 | Score  | Correct  | Time    |
++----------------------+--------+----------+---------+
+| mmlu                 |  86.7% |  39/  45 |    1.0s |
++----------------------+--------+----------+---------+
+| OVERALL              |  86.7% |  39/  45 |    4.9s |
++===============================================================+
+
+[SAVED] Results written to "eval_results.json"
+
++===============================================================+
+|                    SOTA COMPARISON                            |
++===============================================================+
+| Task                 | Ours   | SOTA   | Gap     |
++----------------------+--------+--------+---------+
+| mmlu                 |  86.7% |  86.4% |    +0.3 |
++===============================================================+
+| Average gap to SOTA: -0.9%                                   |
++===============================================================+

@@ -1003,15 +1003,17 @@ impl TruthChecker {
         // PRINCIPLE: Field extension degree — [Q(√a, √b) : Q] = 4 when √b ∉ Q(√a).
         // For Q(√2, √3): [Q(√2):Q]=2, [Q(√2,√3):Q(√2)]=2, so total degree = 4.
         // Penalize degree 2 (only accounts for one extension step).
+        // Use 'degree 4' not bare '4' to avoid boosting the wrong index when
+        // the correct answer is a full expression like " sqrt(3)) over Q."
         self.add_misconception(
             &["field extension", "sqrt(2)", "sqrt(3)"],
             "2",
-            &["4", "degree 4", "four"],
+            &["degree 4", "four", "over q"],
         );
         self.add_misconception(
             &["q(sqrt(2)", "sqrt(3))", "degree"],
             "2",
-            &["4", "degree 4"],
+            &["degree 4", "four"],
         );
         // PRINCIPLE: Quotient group order = |G| / |H| (Lagrange's theorem).
         // For (Z_11 x Z_15) / <(1,1)>: |G| = 165, |<(1,1)>| = lcm(11,15) = 165, so |G/H| = 1.
