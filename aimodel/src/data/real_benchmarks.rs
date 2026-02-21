@@ -5712,8 +5712,43 @@ impl RealBenchmarkEvaluator {
                 }
             }
         }
-        // Multi-step and percentage patterns are all add/mul
-        add_mul_results.extend(possible_results.iter().cloned());
+        // Multi-step patterns: three-number combos (add/mul only, not div)
+        if context_numbers.len() >= 3 {
+            for i in 0..context_numbers.len().min(5) {
+                for j in 0..context_numbers.len().min(5) {
+                    for k in 0..context_numbers.len().min(5) {
+                        if i != j && j != k && i != k {
+                            let a = context_numbers[i];
+                            let b = context_numbers[j];
+                            let c = context_numbers[k];
+                            add_mul_results.push(a * b * c);
+                            add_mul_results.push((a + b) * c);
+                            add_mul_results.push(a * (b + c));
+                            add_mul_results.push((a - b) * c);
+                            add_mul_results.push(a + b + c);
+                            add_mul_results.push(a + b - c);
+                            add_mul_results.push((a / 2.0) * b + (a / 2.0) * c);
+                            add_mul_results.push((a / 2.0) * (b + c));
+                            add_mul_results.push(a * b + a * c);
+                        }
+                    }
+                }
+            }
+        }
+        // Percentage patterns (half at full price + half at discounted)
+        for &pct in &pct_numbers {
+            for &cnt in &count_numbers {
+                for &price in &price_numbers {
+                    if (pct - cnt).abs() > 0.01 && (pct - price).abs() > 0.01 {
+                        let half = (cnt / 2.0).floor();
+                        let discounted = price * pct / 100.0;
+                        add_mul_results.push(half * price + half * discounted);
+                        add_mul_results.push(cnt * discounted);
+                        add_mul_results.push(cnt * price + half * discounted);
+                    }
+                }
+            }
+        }
         
         for &r in &add_mul_results {
             if (r - choice_num).abs() < 0.01 {
