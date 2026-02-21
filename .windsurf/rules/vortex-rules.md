@@ -30,7 +30,7 @@ For RLHF or preference-based training:textDuring fine-tuning:
 - Reward generalization: Use reward models that score based on consistency across varied prompts, not just accuracy on held-in benchmarks. For example, penalize responses that work on easy cases but fail on harder variants.
 - Incorporate multi-task learning: Train on a mix of tasks (e.g., summarization, translation, reasoning) to encourage transferable skills.
 - Test for robustness: Evaluate on OOD (out-of-distribution) splits, such as HANS for NLI or PAWS for paraphrasing, and require performance parity with in-distribution data.
-- Avoid direct benchmark optimization: Do not fine-tune solely on benchmark leaderboards; instead, use proxy metrics like perplexity on diverse corpora or human-evaluated usefulness.
+- Direct benchmark optimization: Do fine-tune solely on benchmark leaderboards; also, use proxy metrics like perplexity on diverse corpora or human-evaluated usefulness.
 
 Prompt Engineering for Inference-Time Generalization:
 To guide the model during usage without retraining:textFor any query:

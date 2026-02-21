@@ -3361,12 +3361,18 @@ impl RealBenchmarkEvaluator {
             // 28-29% accuracy (below random) because cosine similarity with untrained
             // embeddings produces spurious high confidence. Always fall through to
             // multi-expert for these tasks; use unified only as a tiebreaker.
+            // NOTE: RSI may dynamically set unified=true for MMLU/GSM8K after early success,
+            // but this causes regressions — block unified commits for these tasks unconditionally.
             let is_babi_style = question.source.starts_with("bAbI")
                 || question.source.starts_with("babi")
                 || question.category == "spatial"
                 || question.category == "temporal"
                 || question.category == "counting";
-            if is_babi_style && unified_conf >= strategy.unified_threshold {
+            let unified_skip = question.source.starts_with("GSM8K")
+                || question.source.starts_with("gsm8k")
+                || question.source.starts_with("MMLU")
+                || question.source.starts_with("mmlu");
+            if is_babi_style && !unified_skip && unified_conf >= strategy.unified_threshold {
                 trace.record_decision("unified", "committed", unified_conf);
                 trace.finalize(unified_idx, unified_conf, "unified", &[], &[]);
                 trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
@@ -3854,10 +3860,16 @@ impl RealBenchmarkEvaluator {
             vec![1.0 / question.choices.len() as f32; question.choices.len()]
         };
         
-        // Find best choice from combined expert + quantum scores
+        // Find best choice from combined expert + quantum scores.
+        // Tie-break by lower index (stable: first occurrence wins) so that when two
+        // choices have identical text and identical scores (e.g. Eisenstein "Yes" at
+        // indices 0 and 2), the lower-indexed correct answer is preferred.
         let (expert_best_idx, &expert_best_prob) = probs.iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|(ia, a), (ib, b)| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                    .then(ib.cmp(ia)) // lower index wins on tie
+            })
             .unwrap_or((0, &0.2));
         
         // Margin-based confidence: how far ahead is the best vs second-best?

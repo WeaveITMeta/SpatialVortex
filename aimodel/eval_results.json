@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-21T00:54:10.895444400+00:00",
+  "timestamp": "2026-02-21T01:05:39.143598500+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -14,20 +14,20 @@
   "task_results": [
     {
       "task": "mmlu",
-      "accuracy": 77.77777777777779,
-      "num_correct": 35,
+      "accuracy": 82.22222222222221,
+      "num_correct": 37,
       "total": 45,
-      "avg_confidence": 0.6273433,
-      "time_secs": 1.8090972,
+      "avg_confidence": 0.6276702,
+      "time_secs": 0.9324196,
       "wrong_samples": []
     },
     {
       "task": "gsm8k",
-      "accuracy": 35.55555555555556,
-      "num_correct": 16,
+      "accuracy": 40.0,
+      "num_correct": 18,
       "total": 45,
-      "avg_confidence": 0.5870614,
-      "time_secs": 1.9900204000000001,
+      "avg_confidence": 0.58706146,
+      "time_secs": 1.7347554,
       "wrong_samples": []
     },
     {
@@ -35,8 +35,8 @@
       "accuracy": 84.44444444444444,
       "num_correct": 38,
       "total": 45,
-      "avg_confidence": 0.6942376,
-      "time_secs": 2.468,
+      "avg_confidence": 0.6942371,
+      "time_secs": 2.0352342,
       "wrong_samples": []
     },
     {
@@ -44,8 +44,8 @@
       "accuracy": 93.33333333333333,
       "num_correct": 42,
       "total": 45,
-      "avg_confidence": 0.80328876,
-      "time_secs": 6.0298735,
+      "avg_confidence": 0.8032898,
+      "time_secs": 5.8804289,
       "wrong_samples": []
     },
     {
@@ -53,8 +53,8 @@
       "accuracy": 97.77777777777777,
       "num_correct": 44,
       "total": 45,
-      "avg_confidence": 0.7876087,
-      "time_secs": 2.2942235,
+      "avg_confidence": 0.78760964,
+      "time_secs": 2.2606431000000002,
       "wrong_samples": []
     },
     {
@@ -63,14 +63,14 @@
       "num_correct": 45,
       "total": 45,
       "avg_confidence": 0.9935931,
-      "time_secs": 7.5046676,
+      "time_secs": 7.5598701,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 220,
+    "total_correct": 224,
     "total_questions": 270,
-    "overall_accuracy": 81.48148148148148,
-    "total_time_secs": 25.9124003
+    "overall_accuracy": 82.96296296296296,
+    "total_time_secs": 24.30515
   }
 }
