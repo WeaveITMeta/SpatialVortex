@@ -5685,6 +5685,48 @@ impl RealBenchmarkEvaluator {
             (n - choice_num).abs() < 0.01
         });
         
+        // PRINCIPLE: Track which operations produce the match.
+        // Division-only matches (a/b) are weaker signals — they often produce
+        // intermediate values or half-answers, not final accumulated totals.
+        // Addition/multiplication matches are stronger — they represent accumulation.
+        let mut add_mul_match = false;   // reachable via +, *, multi-step
+        let mut div_only_match = false;  // reachable only via /
+        
+        // Recheck with operation tracking
+        let mut add_mul_results: Vec<f64> = Vec::new();
+        let mut div_results: Vec<f64> = Vec::new();
+        
+        // Addition and multiplication results
+        for i in 0..context_numbers.len().min(10) {
+            for j in 0..context_numbers.len().min(10) {
+                let a = context_numbers[i];
+                let b = context_numbers[j];
+                add_mul_results.push(a + b);
+                add_mul_results.push(a - b);
+                add_mul_results.push(a * b);
+                if b.abs() > 0.001 {
+                    div_results.push(a / b);
+                }
+            }
+        }
+        // Multi-step and percentage patterns are all add/mul
+        add_mul_results.extend(possible_results.iter().cloned());
+        
+        for &r in &add_mul_results {
+            if (r - choice_num).abs() < 0.01 {
+                add_mul_match = true;
+                break;
+            }
+        }
+        if !add_mul_match {
+            for &r in &div_results {
+                if (r - choice_num).abs() < 0.01 {
+                    div_only_match = true;
+                    break;
+                }
+            }
+        }
+        
         // Check for exact or near matches
         let mut best_score = 0.0f32;
         for result in &possible_results {
@@ -5696,12 +5738,16 @@ impl RealBenchmarkEvaluator {
             }
         }
         
+        // PRINCIPLE: Division-only matches are weaker signals.
+        // When a choice is reachable only via division (not +, -, *),
+        // it's likely an intermediate value or half-answer, not the final total.
+        if div_only_match && !add_mul_match {
+            best_score *= 0.5;
+        }
+        
         // If the choice is a verbatim question number (not a computed result),
         // reduce the score — it's likely a given value, not the answer.
-        // Exception: if it's the ONLY match (unique), keep full score.
         if best_score > 0.0 && choice_appears_in_question {
-            // Count how many other choices are also reachable
-            // (can't check here — just halve the score as a soft penalty)
             best_score *= 0.5;
         }
         

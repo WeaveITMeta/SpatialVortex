@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-21T02:02:01.342147800+00:00",
+  "timestamp": "2026-02-21T02:06:52.462232500+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -18,7 +18,7 @@
       "num_correct": 17,
       "total": 45,
       "avg_confidence": 0.62297827,
-      "time_secs": 1.5064899,
+      "time_secs": 1.4530976,
       "wrong_samples": []
     }
   ],
@@ -26,6 +26,6 @@
     "total_correct": 17,
     "total_questions": 45,
     "overall_accuracy": 37.77777777777778,
-    "total_time_secs": 5.3648688
+    "total_time_secs": 5.4197594
   }
 }
