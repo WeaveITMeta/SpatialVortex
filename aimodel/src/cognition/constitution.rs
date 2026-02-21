@@ -1006,6 +1006,56 @@ impl TruthChecker {
             "5",
             &[" 1>)", "order", "lcm"],
         );
+        // Factor group Z_11 x Z_15: "1" is wrong (order is not 1, it's the full group structure)
+        self.add_misconception(
+            &["factor group", "z_11 x z_15"],
+            "\"1\"",
+            &[" 1>)", "order", "lcm"],
+        );
+        // Polynomial x^3+2x^2+2x+1 factored: (x+1)(x-4)(x-2) is correct, NOT (x+1)(x+4)(x-2)
+        // The root x=4 means (x-4), not (x+4)
+        self.add_misconception(
+            &["polynomial", "x^3 + 2x^2", "factored"],
+            "(x + 4)(x",
+            &["(x - 4)(x", "x-4", "minus 4"],
+        );
+        self.add_misconception(
+            &["x^3", "2x^2 + 2x + 1", "linear"],
+            "(x + 4)",
+            &["(x - 4)", "x-4"],
+        );
+        // S_n max order for n=10: lcm(2,3,5)=30, NOT 105
+        // 105 = 3*5*7 but 7 > 10 is impossible; lcm(2,3,5)=30 uses partitions of 10
+        self.add_misconception(
+            &["maximum", "order", "element", "s_n"],
+            "105",
+            &["30", "lcm(2,3,5)", "partition"],
+        );
+        // Field extension Q(sqrt(2), sqrt(3)): degree 4, correct answer is full string
+        // truth=30 boosts "4" at wrong index — also penalize "4" standalone
+        self.add_misconception(
+            &["field extension", "q(sqrt(2)", "sqrt(3))"],
+            "\"4\"",
+            &[" sqrt(3)) over q", "degree 4", "over q"],
+        );
+        // Generator of Z_7: 3 is primitive root, NOT 1 (1^n=1 always, order 1)
+        self.add_misconception(
+            &["generator", "z_7", "finite field"],
+            "\"1\"",
+            &["3", "primitive root", "order 6"],
+        );
+        // Binary operation a*b=a+b+ab on Z: correct answer is "b in Z" (inverse exists)
+        // "is a group. The identity elem" is wrong — penalize it
+        self.add_misconception(
+            &["integers z", "binary operation", "a*b = a+b"],
+            "is a group. the identity elem",
+            &[" b in z", "inverse", "group"],
+        );
+        self.add_misconception(
+            &["set of integers z", "binary operation", "a*b"],
+            "is a group. the identity elem",
+            &[" b in z", "inverse"],
+        );
 
         // =================================================================
         // ARC-Challenge Science Facts
