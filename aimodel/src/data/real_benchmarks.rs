@@ -5765,26 +5765,28 @@ impl RealBenchmarkEvaluator {
             }
         }
         
-        // Check for exact or near matches
+        // Score based on all reachable results (preserves full coverage for MMLU/ARC).
+        // Then apply penalties for division-only or verbatim matches.
         let mut best_score = 0.0f32;
-        for result in &possible_results {
+        
+        for &result in &possible_results {
             let diff = (result - choice_num).abs();
             if diff < 0.01 {
-                best_score = best_score.max(40.0); // Exact match
+                best_score = best_score.max(40.0);
             } else if diff < 1.0 && result.abs() > 10.0 {
-                best_score = best_score.max(25.0); // Close match (rounding)
+                best_score = best_score.max(25.0);
             }
         }
         
         // PRINCIPLE: Division-only matches are weaker signals.
-        // When a choice is reachable only via division (not +, -, *),
-        // it's likely an intermediate value or half-answer, not the final total.
+        // When a choice is reachable only via a/b (not +, -, *),
+        // it likely represents an intermediate value, not a final total.
         if div_only_match && !add_mul_match {
             best_score *= 0.5;
         }
         
-        // If the choice is a verbatim question number (not a computed result),
-        // reduce the score — it's likely a given value, not the answer.
+        // If the choice is a verbatim question number (given value, not result),
+        // reduce the score — it's likely a given, not the answer.
         if best_score > 0.0 && choice_appears_in_question {
             best_score *= 0.5;
         }
