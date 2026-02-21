@@ -5696,14 +5696,17 @@ impl RealBenchmarkEvaluator {
         let mut add_mul_results: Vec<f64> = Vec::new();
         let mut div_results: Vec<f64> = Vec::new();
         
-        // Addition and multiplication results
+        // Addition and multiplication results (exclude i==j self-ops: a+a, a*a
+        // are rarely the answer and create false positives like 16+16=32)
         for i in 0..context_numbers.len().min(10) {
             for j in 0..context_numbers.len().min(10) {
                 let a = context_numbers[i];
                 let b = context_numbers[j];
-                add_mul_results.push(a + b);
-                add_mul_results.push(a - b);
-                add_mul_results.push(a * b);
+                if i != j {
+                    add_mul_results.push(a + b);
+                    add_mul_results.push(a - b);
+                    add_mul_results.push(a * b);
+                }
                 if b.abs() > 0.001 {
                     div_results.push(a / b);
                 }
