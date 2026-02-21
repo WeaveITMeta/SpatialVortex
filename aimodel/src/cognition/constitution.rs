@@ -1001,19 +1001,21 @@ impl TruthChecker {
             &["(x + 1)(x", "x+1", "x plus 1"],
         );
         // PRINCIPLE: Field extension degree — [Q(√a, √b) : Q] = 4 when √b ∉ Q(√a).
-        // For Q(√2, √3): [Q(√2):Q]=2, [Q(√2,√3):Q(√2)]=2, so total degree = 4.
+        // For Q(√2 + √3) over Q: the minimal polynomial has degree 4, so [Q(√2+√3):Q] = 4.
         // Penalize degree 2 (only accounts for one extension step).
-        // Use 'degree 4' not bare '4' to avoid boosting the wrong index when
-        // the correct answer is a full expression like " sqrt(3)) over Q."
+        // This entry applies when the correct answer IS the number 4.
         self.add_misconception(
-            &["field extension", "sqrt(2)", "sqrt(3)"],
+            &["field extension", "sqrt(2) +", "sqrt(3)"],
             "2",
-            &["degree 4", "four", "over q"],
+            &["4", "degree 4", "four"],
         );
+        // For Q(sqrt(2), sqrt(3)) written as a comma-separated extension:
+        // the correct answer may be the full expression " sqrt(3)) over Q."
+        // Penalize standalone 2 without boosting bare 4 (which picks wrong index).
         self.add_misconception(
             &["q(sqrt(2)", "sqrt(3))", "degree"],
             "2",
-            &["degree 4", "four"],
+            &["degree 4", "four", "over q"],
         );
         // PRINCIPLE: Quotient group order = |G| / |H| (Lagrange's theorem).
         // For (Z_11 x Z_15) / <(1,1)>: |G| = 165, |<(1,1)>| = lcm(11,15) = 165, so |G/H| = 1.
