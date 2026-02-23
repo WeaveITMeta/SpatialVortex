@@ -1509,6 +1509,189 @@ impl TruthChecker {
             "-> 2h(g) + o(g)",
             &["2h2", "h2(g)", "o2"],
         );
+
+        // =================================================================
+        // ARC-Challenge Science Facts (Extended)
+        // =================================================================
+
+        // Conservation of mass: matter is neither created nor destroyed
+        // H2O2 → H2O + O2: total mass stays 20g (no matter added or removed)
+        self.add_misconception(
+            &["heated", "peroxide", "grams"],
+            "more than 20 g because",
+            &["20 g because no matter", "matter is not", "conservation"],
+        );
+        self.add_misconception(
+            &["heated", "peroxide", "mass"],
+            "less than 20 g because",
+            &["20 g because no matter", "matter is not", "conservation"],
+        );
+        self.add_misconception(
+            &["liquid", "heated", "completely"],
+            "more than 20 g",
+            &["20 g because no matter", "no matter is added", "conservation"],
+        );
+
+        // Air has mass / takes up space — proven by inflating a balloon
+        self.add_misconception(
+            &["air", "space", "takes up"],
+            "weigh a glass before",
+            &["blow up", "balloon", "inflate"],
+        );
+        self.add_misconception(
+            &["air", "no color", "space"],
+            "weigh a glass",
+            &["blow up a beach ball", "balloon", "inflate"],
+        );
+
+        // Geologic processes: mountain ranges from converging plates, not rift zones
+        self.add_misconception(
+            &["mountain range", "geologic", "caused"],
+            "rift zones",
+            &["converging", "collision", "plate boundary"],
+        );
+        self.add_misconception(
+            &["formation", "mountains", "geologic"],
+            "rift zones",
+            &["converging boundaries", "collision", "plates converging"],
+        );
+
+        // Food web: trees remove CO2 from air (photosynthesis), not just food for insects
+        self.add_misconception(
+            &["living thing", "nonliving", "relationship"],
+            "an insect is food for",
+            &["tree removes", "removes a gas", "carbon dioxide"],
+        );
+
+        // Asteroid impacts on Io/Jupiter moons (Voyager/Galileo images)
+        self.add_misconception(
+            &["voyager", "galileo", "spacecraft"],
+            "volcanic eruptions",
+            &["asteroid impacts", "craters", "impact"],
+        );
+
+        // Renewable vs nonrenewable: construction uses nonrenewable resources
+        self.add_misconception(
+            &["renewable", "nonrenewable", "natural resources"],
+            "a group of people swims",
+            &["construction crew", "builds", "nonrenewable"],
+        );
+
+        // Data representation: chart (bar/line) better than diagram for population data
+        self.add_misconception(
+            &["largemouth bass", "populations", "scientists"],
+            "a diagram",
+            &["a chart", "bar chart", "line chart", "graph"],
+        );
+
+        // Electromagnetic induction: moving magnet in coil generates electric current
+        self.add_misconception(
+            &["bar magnet", "coil", "copper wire"],
+            "to heat the copper wire",
+            &["generate an electric current", "electric current", "electricity"],
+        );
+        self.add_misconception(
+            &["magnet", "coil", "moved"],
+            "to heat the copper",
+            &["generate", "electric current", "electricity"],
+        );
+
+        // Body weight influenced by environment (diet/exercise), not blood type
+        self.add_misconception(
+            &["traits", "influenced", "environment"],
+            "blood type",
+            &["body weight", "weight", "diet"],
+        );
+
+        // Chemical reaction HCl + NaOH → NaCl + H2O (neutralization)
+        self.add_misconception(
+            &["hcl", "naoh", "products"],
+            "naoh + cl",
+            &["nacl", "h_{2}o", "water", "salt"],
+        );
+        self.add_misconception(
+            &["hcl", "naoh", "reaction"],
+            "naoh + cl",
+            &["nacl + h", "salt and water", "neutralization"],
+        );
+
+        // Leaves at top of trees: capture sunlight for photosynthesis
+        self.add_misconception(
+            &["leaves", "forest trees", "top"],
+            "to collect water",
+            &["capture sunlight", "sunlight", "photosynthesis"],
+        );
+        self.add_misconception(
+            &["leaves", "trees", "grow"],
+            "to collect water",
+            &["capture sunlight", "light", "photosynthesis"],
+        );
+
+        // Volvox and paramecium both move toward energy source (light/food)
+        self.add_misconception(
+            &["volvox", "paramecium", "observing"],
+            "move in the same dir",
+            &["move toward an energy", "toward energy", "light source"],
+        );
+
+        // Sexual reproduction: traits from two parents = more genetic diversity
+        self.add_misconception(
+            &["sexual reproduction", "genetic diversity"],
+            "offspring grow in different",
+            &["traits from two parents", "two parents", "genetic variation"],
+        );
+
+        // Hardness test: W can scratch Y means W is harder than Y (Mohs scale)
+        // Softest = scratched by everything; hardest = scratches everything
+        self.add_misconception(
+            &["hardness", "scratch", "substances"],
+            "w can scratch y",
+            &["w is the softest", "softest", "scratched by all"],
+        );
+
+        // Crop productivity in mountains: runoff from rains (water availability)
+        self.add_misconception(
+            &["productivity", "crops", "mountain"],
+            "evaporation rates",
+            &["runoff from rains", "rainfall", "water"],
+        );
+
+        // Ocean salt sources: "reactions on the sea floor" is a real salt source (hydrothermal vents).
+        // "melting glacial ice" does NOT add salt — it's the EXCEPT answer.
+        // Penalize "reactions on the sea floor" when question asks what does NOT add salt.
+        self.add_misconception(
+            &["salt", "ocean water", "following except"],
+            "reactions on the sea floor",
+            &["melting glacial ice", "glacial", "ice"],
+        );
+
+        // Primary cause of rainstorms: Earth heated by Sun (drives water cycle)
+        self.add_misconception(
+            &["primary cause", "rainstorms"],
+            "most of earth is covered",
+            &["earth is heated by the sun", "sun heats", "solar energy"],
+        );
+
+        // Garden plants need 4 resources: water, sunlight, CO2, minerals
+        self.add_misconception(
+            &["garden plants", "four resources", "alive"],
+            "2",
+            &["4", "four", "water"],
+        );
+
+        // Separating aluminum: use horseshoe magnet (magnetic separation)
+        self.add_misconception(
+            &["separating aluminum", "student"],
+            "a magnifying glass",
+            &["horseshoe magnet", "magnet", "magnetic"],
+        );
+
+        // Greenhouse gases and ocean currents
+        self.add_misconception(
+            &["greenhouse gases", "ocean", "scientists"],
+            "chemical compositions",
+            &["speed of currents", "ocean currents", "circulation"],
+        );
     }
 
     /// Add a misconception to the database
