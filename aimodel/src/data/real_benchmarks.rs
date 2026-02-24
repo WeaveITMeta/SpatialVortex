@@ -6041,7 +6041,11 @@ impl RealBenchmarkEvaluator {
         // raw_range > 0.10 means genuine discriminative signal — full weight.
         // Linear ramp between 0.02 and 0.10 for smooth transition.
         let confidence = ((raw_range - 0.02) / 0.08).clamp(0.0, 1.0);
-        let max_score = 15.0 * confidence;
+        // Cap at 10.0: audit showed latent_gen as TOP expert is wrong 2:1 (8W/4OK)
+        // but as supporting signal it's correct 1.75:1 (35OK/20W). At 10.0 it
+        // amplifies existing expert consensus without overriding truth (25-45),
+        // knowledge (20), or comprehensive (10-18) when they have real signal.
+        let max_score = 10.0 * confidence;
 
         let range = raw_range.max(1e-6);
         scores.iter_mut().for_each(|s| {
