@@ -6024,20 +6024,28 @@ impl RealBenchmarkEvaluator {
             scores.push(dot);
         }
 
-        // Convert similarities to scores: scale and shift so the best choice
-        // gets a meaningful positive score and others get less
+        // Convert similarities to scores with confidence gating.
+        // When raw cosine similarity range is narrow, the generative signal
+        // is noise (hash-based embeddings produce similar trajectories for
+        // semantically different choices). Gate the output by range width.
         if scores.is_empty() {
             return scores;
         }
 
         let max_sim = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let min_sim = scores.iter().cloned().fold(f32::INFINITY, f32::min);
-        let range = (max_sim - min_sim).max(1e-6);
+        let raw_range = max_sim - min_sim;
 
-        // Scale to [0, 15] range — comparable to other expert scores
-        // The generative signal should be meaningful but not dominate
+        // Confidence gate: raw_range < 0.02 means all choices look the same
+        // to the generative model — output is pure noise, scale to near-zero.
+        // raw_range > 0.10 means genuine discriminative signal — full weight.
+        // Linear ramp between 0.02 and 0.10 for smooth transition.
+        let confidence = ((raw_range - 0.02) / 0.08).clamp(0.0, 1.0);
+        let max_score = 15.0 * confidence;
+
+        let range = raw_range.max(1e-6);
         scores.iter_mut().for_each(|s| {
-            *s = (*s - min_sim) / range * 15.0;
+            *s = (*s - min_sim) / range * max_score;
         });
 
         scores
