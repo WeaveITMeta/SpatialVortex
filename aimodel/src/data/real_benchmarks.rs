@@ -3817,12 +3817,13 @@ impl RealBenchmarkEvaluator {
             .collect();
         
         // =================================================================
-        // EXPERT 11: AUTO-REGRESSIVE LATENT GENERATION
-        // Generate answer in latent space, match to closest choice.
-        // Runs after per-choice loop because it scores all choices at once.
-        // GSM8K excluded: hash-based embeddings have no arithmetic signal.
+        // EXPERT 11: AUTO-REGRESSIVE LATENT GENERATION (DISABLED)
+        // A/B test result: WITH=90.4%, WITHOUT=93.7% → latent_gen hurts -3.3%
+        // Root cause: hash-based embeddings produce noise, not semantic signal.
+        // The generative architecture (generate_answer_latent + score_latent_generation)
+        // is sound — re-enable when real learned embeddings replace hash-based ones.
         // =================================================================
-        if !is_gsm8k_source {
+        if false { // DISABLED: re-enable with learned embeddings
             let gen_scores = self.score_latent_generation(
                 &question_embedding,
                 &choice_embeds,
