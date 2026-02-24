@@ -3802,6 +3802,43 @@ impl RealBenchmarkEvaluator {
         }
         
         // =================================================================
+        // Build choice embeddings (shared by Expert 11 + Quantum JEPA)
+        // =================================================================
+        let is_gsm8k_source = question.source.to_lowercase().contains("gsm8k");
+        let choice_embeds: Vec<Vec<f32>> = question.choices.iter()
+            .map(|c| {
+                let c_lower = c.to_lowercase();
+                let c_words: Vec<&str> = c_lower
+                    .split(|ch: char| !ch.is_alphanumeric())
+                    .filter(|w| w.len() > 1)
+                    .collect();
+                self.get_text_embedding(&c_words)
+            })
+            .collect();
+        
+        // =================================================================
+        // EXPERT 11: AUTO-REGRESSIVE LATENT GENERATION
+        // Generate answer in latent space, match to closest choice.
+        // Runs after per-choice loop because it scores all choices at once.
+        // GSM8K excluded: hash-based embeddings have no arithmetic signal.
+        // =================================================================
+        if !is_gsm8k_source {
+            let gen_scores = self.score_latent_generation(
+                &question_embedding,
+                &choice_embeds,
+                &passage_context,
+            );
+            for (ci, gen_score) in gen_scores.iter().enumerate() {
+                if ci < logits.len() {
+                    logits[ci] += gen_score;
+                    if ci < debug_breakdowns.len() {
+                        debug_breakdowns[ci].push(("latent_gen", *gen_score));
+                    }
+                }
+            }
+        }
+        
+        // =================================================================
         // DEBUG REASONING: Print per-expert score breakdown for each choice
         // =================================================================
         if self.debug_reasoning {
@@ -3841,18 +3878,6 @@ impl RealBenchmarkEvaluator {
         // Pathway = Amplitude Amplification (searches all n! paths)
         // Energy = Quantum Interference (constructive for correct)
         // =================================================================
-        
-        // Build choice embeddings for quantum search
-        let choice_embeds: Vec<Vec<f32>> = question.choices.iter()
-            .map(|c| {
-                let c_lower = c.to_lowercase();
-                let c_words: Vec<&str> = c_lower
-                    .split(|ch: char| !ch.is_alphanumeric())
-                    .filter(|w| w.len() > 1)
-                    .collect();
-                self.get_text_embedding(&c_words)
-            })
-            .collect();
         
         // Run quantum search (JEPA predicts target, pathway finds optimal path)
         let (quantum_best_idx, quantum_confidence) = self.quantum_jepa.quantum_search(
@@ -5835,6 +5860,187 @@ impl RealBenchmarkEvaluator {
         } else {
             None
         }
+    }
+
+    // =========================================================================
+    // AUTO-REGRESSIVE LATENT ANSWER GENERATION
+    // Inspired by Unified Latents (UL) paper: generate answer in latent space
+    // first, then match to closest choice. Uses CALM encoder + Vortex Cycle
+    // as diffusion-like iterative refinement schedule.
+    //
+    // Architecture:
+    //   Question → CALM encode → latent_q
+    //   latent_q → predict_next × N steps (auto-regressive) → latent_answer
+    //   For each choice: CALM encode → latent_c
+    //   Score = cosine_similarity(latent_answer, latent_c)
+    //
+    // This is fundamentally different from the discriminative approach:
+    //   Discriminative: "How well does each choice match the question?"
+    //   Generative: "What answer does the question generate? Which choice is closest?"
+    // =========================================================================
+
+    /// Generate an answer latent vector from a question using auto-regressive
+    /// prediction in CALM's continuous latent space.
+    ///
+    /// Uses a diffusion-inspired denoising schedule via the Vortex Cycle:
+    /// - Steps 1-3: Coarse answer formation (high learning rate blend)
+    /// - Steps 4-6: Refinement (medium blend, sacred attention at 3,6)
+    /// - Steps 7-9: Fine-tuning (low blend, sacred verification at 9)
+    ///
+    /// Returns the predicted answer latent vector.
+    fn generate_answer_latent(&self, question_latent: &[f32], context_latent: Option<&[f32]>) -> Vec<f32> {
+        let latent_dim = question_latent.len();
+        let mut answer_latent = question_latent.to_vec();
+
+        // Create a LatentState for CALM's predict_next
+        let mut state = crate::ml::calm::LatentState {
+            latent: answer_latent.clone(),
+            energy: 1.0,
+            sacred_alignment: 0.5,
+            step: 0,
+        };
+
+        // Vortex Cycle denoising schedule: 9 steps (1→2→3→4→5→6→7→8→9)
+        // Each step: predict_next generates the next latent, then blend with
+        // context signal. Blend decreases over steps (coarse → fine).
+        let vortex_positions = [1u8, 2, 3, 4, 5, 6, 7, 8, 9];
+
+        for &pos in &vortex_positions {
+            // Auto-regressive step: predict next latent state
+            let next_state = self.calm_engine.predict_next(&state);
+
+            // Diffusion-inspired blend schedule:
+            // Early steps: high blend (explore answer space)
+            // Late steps: low blend (refine toward answer)
+            let blend = match pos {
+                1..=3 => 0.8,  // Coarse: mostly new prediction
+                4..=6 => 0.5,  // Medium: balance old and new
+                7..=9 => 0.3,  // Fine: mostly preserve accumulated answer
+                _ => 0.5,
+            };
+
+            // Blend predicted latent with current state
+            for i in 0..latent_dim.min(next_state.latent.len()) {
+                answer_latent[i] = answer_latent[i] * (1.0 - blend) + next_state.latent[i] * blend;
+            }
+
+            // At sacred positions (3, 6, 9): attend to context if available
+            // This grounds the generated answer in the question's context
+            if (pos == 3 || pos == 6 || pos == 9) && context_latent.is_some() {
+                let ctx = context_latent.unwrap();
+                // Cross-attention: pull answer toward context-relevant regions
+                let ctx_blend = match pos {
+                    3 => 0.2,  // Light grounding
+                    6 => 0.3,  // Medium grounding
+                    9 => 0.4,  // Strong grounding (verification)
+                    _ => 0.2,
+                };
+                for i in 0..latent_dim.min(ctx.len()) {
+                    answer_latent[i] = answer_latent[i] * (1.0 - ctx_blend) + ctx[i] * ctx_blend;
+                }
+            }
+
+            // Update state for next iteration
+            state = crate::ml::calm::LatentState {
+                latent: answer_latent.clone(),
+                energy: next_state.energy,
+                sacred_alignment: next_state.sacred_alignment,
+                step: pos as usize,
+            };
+        }
+
+        // L2-normalize the answer latent for cosine similarity matching
+        let norm: f32 = answer_latent.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 1e-8 {
+            for val in &mut answer_latent {
+                *val /= norm;
+            }
+        }
+
+        answer_latent
+    }
+
+    /// Score each choice by generating an answer latent and comparing via
+    /// cosine similarity. Returns per-choice scores.
+    ///
+    /// This is the generative scoring path: instead of asking "does this choice
+    /// match the question?", we ask "what answer does the question predict,
+    /// and how close is each choice to that prediction?"
+    fn score_latent_generation(
+        &self,
+        question_embedding: &[f32],
+        choice_embeddings: &[Vec<f32>],
+        passage_context: &str,
+    ) -> Vec<f32> {
+        // Encode question to CALM latent space
+        let q_words: Vec<&str> = passage_context
+            .split_whitespace()
+            .chain(std::iter::once(""))
+            .take(50)
+            .collect();
+
+        // Use question embedding directly as the question latent
+        // (already in the same vector space as CALM)
+        let question_latent = question_embedding;
+
+        // Optionally encode passage context as a separate latent for grounding
+        let context_latent: Option<Vec<f32>> = if !passage_context.is_empty() {
+            let ctx_words: Vec<&str> = passage_context
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|w| w.len() > 1)
+                .take(50)
+                .collect();
+            if !ctx_words.is_empty() {
+                Some(self.get_text_embedding(&ctx_words))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Generate answer latent via auto-regressive prediction
+        let answer_latent = self.generate_answer_latent(
+            question_latent,
+            context_latent.as_deref(),
+        );
+
+        // Score each choice by cosine similarity to generated answer
+        let mut scores = Vec::with_capacity(choice_embeddings.len());
+        for choice_embed in choice_embeddings {
+            // L2-normalize choice embedding
+            let c_norm: f32 = choice_embed.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if c_norm < 1e-8 {
+                scores.push(0.0);
+                continue;
+            }
+
+            // Cosine similarity between generated answer and choice
+            let dot: f32 = answer_latent.iter()
+                .zip(choice_embed.iter())
+                .map(|(a, b)| a * b / c_norm)
+                .sum();
+
+            scores.push(dot);
+        }
+
+        // Convert similarities to scores: scale and shift so the best choice
+        // gets a meaningful positive score and others get less
+        if scores.is_empty() {
+            return scores;
+        }
+
+        let max_sim = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min_sim = scores.iter().cloned().fold(f32::INFINITY, f32::min);
+        let range = (max_sim - min_sim).max(1e-6);
+
+        // Scale to [0, 15] range — comparable to other expert scores
+        // The generative signal should be meaningful but not dominate
+        scores.iter_mut().for_each(|s| {
+            *s = (*s - min_sim) / range * 15.0;
+        });
+
+        scores
     }
 
     /// General symbolic arithmetic reasoning
