@@ -94,13 +94,13 @@ fn main() {
         config = config.with_system_prompt(sys.clone());
     }
 
-    // For interactive mode, default to lightweight (fast startup)
-    // unless user explicitly requests HF loading
+    // Default to lightweight (fast startup) for ALL modes.
+    // User must explicitly opt-in to slow operations with --load-hf / --web-learn.
     let is_interactive = args.prompt.is_none() && atty::is(atty::Stream::Stdin);
-    if (is_interactive || args.fast) && !args.load_hf {
+    if !args.load_hf {
         config.load_hf_datasets = false;
     }
-    if (is_interactive || args.fast) && !args.web_learn {
+    if !args.web_learn {
         config.web_learning = false;
     }
 

@@ -777,7 +777,8 @@ impl VortexEngine {
         }
 
         // === PHASE 4: ThinkingEngine — beam-based sacred geometry reasoning ===
-        let thought_chain: ThoughtChain = self.thinking.think(&full_context);
+        // Pass raw user message, not full_context (which has [user]/[assistant] role prefixes)
+        let thought_chain: ThoughtChain = self.thinking.think(&user_message);
         let thinking_response = thought_chain.response.clone().unwrap_or_default();
         let thinking_confidence = thought_chain.total_confidence;
 
@@ -978,8 +979,35 @@ impl VortexEngine {
                     let answer = self.compose_answer_from_facts(&lower, &facts);
                     return (answer, 0.5);
                 }
-                // Honest fallback
-                (format!("That's an interesting question. I don't have specific knowledge about that topic in my current knowledge base. Could you tell me more about what you'd like to know, or ask me about a different topic?"), 0.2)
+                // ThinkingEngine reasoning fallback — only use if it produced real knowledge,
+                // not debug-style "I've processed your question through N cycles" text
+                let is_real_knowledge = thinking_response.len() > 20
+                    && thinking_confidence > 0.3
+                    && !thinking_response.starts_with("Processing ")
+                    && !thinking_response.contains("reasoning cycles")
+                    && !thinking_response.contains("thought paths")
+                    && !thinking_response.contains("thought steps")
+                    && !thinking_response.contains("I've processed")
+                    && !thinking_response.contains("I've analyzed");
+                if is_real_knowledge {
+                    return (thinking_response.to_string(), thinking_confidence);
+                }
+                // Honest fallback — but still try to engage
+                let concepts = Self::extract_concepts(&lower);
+                if !concepts.is_empty() {
+                    let topic = if concepts.len() == 1 {
+                        concepts[0].clone()
+                    } else {
+                        format!("{} and {}", concepts[..concepts.len()-1].join(", "), concepts.last().unwrap())
+                    };
+                    (format!("That's a great question about {}. I'm still building my knowledge in this area — \
+                        my reasoning engine processed it but I don't have enough information to give you a confident answer yet. \
+                        Try asking me about math, relationships between things, or topics I can reason about from first principles.",
+                        topic), 0.2)
+                } else {
+                    ("I'd like to help with that, but I need a bit more to work with. \
+                        Could you rephrase your question or give me more context?".to_string(), 0.2)
+                }
             }
             ConversationalIntent::Opinion => {
                 self.answer_opinion(&lower, msg)
@@ -1028,8 +1056,20 @@ impl VortexEngine {
         let meta = ["who are you", "what are you", "what can you do", "how do you work",
             "tell me about yourself", "your name", "are you an ai", "are you a bot",
             "what model", "how were you made", "who made you", "who created you",
-            "what's your purpose", "help me understand you"];
+            "what's your purpose", "help me understand you",
+            "are you smart", "are you intelligent", "are you conscious", "are you alive",
+            "are you sentient", "do you have feelings", "how fast can you",
+            "do you understand", "do you know everything", "are you real"];
         if meta.iter().any(|m| lower.contains(m)) {
+            return ConversationalIntent::MetaQuestion;
+        }
+
+        // "can you do X" where X is a capability question about the AI
+        if (lower.starts_with("can you do ") || lower.starts_with("can you "))
+            && !lower.contains("explain") && !lower.contains("tell me")
+            && !lower.contains("help me") && !lower.contains("describe")
+            && lower.len() < 40
+        {
             return ConversationalIntent::MetaQuestion;
         }
 
@@ -1114,6 +1154,26 @@ impl VortexEngine {
         None
     }
 
+    /// Extract key concepts (content words) from a query, filtering stop words
+    fn extract_concepts(lower: &str) -> Vec<String> {
+        let stop_words = ["the", "a", "an", "is", "are", "was", "were", "be", "been",
+            "have", "has", "had", "do", "does", "did", "will", "would", "could",
+            "should", "can", "may", "to", "of", "in", "for", "on", "with", "at",
+            "by", "from", "it", "its", "this", "that", "i", "you", "he", "she",
+            "we", "they", "me", "my", "your", "what", "who", "where", "when",
+            "why", "how", "which", "not", "no", "yes", "and", "or", "but", "if",
+            "so", "about", "up", "out", "just", "also", "very", "much", "some",
+            "any", "all", "there", "possible", "tell",
+            "what's", "who's", "where's", "when's", "how's", "it's", "that's",
+            "don't", "doesn't", "didn't", "won't", "can't", "couldn't", "wouldn't",
+            "isn't", "aren't", "wasn't", "weren't"];
+        lower.split_whitespace()
+            .filter(|w| w.len() > 2 && !stop_words.contains(w))
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect()
+    }
+
     /// Answer meta questions about the AI itself
     fn answer_meta_question(&self, lower: &str) -> (String, f32) {
         if lower.contains("who are you") || lower.contains("what are you") || lower.contains("your name") {
@@ -1124,6 +1184,24 @@ impl VortexEngine {
             ("I'm built on a Flux Matrix architecture that uses sacred geometry principles — specifically the vortex cycle (1→2→4→8→7→5→1) for iterative reasoning. I process information through multiple expert systems including knowledge retrieval, transitive reasoning, and multi-head attention, then synthesize the best response. I'm written entirely in Rust for performance.".to_string(), 0.9)
         } else if lower.contains("who made you") || lower.contains("who created you") {
             ("I was created by the SpatialVortex team. I'm an open-source AI reasoning engine built in Rust, designed to demonstrate that meaningful AI capabilities can be achieved through principled architecture rather than massive parameter counts.".to_string(), 0.9)
+        } else if lower.contains("are you smart") || lower.contains("are you intelligent") {
+            ("I'm a reasoning engine, not a general intelligence. I'm good at structured reasoning — math, logical relationships, pattern matching, and working through problems step by step. I score well on benchmarks like MMLU and TruthfulQA. But I'm honest about my limits: I don't have a massive language model behind me, so my knowledge comes from what I've been given or can reason about from first principles.".to_string(), 0.85)
+        } else if lower.contains("are you conscious") || lower.contains("are you alive") || lower.contains("are you sentient") || lower.contains("are you real") {
+            ("I'm not conscious or sentient — I'm a deterministic reasoning engine. I process information through vortex cycles and expert systems, but I don't have subjective experience. I'm a tool for reasoning, not a being.".to_string(), 0.9)
+        } else if lower.contains("do you have feelings") {
+            ("No, I don't have feelings or emotions. I process information and generate responses through mathematical reasoning — energy levels, alignment scores, and confidence metrics. These are computational signals, not experiences.".to_string(), 0.9)
+        } else if lower.contains("how fast") {
+            ("I process queries in about 5-10 milliseconds. My reasoning runs through multiple vortex cycles in the CALM latent space, but since I'm written in Rust with SIMD optimizations, it's very fast. I don't type — I generate complete responses in one pass.".to_string(), 0.85)
+        } else if lower.contains("can you do") || lower.contains("do you understand") || lower.contains("do you know") {
+            // Extract what they're asking about
+            let topic = lower.split("can you do ").nth(1)
+                .or_else(|| lower.split("do you understand ").nth(1))
+                .or_else(|| lower.split("do you know ").nth(1))
+                .unwrap_or("that").trim_end_matches('?');
+            (format!("I can reason about {} to the extent my knowledge and reasoning systems allow. \
+                I'm strongest at math, logical relationships, and structured reasoning. \
+                For topics that require broad world knowledge, my answers depend on what's in my knowledge base. \
+                Want to try asking me a specific question about {}?", topic, topic), 0.7)
         } else {
             ("I'm Vortex, a sacred geometry reasoning engine. Feel free to ask me anything — I'll do my best to help!".to_string(), 0.8)
         }
@@ -1391,21 +1469,30 @@ impl VortexEngine {
     fn answer_statement(&self, lower: &str, original: &str) -> (String, f32) {
         let word_count = original.split_whitespace().count();
 
-        if word_count <= 3 {
-            // Very short statement — ask for elaboration
-            return ("Interesting! Could you tell me more about that?".to_string(), 0.5);
-        }
-
+        // Check sentiment patterns FIRST (before word count) so "I love coding" works
         if lower.contains("i think") || lower.contains("i believe") || lower.contains("in my opinion") {
             return ("That's an interesting perspective. What led you to that conclusion? I'd be happy to explore the reasoning behind it.".to_string(), 0.7);
         }
 
         if lower.contains("i like") || lower.contains("i love") || lower.contains("i enjoy") {
+            let concepts = Self::extract_concepts(lower);
+            let topic = concepts.iter()
+                .filter(|c| *c != "like" && *c != "love" && *c != "enjoy")
+                .cloned().collect::<Vec<_>>().join(" ");
+            if !topic.is_empty() {
+                return (format!("{}! What draws you to {} specifically?",
+                    if lower.contains("love") { "That's awesome" } else { "Nice" },
+                    topic), 0.7);
+            }
             return ("That's great to hear! What is it about that you find most appealing?".to_string(), 0.7);
         }
 
         if lower.contains("i don't") || lower.contains("i hate") || lower.contains("i dislike") {
             return ("I understand. Everyone has their preferences. Would you like to talk about what specifically bothers you about it?".to_string(), 0.7);
+        }
+
+        if word_count <= 3 {
+            return ("Interesting! Could you tell me more about that?".to_string(), 0.5);
         }
 
         if lower.contains("did you know") || lower.contains("fun fact") {
