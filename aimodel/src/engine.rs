@@ -958,25 +958,42 @@ impl VortexEngine {
                 self.answer_math_conversational(&lower, msg)
             }
             ConversationalIntent::FactualQuestion => {
-                // Try knowledge sources in priority order
-                if let Some((answer, conf)) = world_answer {
-                    if conf > 0.3 {
-                        return (self.wrap_knowledge_response(&lower, &answer), conf);
+                // Extract question concepts for relevance validation
+                let q_concepts = Self::extract_concepts(&lower);
+
+                // Validate that a knowledge answer is actually relevant to the question.
+                // Requires the FIRST concept (the real topic) to appear in the answer.
+                // Prevents "How does gravity work?" from returning knowledge about "work" (jobs).
+                let is_relevant = |answer: &str| -> bool {
+                    if q_concepts.is_empty() { return true; }
+                    let answer_lower = answer.to_lowercase();
+                    // Must match the first (primary) concept, not just any concept
+                    answer_lower.contains(q_concepts[0].as_str())
+                };
+
+                // Try knowledge sources in priority order (with relevance check)
+                if let Some((ref answer, conf)) = world_answer {
+                    if conf > 0.3 && is_relevant(answer) {
+                        return (self.wrap_knowledge_response(&lower, answer), conf);
                     }
                 }
-                if let Some((answer, conf)) = transitive_answer {
-                    if conf > 0.3 {
-                        return (self.wrap_knowledge_response(&lower, &answer), conf);
+                if let Some((ref answer, conf)) = transitive_answer {
+                    if conf > 0.3 && is_relevant(answer) {
+                        return (self.wrap_knowledge_response(&lower, answer), conf);
                     }
                 }
-                if pipeline_confidence > 0.2 && !pipeline_answer.is_empty() {
+                if pipeline_confidence > 0.2 && !pipeline_answer.is_empty() && is_relevant(pipeline_answer) {
                     return (self.wrap_knowledge_response(&lower, pipeline_answer), pipeline_confidence);
                 }
-                // RAG fallback
+                // RAG fallback (with relevance check)
                 let rag_results = self.rag_engine.search(&lower);
-                if !rag_results.is_empty() {
-                    let facts: Vec<&str> = rag_results.iter().take(3).map(|r| r.content.as_str()).collect();
-                    let answer = self.compose_answer_from_facts(&lower, &facts);
+                let relevant_rag: Vec<&str> = rag_results.iter()
+                    .filter(|r| is_relevant(&r.content))
+                    .take(3)
+                    .map(|r| r.content.as_str())
+                    .collect();
+                if !relevant_rag.is_empty() {
+                    let answer = self.compose_answer_from_facts(&lower, &relevant_rag);
                     return (answer, 0.5);
                 }
                 // ThinkingEngine reasoning fallback — only use if it produced real knowledge,
@@ -992,22 +1009,9 @@ impl VortexEngine {
                 if is_real_knowledge {
                     return (thinking_response.to_string(), thinking_confidence);
                 }
-                // Honest fallback — but still try to engage
-                let concepts = Self::extract_concepts(&lower);
-                if !concepts.is_empty() {
-                    let topic = if concepts.len() == 1 {
-                        concepts[0].clone()
-                    } else {
-                        format!("{} and {}", concepts[..concepts.len()-1].join(", "), concepts.last().unwrap())
-                    };
-                    (format!("That's a great question about {}. I'm still building my knowledge in this area — \
-                        my reasoning engine processed it but I don't have enough information to give you a confident answer yet. \
-                        Try asking me about math, relationships between things, or topics I can reason about from first principles.",
-                        topic), 0.2)
-                } else {
-                    ("I'd like to help with that, but I need a bit more to work with. \
-                        Could you rephrase your question or give me more context?".to_string(), 0.2)
-                }
+                // Intelligent fallback — decompose the question to show understanding
+                let decomposition = Self::decompose_question(&lower);
+                (decomposition, 0.25)
             }
             ConversationalIntent::Opinion => {
                 self.answer_opinion(&lower, msg)
@@ -1154,6 +1158,166 @@ impl VortexEngine {
         None
     }
 
+    /// Decompose a question into its structural components and compose an
+    /// intelligent response. This is principled reasoning about the question
+    /// itself — no hardcoded facts, only understanding of question structure.
+    fn decompose_question(lower: &str) -> String {
+        let concepts = Self::extract_concepts(lower);
+
+        // --- Extract the real topic from question structure ---
+        // "how does gravity work?" → "gravity"
+        // "what's the difference between AI and ML?" → "AI and ML"
+        // "what's the 2nd law of physics?" → "physics"
+        let topic = Self::extract_topic(lower, &concepts);
+
+        // --- Identify question type from structure ---
+
+        // Yes/No questions: "Is X possible?", "Can X do Y?", "Are X Y?"
+        if lower.starts_with("is ") || lower.starts_with("are ")
+            || lower.starts_with("can ") || lower.starts_with("does ")
+            || lower.starts_with("do ") || lower.starts_with("will ")
+            || lower.starts_with("could ") || lower.starts_with("would ")
+        {
+            if lower.contains("possible") || lower.contains("feasible") {
+                return format!("Whether {} is possible depends on the constraints and context. \
+                    In principle, many things are possible given the right conditions — the real question \
+                    is usually about practicality, cost, and current technology. \
+                    I'd need more specific knowledge about {} to give you a definitive answer.", topic, topic);
+            }
+            return format!("That's a yes/no question about {}. To answer it properly, I'd need to \
+                reason about the specific properties and constraints involved. \
+                Could you give me some context or facts to work with? \
+                I'm good at reasoning through problems when I have the premises.", topic);
+        }
+
+        // Definition questions: "What is X?", "What's the Nth law of Y?"
+        if lower.starts_with("what") {
+            if lower.contains("law") || lower.contains("principle") || lower.contains("rule")
+                || lower.contains("theorem") || lower.contains("theory")
+            {
+                return format!("You're asking about a {} — that's a definition/recall question. \
+                    I can reason about mathematical and logical principles, but I don't have \
+                    a pre-loaded encyclopedia. If you can state the principle, I can help you \
+                    reason about its implications and applications.", topic);
+            }
+            if lower.contains("difference") || lower.contains("between") {
+                return format!("You're asking me to compare {}. \
+                    I can analyze differences if you give me the properties of each — \
+                    I'm good at structured comparison and logical reasoning.", topic);
+            }
+            return format!("You're asking about {}. That requires factual knowledge I don't currently have loaded. \
+                I can reason about things from first principles — try giving me some facts about {} \
+                and I'll help you work through the logic.", topic, topic);
+        }
+
+        // Causal questions: "Why does X?", "Why is X?"
+        if lower.starts_with("why") {
+            return format!("You're asking about the cause or reason behind {}. \
+                Causal reasoning is one of my strengths — but I need the relevant facts to reason from. \
+                If you can describe the situation, I can help trace the causal chain.", topic);
+        }
+
+        // Process questions: "How does X work?", "How do you X?"
+        if lower.starts_with("how") {
+            if lower.contains("work") || lower.contains("function") || lower.contains("operate") {
+                return format!("You're asking about how {} works. \
+                    I can break down processes step-by-step if you give me the components. \
+                    What specific aspect of {} would you like me to reason about?", topic, topic);
+            }
+            return format!("You're asking about the process or method for {}. \
+                I can help work through procedures step-by-step — \
+                could you give me more specifics about what you're trying to understand?", topic);
+        }
+
+        // Who/Where/When — entity/location/time questions
+        if lower.starts_with("who") {
+            return format!("You're asking about a person or entity related to {}. \
+                That's a factual recall question — I'd need that information in my knowledge base to answer it. \
+                I'm better at reasoning about relationships and logic than recalling specific names.", topic);
+        }
+        if lower.starts_with("where") {
+            return format!("You're asking about a location related to {}. \
+                I can reason about spatial relationships when given the facts, \
+                but I don't have a geographic knowledge base loaded right now.", topic);
+        }
+        if lower.starts_with("when") {
+            return format!("You're asking about timing related to {}. \
+                I can reason about temporal sequences and ordering, \
+                but I'd need the relevant historical facts to give you a specific answer.", topic);
+        }
+
+        // Generic fallback with topic awareness
+        if !concepts.is_empty() {
+            format!("I understand you're asking about {}. My reasoning engine processed this \
+                but I don't have enough domain knowledge loaded to give you a confident answer. \
+                I'm strongest at math, logical reasoning, and working through problems step-by-step. \
+                Try framing your question as a reasoning problem and I can help!", topic)
+        } else {
+            "I'd like to help with that. Could you rephrase your question or give me more context? \
+                I work best with specific, concrete questions I can reason about step-by-step.".to_string()
+        }
+    }
+
+    /// Extract the real topic from a question, understanding its structure.
+    /// "how does gravity work?" → "gravity"
+    /// "what's the difference between AI and ML?" → "AI and ML"
+    /// "who invented the internet?" → "the internet"
+    fn extract_topic(lower: &str, concepts: &[String]) -> String {
+        // Pattern: "how does X work/function/operate"
+        for verb in &["work", "function", "operate"] {
+            if let Some(pos) = lower.find(verb) {
+                let before = lower[..pos].trim();
+                // Extract the subject between "how does" and "work"
+                let subject = before
+                    .trim_start_matches("how does ")
+                    .trim_start_matches("how do ")
+                    .trim_start_matches("how did ")
+                    .trim();
+                if subject.len() > 1 {
+                    return subject.to_string();
+                }
+            }
+        }
+
+        // Pattern: "difference between X and Y"
+        if lower.contains("between") {
+            if let Some(pos) = lower.find("between ") {
+                let rest = &lower[pos + 8..];
+                let rest = rest.trim_end_matches('?').trim();
+                if !rest.is_empty() {
+                    return rest.to_string();
+                }
+            }
+        }
+
+        // Pattern: "who/what invented/discovered/created X"
+        for verb in &["invented", "discovered", "created", "built", "founded", "wrote"] {
+            if let Some(pos) = lower.find(verb) {
+                let after = lower[pos + verb.len()..].trim().trim_end_matches('?').trim();
+                if after.len() > 1 {
+                    return after.to_string();
+                }
+            }
+        }
+
+        // Pattern: "Nth law/principle of X"
+        if lower.contains(" of ") && (lower.contains("law") || lower.contains("principle") || lower.contains("theory")) {
+            if let Some(pos) = lower.rfind(" of ") {
+                let after = lower[pos + 4..].trim().trim_end_matches('?').trim();
+                if after.len() > 1 {
+                    return after.to_string();
+                }
+            }
+        }
+
+        // Default: join concepts
+        if concepts.is_empty() {
+            "that topic".to_string()
+        } else {
+            concepts.join(" ")
+        }
+    }
+
     /// Extract key concepts (content words) from a query, filtering stop words
     fn extract_concepts(lower: &str) -> Vec<String> {
         let stop_words = ["the", "a", "an", "is", "are", "was", "were", "be", "been",
@@ -1163,7 +1327,11 @@ impl VortexEngine {
             "we", "they", "me", "my", "your", "what", "who", "where", "when",
             "why", "how", "which", "not", "no", "yes", "and", "or", "but", "if",
             "so", "about", "up", "out", "just", "also", "very", "much", "some",
-            "any", "all", "there", "possible", "tell",
+            "any", "all", "there", "possible", "tell", "get", "got", "make",
+            "take", "give", "find", "think", "know", "want", "need", "like",
+            "come", "go", "see", "look", "use", "try", "say", "said", "thing",
+            "work", "put", "keep", "let", "seem", "help", "show", "turn",
+            "call", "ask", "own", "point", "mean", "different", "move",
             "what's", "who's", "where's", "when's", "how's", "it's", "that's",
             "don't", "doesn't", "didn't", "won't", "can't", "couldn't", "wouldn't",
             "isn't", "aren't", "wasn't", "weren't"];
