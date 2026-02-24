@@ -8,8 +8,10 @@
 //! 5. Produces coherent responses
 
 use crate::data::models::BeamTensor;
-use crate::core::sacred_geometry::VortexPositioningEngine;
+use crate::ml::ebrm::EnergyBasedReasoningModel;
+use crate::ml::flux_embedding::FluxEmbeddingTrainer;
 use crate::ml::calm::{CALMEngine, CALMConfig};
+use crate::core::VortexPositioningEngine;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -195,6 +197,9 @@ pub struct ThinkingEngine {
     accumulated_latent: Option<crate::ml::calm::LatentState>,
     /// Source memory - everything learned from RAG and tools
     source_memory: Vec<(String, Vec<BeamTensor>, f32, u64)>, // (source, beams, relevance, cycle_learned)
+    /// Flux embedding trainer — SVD bootstrap + contrastive refinement
+    /// When present, provides learned semantic embeddings for beam encoding/decoding
+    flux_trainer: Option<FluxEmbeddingTrainer>,
 }
 
 impl ThinkingEngine {
@@ -213,6 +218,7 @@ impl ThinkingEngine {
             vortex_cycle: 0,
             accumulated_latent: None,
             source_memory: Vec::new(),
+            flux_trainer: None,
         };
         // Bootstrap with seed knowledge
         engine.bootstrap_knowledge();
@@ -630,7 +636,8 @@ impl ThinkingEngine {
         chain
     }
 
-    /// Convert text to BeamTensors using learned vocabulary
+    /// Convert text to BeamTensors using learned vocabulary.
+    /// Priority: 1) handcrafted vocabulary, 2) flux-trained SVD embeddings, 3) hash fallback
     fn text_to_beams(&self, text: &str) -> Vec<BeamTensor> {
         let lowercase = text.to_lowercase();
         let words: Vec<&str> = lowercase
@@ -641,15 +648,22 @@ impl ThinkingEngine {
         let mut beams = Vec::new();
         for word in words {
             if let Some(beam) = self.vocabulary.get(word) {
+                // Priority 1: handcrafted vocabulary (100 core words)
                 beams.push(beam.clone());
+            } else if let Some(ref trainer) = self.flux_trainer {
+                // Priority 2: SVD-trained semantic embeddings projected to 9-dim
+                let mut beam = BeamTensor::default();
+                beam.digits = trainer.to_beam_digits(word);
+                beam.confidence = if trainer.embeddings.contains_key(word) { 0.8 } else { 0.5 };
+                beam.word = word.to_string();
+                beams.push(beam);
             } else {
-                // Create beam from character patterns
+                // Priority 3: hash fallback (no semantic content)
                 let mut beam = BeamTensor::default();
                 let hash = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 for i in 0..9 {
                     beam.digits[i] = ((hash >> (i * 7)) & 0x7F) as f32 / 127.0;
                 }
-                // Normalize
                 let sum: f32 = beam.digits.iter().sum();
                 if sum > 0.0 {
                     beam.digits.iter_mut().for_each(|d| *d /= sum);
@@ -829,7 +843,8 @@ impl ThinkingEngine {
         }
     }
 
-    /// Learn new vocabulary from the query (extracted from generate_response)
+    /// Learn new vocabulary from the query (extracted from generate_response).
+    /// Uses flux-trained embeddings when available, hash fallback otherwise.
     fn learn_vocabulary_from_query(&mut self, chain: &ThoughtChain) {
         let query_lower = chain.query.to_lowercase();
         let query_words: Vec<&str> = query_lower
@@ -844,18 +859,62 @@ impl ThinkingEngine {
 
         for word in words_to_learn {
             let mut beam = BeamTensor::default();
-            let hash = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-            for i in 0..9 {
-                beam.digits[i] = ((hash >> (i * 7)) & 0x7F) as f32 / 127.0;
+
+            if let Some(ref trainer) = self.flux_trainer {
+                // Use SVD-trained semantic embeddings projected to 9-dim
+                beam.digits = trainer.to_beam_digits(&word);
+                beam.confidence = if trainer.embeddings.contains_key(&word) { 0.8 } else { 0.5 };
+            } else {
+                // Hash fallback
+                let hash = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                for i in 0..9 {
+                    beam.digits[i] = ((hash >> (i * 7)) & 0x7F) as f32 / 127.0;
+                }
+                let sum: f32 = beam.digits.iter().sum();
+                if sum > 0.0 {
+                    beam.digits.iter_mut().for_each(|d| *d /= sum);
+                }
+                beam.confidence = 0.5;
             }
-            let sum: f32 = beam.digits.iter().sum();
-            if sum > 0.0 {
-                beam.digits.iter_mut().for_each(|d| *d /= sum);
-            }
-            beam.confidence = 0.5;
+
             let beam_hash = Self::beam_hash(&beam);
             self.vocabulary.insert(word.clone(), beam);
             self.reverse_vocab.insert(beam_hash, word);
+        }
+
+        // Online contrastive refinement: refine embeddings from the query sentence
+        if let Some(ref mut trainer) = self.flux_trainer {
+            trainer.refine_from_sentence(&chain.query);
+        }
+    }
+
+    /// Import a trained FluxEmbeddingTrainer into the thinking engine.
+    /// Rebuilds vocabulary BeamTensors from SVD-trained embeddings,
+    /// giving beam_to_word() semantic grounding instead of hash noise.
+    pub fn import_flux_trainer(&mut self, trainer: FluxEmbeddingTrainer) {
+        // Rebuild vocabulary entries from trained embeddings
+        let mut new_entries = 0usize;
+        for (word, _embed) in &trainer.embeddings {
+            if !self.vocabulary.contains_key(word) {
+                let mut beam = BeamTensor::default();
+                beam.digits = trainer.to_beam_digits(word);
+                beam.confidence = 0.8;
+                beam.word = word.clone();
+                let hash = Self::beam_hash(&beam);
+                self.vocabulary.insert(word.clone(), beam);
+                self.reverse_vocab.insert(hash, word.clone());
+                new_entries += 1;
+            }
+        }
+
+        // Also sync to CALM engine for latent space operations
+        self.calm.import_embeddings(&trainer.embeddings);
+
+        self.flux_trainer = Some(trainer);
+
+        if new_entries > 0 {
+            println!("   ThinkingEngine: imported {} flux-trained words into vocabulary (total: {})",
+                new_entries, self.vocabulary.len());
         }
     }
 

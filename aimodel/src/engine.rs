@@ -23,6 +23,7 @@ use crate::ml::consciousness_learner::{ConsciousnessLearner, ConsciousnessConfig
 use crate::ml::transitive_flux::TransitiveFluxReasoner;
 use crate::ml::dynamic_rsi::{DynamicRSI, InferenceObservation};
 use crate::ml::rag_search::{RAGSearchEngine, RAGSearchConfig};
+use crate::ml::flux_embedding::{FluxEmbeddingTrainer, FluxEmbeddingConfig};
 use crate::data::hf_datasets::{HFDatasetLoader, DatasetLoaderConfig, DatasetCategory, get_datasets_by_category};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -386,6 +387,9 @@ impl VortexEngine {
             self.extract_knowledge_from_hf(&loader);
             println!("   ✅ Loaded {} examples from HF in {:.1}s ({} failed)",
                 total_loaded, start.elapsed().as_secs_f32(), failed);
+
+            // Train flux embeddings from corpus (SVD bootstrap + contrastive refinement)
+            self.train_flux_embeddings(&loader);
         } else {
             println!("   ⚠ No HF datasets loaded ({} failed) — using web learning only", failed);
         }
@@ -484,6 +488,67 @@ impl VortexEngine {
             .take(4)
             .collect();
         words.join(" ")
+    }
+
+    /// Train flux embeddings from HF corpus data.
+    /// Extracts sentences from loaded examples, runs SVD bootstrap + contrastive refinement,
+    /// then imports the trained embeddings into ThinkingEngine for semantic beam encoding.
+    fn train_flux_embeddings(&mut self, loader: &HFDatasetLoader) {
+        let start = Instant::now();
+        let all_examples = loader.get_all_examples();
+
+        // Build corpus: collect all text, questions, and answers as sentences
+        let mut corpus: Vec<String> = Vec::with_capacity(all_examples.len() * 2);
+        let mut qa_pairs: Vec<(String, String)> = Vec::new();
+
+        for example in &all_examples {
+            if !example.text.is_empty() {
+                corpus.push(example.text.clone());
+            }
+            if let Some(ref q) = example.question {
+                corpus.push(q.clone());
+                if let Some(ref a) = example.answer {
+                    corpus.push(a.clone());
+                    qa_pairs.push((q.clone(), a.clone()));
+                }
+            }
+        }
+
+        if corpus.is_empty() {
+            println!("   ⚠ No corpus for flux embedding training");
+            return;
+        }
+
+        // Configure and train
+        let config = FluxEmbeddingConfig {
+            embed_dim: 128,
+            window_size: 5,
+            min_count: 3,
+            svd_iterations: 5,
+            contrastive_lr: 0.01,
+            n_negatives: 5,
+            contrastive_epochs: 3,
+            ..FluxEmbeddingConfig::default()
+        };
+
+        let mut trainer = FluxEmbeddingTrainer::new(config);
+        trainer.train(&corpus);
+
+        // Contrastive refinement from Q/A pairs
+        if !qa_pairs.is_empty() {
+            let pairs_ref: Vec<(&str, &str)> = qa_pairs.iter()
+                .map(|(q, a)| (q.as_str(), a.as_str()))
+                .collect();
+            trainer.refine_from_pairs(&pairs_ref);
+        }
+
+        let stats = &trainer.stats;
+        println!("   🔮 Flux embeddings: {} vocab, {} PPMI entries, SVD {:.0}ms, contrastive {:.0}ms (total {:.1}s)",
+            stats.vocab_size, stats.ppmi_entries, stats.svd_time_ms, stats.contrastive_time_ms,
+            start.elapsed().as_secs_f32());
+
+        // Import trained embeddings into ThinkingEngine for semantic beam encoding
+        self.thinking.import_flux_trainer(trainer);
     }
 
     /// Seed the consciousness vortex from extracted knowledge

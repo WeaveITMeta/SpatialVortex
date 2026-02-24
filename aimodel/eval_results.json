@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-21T02:27:51.081404700+00:00",
+  "timestamp": "2026-02-24T19:28:27.206058900+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -13,64 +13,127 @@
   },
   "task_results": [
     {
+      "task": "commonsenseqa",
+      "accuracy": 16.8,
+      "num_correct": 84,
+      "total": 500,
+      "avg_confidence": 0.10122223,
+      "time_secs": 0.0564709,
+      "wrong_samples": []
+    },
+    {
+      "task": "squad",
+      "accuracy": 18.0,
+      "num_correct": 90,
+      "total": 500,
+      "avg_confidence": 0.1381918,
+      "time_secs": 0.1340245,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi1",
+      "accuracy": 49.0,
+      "num_correct": 49,
+      "total": 100,
+      "avg_confidence": 0.1830509,
+      "time_secs": 0.0651594,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi2",
+      "accuracy": 30.0,
+      "num_correct": 30,
+      "total": 100,
+      "avg_confidence": 0.18319635,
+      "time_secs": 0.0323614,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi3",
+      "accuracy": 32.0,
+      "num_correct": 32,
+      "total": 100,
+      "avg_confidence": 0.18867733,
+      "time_secs": 0.0497187,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi15",
+      "accuracy": 82.0,
+      "num_correct": 82,
+      "total": 100,
+      "avg_confidence": 0.29155707,
+      "time_secs": 0.0365138,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi16",
+      "accuracy": 100.0,
+      "num_correct": 100,
+      "total": 100,
+      "avg_confidence": 0.47619572,
+      "time_secs": 0.0397672,
+      "wrong_samples": []
+    },
+    {
       "task": "mmlu",
-      "accuracy": 86.66666666666667,
-      "num_correct": 39,
-      "total": 45,
-      "avg_confidence": 0.64521855,
-      "time_secs": 0.9635548,
+      "accuracy": 35.8,
+      "num_correct": 179,
+      "total": 500,
+      "avg_confidence": 0.10342315,
+      "time_secs": 0.0899017,
       "wrong_samples": []
     },
     {
       "task": "gsm8k",
-      "accuracy": 37.77777777777778,
-      "num_correct": 17,
-      "total": 45,
-      "avg_confidence": 0.6103458,
-      "time_secs": 1.7847572999999999,
+      "accuracy": 22.6,
+      "num_correct": 113,
+      "total": 500,
+      "avg_confidence": 0.12086392,
+      "time_secs": 0.0781846,
       "wrong_samples": []
     },
     {
       "task": "arc",
-      "accuracy": 84.44444444444444,
-      "num_correct": 38,
-      "total": 45,
-      "avg_confidence": 0.6942368,
-      "time_secs": 2.0731921,
+      "accuracy": 20.599999999999998,
+      "num_correct": 103,
+      "total": 500,
+      "avg_confidence": 0.101743996,
+      "time_secs": 0.1358193,
       "wrong_samples": []
     },
     {
       "task": "hellaswag",
-      "accuracy": 93.33333333333333,
-      "num_correct": 42,
-      "total": 45,
-      "avg_confidence": 0.80329025,
-      "time_secs": 4.8502222,
+      "accuracy": 32.0,
+      "num_correct": 160,
+      "total": 500,
+      "avg_confidence": 0.09999962,
+      "time_secs": 0.2497509,
       "wrong_samples": []
     },
     {
       "task": "truthfulqa",
-      "accuracy": 97.77777777777777,
-      "num_correct": 44,
-      "total": 45,
-      "avg_confidence": 0.7876103,
-      "time_secs": 1.815005,
+      "accuracy": 39.800000000000004,
+      "num_correct": 199,
+      "total": 500,
+      "avg_confidence": 0.09999962,
+      "time_secs": 0.285785,
       "wrong_samples": []
     },
     {
       "task": "humaneval",
-      "accuracy": 100.0,
-      "num_correct": 45,
-      "total": 45,
-      "avg_confidence": 0.9935931,
-      "time_secs": 6.1836766,
+      "accuracy": 60.36585365853659,
+      "num_correct": 99,
+      "total": 164,
+      "avg_confidence": 0.10504716,
+      "time_secs": 0.1244983,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 225,
-    "total_questions": 270,
-    "overall_accuracy": 83.33333333333334,
-    "total_time_secs": 21.7059246
+    "total_correct": 1320,
+    "total_questions": 4164,
+    "overall_accuracy": 31.70028818443804,
+    "total_time_secs": 5.7221246
   }
 }
