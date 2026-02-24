@@ -931,9 +931,17 @@ impl VortexEngine {
 
         match intent {
             ConversationalIntent::Greeting => {
-                let name = self.extract_name_from_history();
-                let resp = if let Some(n) = name {
-                    format!("Hello {}! I'm Vortex, a reasoning engine built on sacred geometry principles. How can I help you today?", n)
+                // Check if user is introducing themselves
+                let introduced_name = Self::extract_name_from_text(&lower);
+                let remembered_name = self.extract_name_from_history();
+                let name = introduced_name.or(remembered_name);
+
+                let resp = if let Some(ref n) = name {
+                    if lower.contains("my name is") || lower.starts_with("i'm ") || lower.starts_with("call me") {
+                        format!("Nice to meet you, {}! I'm Vortex, a reasoning engine built on sacred geometry principles. How can I help you today?", n)
+                    } else {
+                        format!("Hello {}! I'm Vortex, a reasoning engine built on sacred geometry principles. How can I help you today?", n)
+                    }
                 } else {
                     "Hello! I'm Vortex, a reasoning engine built on sacred geometry principles. I can answer questions, reason about relationships, do math, and have conversations. What would you like to talk about?".to_string()
                 };
@@ -992,12 +1000,21 @@ impl VortexEngine {
 
     /// Classify user message into a conversational intent
     fn classify_intent(lower: &str) -> ConversationalIntent {
-        // Greeting patterns
+        // Greeting patterns (includes name introductions like "my name is X")
         let greetings = ["hello", "hi ", "hi!", "hey", "good morning", "good afternoon",
             "good evening", "howdy", "greetings", "what's up", "sup", "yo ",
-            "how are you", "how's it going", "nice to meet"];
+            "how are you", "how's it going", "nice to meet",
+            "my name is", "i'm ", "call me "];
         if greetings.iter().any(|g| lower.starts_with(g) || lower == g.trim()) {
             return ConversationalIntent::Greeting;
+        }
+
+        // Standalone social tokens (work even without history)
+        let social = ["thanks", "thank you", "thx", "ty", "ok", "okay",
+            "yes", "yeah", "sure", "no", "nope", "cool", "nice", "great",
+            "awesome", "got it", "understood", "right"];
+        if social.iter().any(|s| lower == *s || lower == format!("{}!", s) || lower == format!("{}.", s)) {
+            return ConversationalIntent::Continuation;
         }
 
         // Farewell patterns
@@ -1075,6 +1092,22 @@ impl VortexEngine {
                             return Some(Self::capitalize(&name));
                         }
                     }
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract a name from the current message text (static, no history needed)
+    /// Handles: "my name is X", "i'm X", "call me X"
+    fn extract_name_from_text(lower: &str) -> Option<String> {
+        for prefix in &["my name is ", "i'm ", "i am ", "call me "] {
+            if let Some(pos) = lower.find(prefix) {
+                let rest = &lower[pos + prefix.len()..];
+                let name: String = rest.split(|c: char| !c.is_alphabetic())
+                    .next().unwrap_or("").to_string();
+                if name.len() >= 2 && name.len() <= 20 {
+                    return Some(Self::capitalize(&name));
                 }
             }
         }
@@ -1266,16 +1299,21 @@ impl VortexEngine {
             .find(|m| m.role == ChatRole::Assistant)
             .map(|m| m.content.clone());
 
+        // Handle social tokens that work with or without history
+        if lower == "thanks" || lower == "thank you" || lower.contains("thanks") || lower == "thx" || lower == "ty" {
+            return ("You're welcome! Let me know if you have any other questions.".to_string(), 0.9);
+        }
+        if lower == "ok" || lower == "okay" || lower == "cool" || lower == "nice" || lower == "great" || lower == "awesome" || lower == "got it" || lower == "understood" || lower == "right" {
+            return ("Glad to hear it! Is there anything else you'd like to discuss?".to_string(), 0.7);
+        }
+
         if let Some(prev) = last_assistant {
             // User is continuing the conversation
-            if lower == "yes" || lower == "yeah" || lower == "sure" || lower == "ok" || lower == "go on" || lower == "continue" {
+            if lower == "yes" || lower == "yeah" || lower == "sure" || lower == "go on" || lower == "continue" {
                 return ("Sure! What else would you like to know? Feel free to ask me anything.".to_string(), 0.7);
             }
             if lower == "no" || lower == "nope" || lower == "not really" {
                 return ("No problem! Is there something else I can help you with?".to_string(), 0.7);
-            }
-            if lower == "thanks" || lower == "thank you" || lower.contains("thanks") {
-                return ("You're welcome! Let me know if you have any other questions.".to_string(), 0.9);
             }
             if lower == "why" || lower == "why?" {
                 return (format!("That's because my reasoning is based on the information available to me. My previous response was: \"{}\". Would you like me to elaborate on any specific part?",
