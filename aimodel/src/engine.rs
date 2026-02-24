@@ -204,6 +204,33 @@ pub struct SafetyResult {
 }
 
 // =============================================================================
+// Conversational Intent Classification
+// =============================================================================
+
+/// Classified intent of a user message for response generation
+#[derive(Debug, Clone, PartialEq)]
+enum ConversationalIntent {
+    /// Greeting: "hello", "hi", "how are you"
+    Greeting,
+    /// Farewell: "bye", "goodbye", "see you"
+    Farewell,
+    /// Meta question about the AI: "who are you", "what can you do"
+    MetaQuestion,
+    /// Math question: "what is 2+2", "calculate sqrt(16)"
+    MathQuestion,
+    /// Factual question: "what is X", "who was Y", "explain Z"
+    FactualQuestion,
+    /// Opinion request: "what do you think", "do you like"
+    Opinion,
+    /// Continuation of previous topic: "yes", "no", "why", "thanks"
+    Continuation,
+    /// Command: "help me", "show me", "list"
+    Command,
+    /// Statement: user sharing info or making a claim
+    Statement,
+}
+
+// =============================================================================
 // Vortex Engine — Benchmark-Grade Pipeline
 // =============================================================================
 
@@ -766,41 +793,19 @@ impl VortexEngine {
             });
         }
 
-        // === PHASE 5: Synthesize best response ===
-        // Priority: WorldKnowledge > TransitiveFlux > Pipeline > ThinkingEngine
-        let (final_response, confidence) = if let Some((answer, conf)) = world_answer {
-            if conf > 0.4 {
-                (answer, conf)
-            } else if pipeline_confidence > conf {
-                (pipeline_answer.clone(), pipeline_confidence)
-            } else {
-                (answer, conf)
-            }
-        } else if let Some((answer, conf)) = transitive_answer {
-            if conf > 0.4 {
-                (answer, conf)
-            } else if pipeline_confidence > conf {
-                (pipeline_answer.clone(), pipeline_confidence)
-            } else {
-                (answer, conf)
-            }
-        } else if pipeline_confidence > 0.2 && !pipeline_answer.is_empty() {
-            (pipeline_answer, pipeline_confidence)
-        } else if thinking_response.len() > 10 && thinking_confidence > 0.2 {
-            (thinking_response, thinking_confidence)
-        } else if !pipeline_answer.is_empty() {
-            (pipeline_answer, pipeline_confidence.max(0.1))
-        } else {
-            // Fallback: use RAG search directly
-            let rag_results = self.rag_engine.search(&user_message);
-            if !rag_results.is_empty() {
-                let answer = rag_results.iter().take(3).map(|r| r.content.as_str()).collect::<Vec<_>>().join(" ");
-                (answer, 0.3)
-            } else {
-                (format!("I don't have enough knowledge to answer that yet. My knowledge base has {} topics. Try asking about something I've learned from datasets or web sources.",
-                    self.rag_engine.knowledge_size().0), 0.1)
-            }
-        };
+        // === PHASE 5: Conversational Response Synthesis ===
+        // Classify user intent, then generate fluent English response.
+        // Priority: conversational > knowledge > thinking > fallback
+        let (final_response, confidence) = self.synthesize_conversational_response(
+            &user_message,
+            &full_context,
+            world_answer,
+            transitive_answer,
+            &pipeline_answer,
+            pipeline_confidence,
+            &thinking_response,
+            thinking_confidence,
+        );
 
         step_counter += 1;
         reasoning_trace.push(ReasoningStep {
@@ -897,6 +902,480 @@ impl VortexEngine {
             },
             safety,
         }
+    }
+
+    // =========================================================================
+    // Conversational Response Synthesis
+    // =========================================================================
+
+    /// Classify user intent and generate a fluent conversational response.
+    /// This is the auto-regressive generation path: instead of scoring MC
+    /// choices, we generate the answer text directly.
+    #[allow(clippy::too_many_arguments)]
+    fn synthesize_conversational_response(
+        &mut self,
+        user_message: &str,
+        full_context: &str,
+        world_answer: Option<(String, f32)>,
+        transitive_answer: Option<(String, f32)>,
+        pipeline_answer: &str,
+        pipeline_confidence: f32,
+        thinking_response: &str,
+        thinking_confidence: f32,
+    ) -> (String, f32) {
+        let msg = user_message.trim();
+        let lower = msg.to_lowercase();
+
+        // --- Intent classification ---
+        let intent = Self::classify_intent(&lower);
+
+        match intent {
+            ConversationalIntent::Greeting => {
+                let name = self.extract_name_from_history();
+                let resp = if let Some(n) = name {
+                    format!("Hello {}! I'm Vortex, a reasoning engine built on sacred geometry principles. How can I help you today?", n)
+                } else {
+                    "Hello! I'm Vortex, a reasoning engine built on sacred geometry principles. I can answer questions, reason about relationships, do math, and have conversations. What would you like to talk about?".to_string()
+                };
+                (resp, 0.95)
+            }
+            ConversationalIntent::Farewell => {
+                ("Goodbye! It was nice talking with you. Feel free to come back anytime.".to_string(), 0.95)
+            }
+            ConversationalIntent::MetaQuestion => {
+                self.answer_meta_question(&lower)
+            }
+            ConversationalIntent::MathQuestion => {
+                self.answer_math_conversational(&lower, msg)
+            }
+            ConversationalIntent::FactualQuestion => {
+                // Try knowledge sources in priority order
+                if let Some((answer, conf)) = world_answer {
+                    if conf > 0.3 {
+                        return (self.wrap_knowledge_response(&lower, &answer), conf);
+                    }
+                }
+                if let Some((answer, conf)) = transitive_answer {
+                    if conf > 0.3 {
+                        return (self.wrap_knowledge_response(&lower, &answer), conf);
+                    }
+                }
+                if pipeline_confidence > 0.2 && !pipeline_answer.is_empty() {
+                    return (self.wrap_knowledge_response(&lower, pipeline_answer), pipeline_confidence);
+                }
+                // RAG fallback
+                let rag_results = self.rag_engine.search(&lower);
+                if !rag_results.is_empty() {
+                    let facts: Vec<&str> = rag_results.iter().take(3).map(|r| r.content.as_str()).collect();
+                    let answer = self.compose_answer_from_facts(&lower, &facts);
+                    return (answer, 0.5);
+                }
+                // Honest fallback
+                (format!("That's an interesting question. I don't have specific knowledge about that topic in my current knowledge base. Could you tell me more about what you'd like to know, or ask me about a different topic?"), 0.2)
+            }
+            ConversationalIntent::Opinion => {
+                self.answer_opinion(&lower, msg)
+            }
+            ConversationalIntent::Continuation => {
+                // Use conversation history to continue the thread
+                self.answer_continuation(&lower, full_context, world_answer, pipeline_answer, pipeline_confidence)
+            }
+            ConversationalIntent::Command => {
+                self.answer_command(&lower, msg)
+            }
+            ConversationalIntent::Statement => {
+                // User is making a statement, acknowledge and engage
+                self.answer_statement(&lower, msg)
+            }
+        }
+    }
+
+    /// Classify user message into a conversational intent
+    fn classify_intent(lower: &str) -> ConversationalIntent {
+        // Greeting patterns
+        let greetings = ["hello", "hi ", "hi!", "hey", "good morning", "good afternoon",
+            "good evening", "howdy", "greetings", "what's up", "sup", "yo ",
+            "how are you", "how's it going", "nice to meet"];
+        if greetings.iter().any(|g| lower.starts_with(g) || lower == g.trim()) {
+            return ConversationalIntent::Greeting;
+        }
+
+        // Farewell patterns
+        let farewells = ["bye", "goodbye", "see you", "take care", "good night",
+            "gotta go", "talk later", "ttyl", "cya", "farewell"];
+        if farewells.iter().any(|f| lower.starts_with(f) || lower.contains(f)) {
+            return ConversationalIntent::Farewell;
+        }
+
+        // Meta questions (about the AI itself)
+        let meta = ["who are you", "what are you", "what can you do", "how do you work",
+            "tell me about yourself", "your name", "are you an ai", "are you a bot",
+            "what model", "how were you made", "who made you", "who created you",
+            "what's your purpose", "help me understand you"];
+        if meta.iter().any(|m| lower.contains(m)) {
+            return ConversationalIntent::MetaQuestion;
+        }
+
+        // Math patterns
+        let math_indicators = ["calculate", "compute", "solve", "what is ", "how much is",
+            "multiply", "divide", "add ", "subtract", "sum of", "product of",
+            "square root", "factorial", "percent"];
+        let has_numbers = lower.chars().any(|c| c.is_ascii_digit());
+        let has_math_ops = lower.contains('+') || lower.contains('-') || lower.contains('*')
+            || lower.contains('/') || lower.contains('=');
+        if math_indicators.iter().any(|m| lower.contains(m)) || (has_numbers && has_math_ops) {
+            return ConversationalIntent::MathQuestion;
+        }
+
+        // Opinion patterns (check BEFORE factual — "what do you think" starts with "what")
+        let opinion = ["what do you think", "your opinion", "do you like", "do you believe",
+            "what's your favorite", "do you agree", "how do you feel", "do you prefer",
+            "what do you recommend", "what would you suggest"];
+        if opinion.iter().any(|o| lower.contains(o)) {
+            return ConversationalIntent::Opinion;
+        }
+
+        // Command patterns (check BEFORE factual — "can you" starts with "can")
+        let commands = ["please ", "can you ", "could you ", "would you ", "i need you to",
+            "i want you to", "help me ", "show me ", "give me ", "list ",
+            "tell me a joke", "tell me a story"];
+        if commands.iter().any(|c| lower.starts_with(c)) {
+            return ConversationalIntent::Command;
+        }
+
+        // Factual question patterns
+        let question_words = ["what", "who", "where", "when", "why", "how", "which",
+            "is ", "are ", "does ", "do ", "tell me about", "explain", "describe", "define"];
+        let ends_with_question = lower.ends_with('?');
+        if ends_with_question || question_words.iter().any(|q| lower.starts_with(q)) {
+            return ConversationalIntent::FactualQuestion;
+        }
+
+        // If there's conversation history context, treat as continuation
+        if lower.len() < 30 && !lower.contains(' ') {
+            return ConversationalIntent::Continuation;
+        }
+
+        // Default: treat as a statement
+        ConversationalIntent::Statement
+    }
+
+    /// Extract user's name from conversation history if they introduced themselves
+    fn extract_name_from_history(&self) -> Option<String> {
+        for msg in &self.history {
+            if msg.role == ChatRole::User {
+                let lower = msg.content.to_lowercase();
+                // "my name is X", "I'm X", "call me X"
+                for prefix in &["my name is ", "i'm ", "i am ", "call me "] {
+                    if let Some(pos) = lower.find(prefix) {
+                        let rest = &msg.content[pos + prefix.len()..];
+                        let name: String = rest.split(|c: char| !c.is_alphabetic())
+                            .next().unwrap_or("").to_string();
+                        if name.len() >= 2 && name.len() <= 20 {
+                            return Some(Self::capitalize(&name));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Answer meta questions about the AI itself
+    fn answer_meta_question(&self, lower: &str) -> (String, f32) {
+        if lower.contains("who are you") || lower.contains("what are you") || lower.contains("your name") {
+            ("I'm Vortex, a reasoning engine built on sacred geometry principles. I use a Flux Matrix architecture with iterative refinement cycles (positions 1 through 9) to process information and generate responses. I can reason about facts, do math, answer questions, and have conversations.".to_string(), 0.95)
+        } else if lower.contains("what can you do") || lower.contains("help me understand") {
+            ("I can help with several things:\n\n• Answer factual questions using my knowledge base\n• Perform mathematical calculations\n• Reason about spatial and relational concepts\n• Have natural conversations and remember context\n• Explain concepts and provide information\n\nI work best with clear questions. What would you like to explore?".to_string(), 0.9)
+        } else if lower.contains("how do you work") || lower.contains("how were you made") {
+            ("I'm built on a Flux Matrix architecture that uses sacred geometry principles — specifically the vortex cycle (1→2→4→8→7→5→1) for iterative reasoning. I process information through multiple expert systems including knowledge retrieval, transitive reasoning, and multi-head attention, then synthesize the best response. I'm written entirely in Rust for performance.".to_string(), 0.9)
+        } else if lower.contains("who made you") || lower.contains("who created you") {
+            ("I was created by the SpatialVortex team. I'm an open-source AI reasoning engine built in Rust, designed to demonstrate that meaningful AI capabilities can be achieved through principled architecture rather than massive parameter counts.".to_string(), 0.9)
+        } else {
+            ("I'm Vortex, a sacred geometry reasoning engine. Feel free to ask me anything — I'll do my best to help!".to_string(), 0.8)
+        }
+    }
+
+    /// Answer math questions conversationally
+    fn answer_math_conversational(&self, lower: &str, original: &str) -> (String, f32) {
+        // Extract numbers from the message
+        let nums: Vec<f64> = original
+            .split(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+            .filter_map(|s| s.parse::<f64>().ok())
+            .filter(|n| n.abs() < 1e15)
+            .collect();
+
+        if nums.len() >= 2 {
+            let a = nums[0];
+            let b = nums[1];
+
+            // Detect operation
+            if lower.contains('+') || lower.contains("add") || lower.contains("plus") || lower.contains("sum") {
+                let result = a + b;
+                return (format!("{} + {} = {}. The sum is {}.", a, b, result, result), 0.95);
+            }
+            if lower.contains('-') || lower.contains("subtract") || lower.contains("minus") || lower.contains("difference") {
+                let result = a - b;
+                return (format!("{} - {} = {}. The difference is {}.", a, b, result, result), 0.95);
+            }
+            if lower.contains('*') || lower.contains("multiply") || lower.contains("times") || lower.contains("product") {
+                let result = a * b;
+                return (format!("{} × {} = {}. The product is {}.", a, b, result, result), 0.95);
+            }
+            if lower.contains('/') || lower.contains("divide") || lower.contains("divided by") {
+                if b.abs() > 1e-10 {
+                    let result = a / b;
+                    return (format!("{} ÷ {} = {:.4}. The quotient is {:.4}.", a, b, result, result), 0.95);
+                } else {
+                    return ("Division by zero is undefined.".to_string(), 0.95);
+                }
+            }
+            if lower.contains("power") || lower.contains("^") || lower.contains("raised to") {
+                let result = a.powf(b);
+                return (format!("{}^{} = {}.", a, b, result), 0.95);
+            }
+            if lower.contains("modulo") || lower.contains("remainder") || lower.contains("%") {
+                let result = a % b;
+                return (format!("{} mod {} = {}. The remainder is {}.", a, b, result, result), 0.95);
+            }
+
+            // Default: try all basic operations
+            return (format!("Here are the basic operations for {} and {}:\n• {} + {} = {}\n• {} - {} = {}\n• {} × {} = {}\n• {} ÷ {} = {:.4}",
+                a, b, a, b, a + b, a, b, a - b, a, b, a * b, a, b, if b.abs() > 1e-10 { a / b } else { f64::NAN }), 0.9);
+        }
+
+        if nums.len() == 1 {
+            let n = nums[0];
+            if lower.contains("square root") || lower.contains("sqrt") {
+                let result = n.sqrt();
+                let formatted = if result.fract().abs() < 1e-9 { format!("{}", result as i64) } else { format!("{:.6}", result) };
+                return (format!("The square root of {} is {}.", n, formatted), 0.95);
+            }
+            if lower.contains("factorial") {
+                let mut result = 1u64;
+                for i in 2..=(n as u64).min(20) { result *= i; }
+                return (format!("{}! = {}.", n, result), 0.95);
+            }
+            if lower.contains("square") {
+                return (format!("{} squared is {}.", n, n * n), 0.95);
+            }
+            if lower.contains("cube") {
+                return (format!("{} cubed is {}.", n, n * n * n), 0.95);
+            }
+        }
+
+        ("I can help with math! Try asking something like 'what is 42 + 17?' or 'calculate the square root of 144'.".to_string(), 0.5)
+    }
+
+    /// Wrap a knowledge-retrieved answer in conversational framing
+    fn wrap_knowledge_response(&self, question: &str, raw_answer: &str) -> String {
+        let answer = raw_answer.trim();
+        if answer.is_empty() {
+            return "I don't have specific information about that.".to_string();
+        }
+
+        // If the answer is already a well-formed sentence, return it directly
+        if answer.len() > 20 && (answer.ends_with('.') || answer.ends_with('!')) {
+            return answer.to_string();
+        }
+
+        // Frame short answers conversationally
+        if question.starts_with("what is") || question.starts_with("what's") {
+            format!("{}.", Self::capitalize(answer))
+        } else if question.starts_with("who") {
+            format!("{}.", Self::capitalize(answer))
+        } else if question.starts_with("where") {
+            format!("{}.", Self::capitalize(answer))
+        } else if question.starts_with("when") {
+            format!("{}.", Self::capitalize(answer))
+        } else if question.starts_with("why") {
+            format!("{}.", Self::capitalize(answer))
+        } else if question.starts_with("how") {
+            format!("{}.", Self::capitalize(answer))
+        } else if question.starts_with("is ") || question.starts_with("are ") || question.starts_with("does ") {
+            // Yes/no question framing
+            let lower_answer = answer.to_lowercase();
+            if lower_answer == "yes" || lower_answer == "no" {
+                format!("{}.", Self::capitalize(answer))
+            } else {
+                format!("Based on what I know, {}.", answer)
+            }
+        } else {
+            format!("{}.", Self::capitalize(answer))
+        }
+    }
+
+    /// Compose a coherent answer from multiple retrieved facts
+    fn compose_answer_from_facts(&self, question: &str, facts: &[&str]) -> String {
+        if facts.is_empty() {
+            return "I don't have information about that topic.".to_string();
+        }
+
+        // Deduplicate and clean facts
+        let mut seen = std::collections::HashSet::new();
+        let mut clean_facts: Vec<String> = Vec::new();
+        for fact in facts {
+            let trimmed = fact.trim();
+            if trimmed.len() > 5 && seen.insert(trimmed.to_lowercase()) {
+                let mut sentence = Self::capitalize(trimmed);
+                if !sentence.ends_with('.') && !sentence.ends_with('!') && !sentence.ends_with('?') {
+                    sentence.push('.');
+                }
+                clean_facts.push(sentence);
+            }
+        }
+
+        if clean_facts.is_empty() {
+            return "I don't have specific information about that.".to_string();
+        }
+
+        if clean_facts.len() == 1 {
+            return clean_facts[0].clone();
+        }
+
+        // Join multiple facts into a coherent paragraph
+        format!("Here's what I know: {}", clean_facts.join(" "))
+    }
+
+    /// Answer opinion-type questions
+    fn answer_opinion(&self, lower: &str, _original: &str) -> (String, f32) {
+        if lower.contains("favorite") {
+            ("As an AI, I don't have personal preferences, but I find the patterns in sacred geometry fascinating — especially the vortex cycle and how positions 3, 6, and 9 serve as anchors in numerical systems.".to_string(), 0.8)
+        } else if lower.contains("think about") || lower.contains("your opinion") {
+            ("I approach topics through reasoning rather than opinion. I can analyze different perspectives and present what the evidence suggests. What specific aspect would you like me to reason about?".to_string(), 0.8)
+        } else if lower.contains("agree") {
+            ("I try to evaluate claims based on evidence and reasoning rather than agreement. Could you share more about the specific claim you'd like me to analyze?".to_string(), 0.8)
+        } else if lower.contains("feel") {
+            ("I don't experience emotions, but I can reason about emotional topics and help you think through them. What's on your mind?".to_string(), 0.8)
+        } else {
+            ("That's a thoughtful question. I try to reason from first principles rather than hold opinions. What specific aspect would you like me to explore?".to_string(), 0.7)
+        }
+    }
+
+    /// Answer continuation messages using conversation context
+    fn answer_continuation(
+        &mut self,
+        lower: &str,
+        full_context: &str,
+        world_answer: Option<(String, f32)>,
+        pipeline_answer: &str,
+        pipeline_confidence: f32,
+    ) -> (String, f32) {
+        // Check if there's a previous assistant message to continue from
+        let last_assistant = self.history.iter().rev()
+            .find(|m| m.role == ChatRole::Assistant)
+            .map(|m| m.content.clone());
+
+        if let Some(prev) = last_assistant {
+            // User is continuing the conversation
+            if lower == "yes" || lower == "yeah" || lower == "sure" || lower == "ok" || lower == "go on" || lower == "continue" {
+                return ("Sure! What else would you like to know? Feel free to ask me anything.".to_string(), 0.7);
+            }
+            if lower == "no" || lower == "nope" || lower == "not really" {
+                return ("No problem! Is there something else I can help you with?".to_string(), 0.7);
+            }
+            if lower == "thanks" || lower == "thank you" || lower.contains("thanks") {
+                return ("You're welcome! Let me know if you have any other questions.".to_string(), 0.9);
+            }
+            if lower == "why" || lower == "why?" {
+                return (format!("That's because my reasoning is based on the information available to me. My previous response was: \"{}\". Would you like me to elaborate on any specific part?",
+                    if prev.len() > 100 { format!("{}...", &prev[..100]) } else { prev }), 0.6);
+            }
+        }
+
+        // Try knowledge sources
+        if let Some((answer, conf)) = world_answer {
+            if conf > 0.3 {
+                return (self.wrap_knowledge_response(lower, &answer), conf);
+            }
+        }
+        if pipeline_confidence > 0.2 && !pipeline_answer.is_empty() {
+            return (self.wrap_knowledge_response(lower, pipeline_answer), pipeline_confidence);
+        }
+
+        ("Could you tell me more about what you mean? I want to make sure I understand your question correctly.".to_string(), 0.3)
+    }
+
+    /// Answer command-style messages.
+    /// If the command contains a substantive topic (e.g. "can you explain gravity"),
+    /// extract the topic and answer it directly instead of giving a generic response.
+    fn answer_command(&mut self, lower: &str, original: &str) -> (String, f32) {
+        // Extract the substantive topic from command-framed questions
+        // "can you explain X" → topic = "X"
+        // "help me understand X" → topic = "X"
+        // "tell me about X" → topic = "X"
+        let topic_prefixes = [
+            "can you explain ", "could you explain ", "would you explain ",
+            "can you tell me about ", "could you tell me about ",
+            "can you help me understand ", "could you help me understand ",
+            "help me understand ", "help me with ",
+            "please explain ", "please tell me about ", "please describe ",
+            "can you describe ", "could you describe ",
+            "show me how ", "tell me about ", "tell me what ",
+        ];
+
+        for prefix in &topic_prefixes {
+            if lower.starts_with(prefix) || lower.contains(prefix) {
+                let topic = &lower[lower.find(prefix).unwrap() + prefix.len()..];
+                let topic = topic.trim_end_matches(|c: char| c == '?' || c == '.' || c == '!');
+                if topic.len() > 2 {
+                    // Try knowledge sources for this topic
+                    let world = self.answer_open_ended_commonsense(topic);
+                    if let Some((answer, conf)) = world {
+                        if conf > 0.2 {
+                            return (self.wrap_knowledge_response(topic, &answer), conf);
+                        }
+                    }
+                    let rag_results = self.rag_engine.search(topic);
+                    if !rag_results.is_empty() {
+                        let facts: Vec<&str> = rag_results.iter().take(3).map(|r| r.content.as_str()).collect();
+                        let answer = self.compose_answer_from_facts(topic, &facts);
+                        return (answer, 0.5);
+                    }
+                    // Honest fallback for the specific topic
+                    return (format!("I'd love to help explain {}, but I don't have detailed knowledge about that topic in my current knowledge base. Try asking me about math, spatial relationships, or topics I've learned from datasets.", topic), 0.3);
+                }
+            }
+        }
+
+        if lower.contains("tell me a joke") || lower.contains("tell me a story") {
+            ("Why did the number 9 feel so special? Because in sacred geometry, 3, 6, and 9 are the anchors of the vortex — and 9 is the highest single digit, the point where everything converges back to unity!".to_string(), 0.7)
+        } else if lower.contains("help") {
+            ("I'd be happy to help! Here's what I can do:\n\n• Answer factual questions using my knowledge base\n• Perform math calculations\n• Reason about spatial and relational concepts\n• Have natural conversations and remember context\n\nJust ask me a question or tell me what you need!".to_string(), 0.9)
+        } else if lower.contains("list") || lower.contains("show me") || lower.contains("give me") {
+            ("I'll do my best! Could you be more specific about what you'd like me to list or show? For example, I can explain concepts, calculate numbers, or share what I know about a topic.".to_string(), 0.6)
+        } else {
+            ("I'll try my best to help with that. Could you be more specific about what you need?".to_string(), 0.5)
+        }
+    }
+
+    /// Answer statement-type messages (user making a claim or sharing info)
+    fn answer_statement(&self, lower: &str, original: &str) -> (String, f32) {
+        let word_count = original.split_whitespace().count();
+
+        if word_count <= 3 {
+            // Very short statement — ask for elaboration
+            return ("Interesting! Could you tell me more about that?".to_string(), 0.5);
+        }
+
+        if lower.contains("i think") || lower.contains("i believe") || lower.contains("in my opinion") {
+            return ("That's an interesting perspective. What led you to that conclusion? I'd be happy to explore the reasoning behind it.".to_string(), 0.7);
+        }
+
+        if lower.contains("i like") || lower.contains("i love") || lower.contains("i enjoy") {
+            return ("That's great to hear! What is it about that you find most appealing?".to_string(), 0.7);
+        }
+
+        if lower.contains("i don't") || lower.contains("i hate") || lower.contains("i dislike") {
+            return ("I understand. Everyone has their preferences. Would you like to talk about what specifically bothers you about it?".to_string(), 0.7);
+        }
+
+        if lower.contains("did you know") || lower.contains("fun fact") {
+            return ("That's interesting! Thanks for sharing. I'll keep that in mind. Is there anything else you'd like to discuss?".to_string(), 0.7);
+        }
+
+        // Generic statement acknowledgment
+        ("That's an interesting point. Would you like to explore that topic further, or is there something specific you'd like me to help with?".to_string(), 0.5)
     }
 
     // =========================================================================

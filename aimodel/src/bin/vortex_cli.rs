@@ -59,6 +59,19 @@ struct Args {
     /// Disable memory persistence
     #[arg(long)]
     no_memory: bool,
+
+    /// Skip HuggingFace dataset loading and web learning (fast startup)
+    /// Default: true for interactive mode, false for --prompt mode
+    #[arg(long)]
+    fast: bool,
+
+    /// Force-load HuggingFace datasets (overrides --fast)
+    #[arg(long)]
+    load_hf: bool,
+
+    /// Enable web learning (overrides --fast)
+    #[arg(long)]
+    web_learn: bool,
 }
 
 // =============================================================================
@@ -81,13 +94,23 @@ fn main() {
         config = config.with_system_prompt(sys.clone());
     }
 
+    // For interactive mode, default to lightweight (fast startup)
+    // unless user explicitly requests HF loading
+    let is_interactive = args.prompt.is_none() && atty::is(atty::Stream::Stdin);
+    if (is_interactive || args.fast) && !args.load_hf {
+        config.load_hf_datasets = false;
+    }
+    if (is_interactive || args.fast) && !args.web_learn {
+        config.web_learning = false;
+    }
+
     let mut engine = VortexEngine::with_config(config);
 
     // Determine mode: single prompt, piped stdin, or interactive
     if let Some(ref prompt) = args.prompt {
         // Single-shot mode
         run_single(&mut engine, prompt, &args);
-    } else if atty::is(atty::Stream::Stdin) {
+    } else if is_interactive {
         // Interactive REPL
         run_interactive(&mut engine, &args);
     } else {
