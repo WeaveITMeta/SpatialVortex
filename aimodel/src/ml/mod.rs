@@ -64,7 +64,7 @@ pub mod structured_prediction;
 pub mod secure_aggregation;
 pub mod learning_to_rank;
 pub mod pillar_integration;
-pub mod flux_embedding;
+pub mod vortex_diffusion;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm_alignment::{
@@ -243,9 +243,11 @@ pub use pillar_integration::{
     GatedProposalPipeline, ProposalOrigin, GatedProposalResult,
     InferenceEvidence, ProvenanceTrace, ProvenanceStep,
 };
-pub use flux_embedding::{
-    FluxEmbeddingTrainer, FluxEmbeddingConfig, FluxMatrix, ScoredPermutation,
-    CoOccurrenceMatrix, SVDResult, ContrastiveRefiner, TrainingStats,
-    dot_product as flux_dot_product, cosine_similarity as flux_cosine_similarity,
-    hash_embedding as flux_hash_embedding,
+pub use vortex_diffusion::{
+    VortexDiffusionEngine, VortexDiffusionConfig,
+    VortexNoiseSchedule, ScheduleType,
+    SacredUnmaskingGate, TokenState, TokenLifecycle,
+    DiffusionTransformer, DiffusionStats,
+    VerificationDecision, RejectionReason,
+    ProximityResult, CoherenceResult,
 };
