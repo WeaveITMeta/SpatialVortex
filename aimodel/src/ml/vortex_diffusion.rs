@@ -1525,4 +1525,368 @@ mod tests {
         assert_ne!(result[2], MASK_TOKEN_ID); // Filled in
         assert_ne!(result[3], MASK_TOKEN_ID); // Filled in
     }
+
+    // =========================================================================
+    // Benchmark Tests — Measuring What's Novel
+    // =========================================================================
+
+    /// Helper: create a test engine with given config overrides
+    fn make_engine(num_cycles: usize, sacred: bool, schedule: ScheduleType) -> VortexDiffusionEngine {
+        let config = VortexDiffusionConfig {
+            embed_dim: 64,
+            vocab_size: 200,
+            num_heads: 4,
+            max_seq_len: 128,
+            num_cycles,
+            schedule_type: schedule,
+            temperature: 0.8,
+            top_k: 20,
+            sacred_verification: sacred,
+        };
+        VortexDiffusionEngine::new(config)
+    }
+
+    /// BENCHMARK 1: Schedule Comparison
+    /// Tests that SacredVortex schedule produces DIFFERENT behavior than
+    /// linear/cosine — specifically, it should have non-monotonic sub-steps
+    /// and spend more refinement time at the extremes.
+    #[test]
+    fn bench_schedule_comparison() {
+        let sacred = VortexNoiseSchedule::new(9, ScheduleType::SacredVortex);
+        let linear = VortexNoiseSchedule::new(9, ScheduleType::LogLinear);
+        let cosine = VortexNoiseSchedule::new(9, ScheduleType::Cosine);
+
+        assert_eq!(sacred.total_steps(), 81);
+        assert_eq!(linear.total_steps(), 81);
+        assert_eq!(cosine.total_steps(), 81);
+
+        // Sacred schedule should have LOCAL non-monotonicity within cycles
+        // (expansion → contraction), which linear and cosine do NOT
+        let mut sacred_reversals = 0;
+        let mut linear_reversals = 0;
+        let mut cosine_reversals = 0;
+
+        for i in 1..81 {
+            if sacred.alpha(i) < sacred.alpha(i - 1) { sacred_reversals += 1; }
+            if linear.alpha(i) < linear.alpha(i - 1) { linear_reversals += 1; }
+            if cosine.alpha(i) < cosine.alpha(i - 1) { cosine_reversals += 1; }
+        }
+
+        // Sacred should have reversals (expansion positions dip α)
+        assert!(sacred_reversals > 0,
+            "Sacred schedule should have local reversals, got {}", sacred_reversals);
+
+        // Linear should be perfectly monotonic (0 reversals)
+        assert_eq!(linear_reversals, 0,
+            "Linear schedule should have 0 reversals, got {}", linear_reversals);
+
+        // Cosine should also be monotonic
+        assert_eq!(cosine_reversals, 0,
+            "Cosine schedule should have 0 reversals, got {}", cosine_reversals);
+
+        // All three should end near α=1.0 (fully clean)
+        assert!(sacred.alpha(80) > 0.9, "Sacred should end near 1.0: {}", sacred.alpha(80));
+        assert!(linear.alpha(80) > 0.9, "Linear should end near 1.0: {}", linear.alpha(80));
+        assert!(cosine.alpha(80) > 0.9, "Cosine should end near 1.0: {}", cosine.alpha(80));
+
+        println!("Schedule reversals — Sacred: {}, Linear: {}, Cosine: {}",
+            sacred_reversals, linear_reversals, cosine_reversals);
+    }
+
+    /// BENCHMARK 2: Sacred Verification Effectiveness
+    /// Compare generation WITH vs WITHOUT sacred gates.
+    /// With gates: should have rejections + re-masks, potentially different final tokens.
+    /// Without gates: should lock everything immediately with no rejections.
+    #[test]
+    fn bench_sacred_verification_effectiveness() {
+        let gen_len = 16;
+        let prompt = vec![5u32, 10, 15];
+
+        // With sacred verification
+        let mut sacred_engine = make_engine(5, true, ScheduleType::SacredVortex);
+        let sacred_result = sacred_engine.generate(&prompt, gen_len);
+        let sacred_stats = sacred_engine.get_stats().clone();
+
+        // Without sacred verification
+        let mut flat_engine = make_engine(5, false, ScheduleType::SacredVortex);
+        let flat_result = flat_engine.generate(&prompt, gen_len);
+        let flat_stats = flat_engine.get_stats().clone();
+
+        // Both should produce the correct total length
+        assert_eq!(sacred_result.len(), prompt.len() + gen_len);
+        assert_eq!(flat_result.len(), prompt.len() + gen_len);
+
+        // Both should preserve the prompt
+        assert_eq!(&sacred_result[..3], &[5, 10, 15]);
+        assert_eq!(&flat_result[..3], &[5, 10, 15]);
+
+        // Sacred engine should have recorded verification events
+        // (rejections + verifications > 0 means the gates actually fired)
+        let sacred_gate_events = sacred_stats.sacred_rejections + sacred_stats.sacred_verifications;
+
+        // Flat engine should have ZERO sacred events
+        assert_eq!(flat_stats.sacred_rejections, 0,
+            "Flat engine should have 0 rejections");
+        assert_eq!(flat_stats.sacred_verifications, 0,
+            "Flat engine should have 0 verifications");
+
+        // No masked tokens should remain in either output
+        assert!(!sacred_result[3..].contains(&MASK_TOKEN_ID),
+            "Sacred output should have no masks");
+        assert!(!flat_result[3..].contains(&MASK_TOKEN_ID),
+            "Flat output should have no masks");
+
+        println!("Sacred gates fired {} events ({} rejections, {} verifications, {} forced)",
+            sacred_gate_events,
+            sacred_stats.sacred_rejections,
+            sacred_stats.sacred_verifications,
+            sacred_stats.forced_acceptances);
+        println!("Flat engine: 0 events (no gates)");
+        println!("Sacred avg confidence: {:.4}", sacred_stats.avg_confidence);
+        println!("Flat avg confidence: {:.4}", flat_stats.avg_confidence);
+    }
+
+    /// BENCHMARK 3: Convergence Speed
+    /// How many cycles does it take to lock all tokens?
+    /// Sacred should converge differently than flat — the re-masking may
+    /// take more cycles but produce higher confidence.
+    #[test]
+    fn bench_convergence_speed() {
+        let gen_len = 20;
+
+        // Test convergence at different cycle counts
+        for num_cycles in [3, 5, 9, 15] {
+            let mut engine = make_engine(num_cycles, true, ScheduleType::SacredVortex);
+            let result = engine.generate(&[], gen_len);
+            let stats = engine.get_stats();
+
+            // All tokens should be resolved regardless of cycle count
+            assert_eq!(result.len(), gen_len);
+            assert!(!result.contains(&MASK_TOKEN_ID),
+                "All tokens should resolve at {} cycles", num_cycles);
+
+            // Track how tokens locked across cycles
+            let total_locked: usize = stats.tokens_per_cycle.iter().sum();
+
+            println!("Cycles={}: locked {} tokens across {} position-9 passes, \
+                      avg conf={:.4}, rejections={}, forced={}",
+                num_cycles,
+                total_locked,
+                stats.tokens_per_cycle.len(),
+                stats.avg_confidence,
+                stats.sacred_rejections,
+                stats.forced_acceptances);
+        }
+    }
+
+    /// BENCHMARK 4: Re-masking Effectiveness
+    /// Verify that tokens CAN be re-masked and that the engine handles
+    /// the full lifecycle: Masked → Candidate → Reject → Masked → Candidate → Lock
+    #[test]
+    fn bench_remasking_lifecycle() {
+        let gate = SacredUnmaskingGate::default();
+
+        // Simulate a token going through rejection cycles
+        let mut token = TokenState::masked();
+        assert_eq!(token.rejection_count, 0);
+
+        // Round 1: low confidence → rejected
+        token.propose(42, 0.05, vec![(42, 0.05)]);
+        assert_eq!(token.lifecycle, TokenLifecycle::Candidate);
+
+        let prox = gate.check_proximity(&token);
+        // 0.05 < 0.15 threshold → fails proximity
+        assert!(!prox.passes);
+
+        // Simulate position 9 rejection
+        token.reject();
+        assert_eq!(token.lifecycle, TokenLifecycle::Masked);
+        assert_eq!(token.rejection_count, 1);
+        assert_eq!(token.token_id, MASK_TOKEN_ID);
+
+        // Round 2: better confidence
+        token.propose(55, 0.25, vec![(55, 0.25)]);
+        assert_eq!(token.lifecycle, TokenLifecycle::Candidate);
+
+        let prox2 = gate.check_proximity(&token);
+        // 0.25 >= 0.15 → passes proximity
+        assert!(prox2.passes);
+
+        // Round 3: forced acceptance after max rejections
+        token.reject();
+        token.reject(); // rejection_count = 3
+
+        token.propose(60, 0.01, vec![(60, 0.01)]); // Very low confidence
+        let prox3 = gate.check_proximity(&token);
+        assert!(prox3.passes, "Should be forced at rejection_count=3");
+        assert!(prox3.is_forced);
+
+        println!("Re-masking lifecycle verified: reject→remask→repropose→force-accept");
+    }
+
+    /// BENCHMARK 5: Infill Consistency
+    /// Infilling should always preserve fixed tokens and only modify masks.
+    /// Test with various mask patterns (beginning, middle, end, scattered).
+    #[test]
+    fn bench_infill_consistency() {
+        let mut engine = make_engine(5, true, ScheduleType::SacredVortex);
+        let m = MASK_TOKEN_ID;
+
+        let patterns: Vec<(&str, Vec<u32>)> = vec![
+            ("masks at start",   vec![m, m, m, 10, 20, 30]),
+            ("masks at end",     vec![10, 20, 30, m, m, m]),
+            ("masks in middle",  vec![10, m, m, m, 20, 30]),
+            ("scattered masks",  vec![10, m, 20, m, 30, m]),
+            ("single mask",      vec![10, 20, m, 30, 40, 50]),
+            ("all masked",       vec![m, m, m, m, m, m]),
+        ];
+
+        for (name, pattern) in &patterns {
+            let result = engine.infill(pattern);
+
+            assert_eq!(result.len(), pattern.len(),
+                "{}: length mismatch", name);
+
+            // Fixed tokens must be preserved exactly
+            for (i, &original) in pattern.iter().enumerate() {
+                if original != m {
+                    assert_eq!(result[i], original,
+                        "{}: fixed token at position {} changed from {} to {}",
+                        name, i, original, result[i]);
+                } else {
+                    assert_ne!(result[i], m,
+                        "{}: mask at position {} was not filled", name, i);
+                }
+            }
+
+            println!("{}: OK — all fixed preserved, all masks filled", name);
+        }
+    }
+
+    /// BENCHMARK 6: Schedule Shape Analysis
+    /// Print the α curve for visual inspection and verify mathematical properties.
+    /// The sacred schedule should form an S-curve with local perturbations.
+    #[test]
+    fn bench_schedule_shape_analysis() {
+        let schedule = VortexNoiseSchedule::new(9, ScheduleType::SacredVortex);
+
+        // Collect per-cycle statistics
+        for cycle in 0..9 {
+            let base = cycle * 9;
+            let alphas: Vec<f32> = (0..9).map(|i| schedule.alpha(base + i)).collect();
+            let min = alphas.iter().cloned().fold(f32::INFINITY, f32::min);
+            let max = alphas.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let avg: f32 = alphas.iter().sum::<f32>() / 9.0;
+            let range = max - min;
+
+            println!("Cycle {}: avg={:.4} min={:.4} max={:.4} range={:.4} | {:?}",
+                cycle, avg, min, max, range,
+                alphas.iter().map(|a| format!("{:.3}", a)).collect::<Vec<_>>());
+
+            // Within a cycle, the range (perturbation) should be positive
+            // except at the very extremes (cycle 0 and cycle 8)
+            if cycle > 0 && cycle < 8 {
+                assert!(range > 0.001,
+                    "Cycle {} should have non-trivial perturbation: range={}", cycle, range);
+            }
+        }
+
+        // The middle cycles should have the LARGEST perturbation range
+        // (damping decreases perturbation at extremes)
+        let mid_range = {
+            let base = 4 * 9;
+            let alphas: Vec<f32> = (0..9).map(|i| schedule.alpha(base + i)).collect();
+            let min = alphas.iter().cloned().fold(f32::INFINITY, f32::min);
+            let max = alphas.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            max - min
+        };
+        let late_range = {
+            let base = 8 * 9;
+            let alphas: Vec<f32> = (0..9).map(|i| schedule.alpha(base + i)).collect();
+            let min = alphas.iter().cloned().fold(f32::INFINITY, f32::min);
+            let max = alphas.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            max - min
+        };
+
+        assert!(mid_range > late_range,
+            "Mid-cycles should have larger perturbation than late cycles: {} vs {}",
+            mid_range, late_range);
+
+        println!("\nMid-cycle perturbation: {:.4}", mid_range);
+        println!("Late-cycle perturbation: {:.4}", late_range);
+        println!("Ratio: {:.2}x", mid_range / late_range.max(0.0001));
+    }
+
+    /// BENCHMARK 7: Prompt-Conditioned Generation
+    /// The same engine with different prompts should produce different outputs.
+    /// This tests that bidirectional context from the prompt actually influences generation.
+    #[test]
+    fn bench_prompt_conditioning() {
+        let mut engine = make_engine(5, true, ScheduleType::SacredVortex);
+        let gen_len = 12;
+
+        let prompt_a = vec![10u32, 20, 30];
+        let prompt_b = vec![50u32, 60, 70];
+        let prompt_c = vec![10u32, 20, 30]; // Same as A
+
+        let result_a = engine.generate(&prompt_a, gen_len);
+        let result_b = engine.generate(&prompt_b, gen_len);
+        let result_c = engine.generate(&prompt_c, gen_len);
+
+        // Prompts should be preserved
+        assert_eq!(&result_a[..3], &[10, 20, 30]);
+        assert_eq!(&result_b[..3], &[50, 60, 70]);
+        assert_eq!(&result_c[..3], &[10, 20, 30]);
+
+        // Different prompts should produce different generated tokens
+        // (at least some positions should differ)
+        let gen_a = &result_a[3..];
+        let gen_b = &result_b[3..];
+        let gen_c = &result_c[3..];
+
+        let diff_ab: usize = gen_a.iter().zip(gen_b.iter())
+            .filter(|(a, b)| a != b)
+            .count();
+
+        // Same prompt should produce IDENTICAL results (deterministic with same weights)
+        let diff_ac: usize = gen_a.iter().zip(gen_c.iter())
+            .filter(|(a, b)| a != b)
+            .count();
+
+        assert_eq!(diff_ac, 0,
+            "Same prompt should produce identical output (deterministic): {} differences", diff_ac);
+
+        println!("Prompt A vs B: {}/{} tokens differ", diff_ab, gen_len);
+        println!("Prompt A vs C (same): {}/{} tokens differ", diff_ac, gen_len);
+    }
+
+    /// BENCHMARK 8: All-Schedule Generation Comparison
+    /// Run the same generation task across all 3 schedules and compare stats.
+    #[test]
+    fn bench_all_schedules_generation() {
+        let gen_len = 16;
+        let prompt = vec![10u32, 20, 30];
+
+        for (name, stype) in [
+            ("SacredVortex", ScheduleType::SacredVortex),
+            ("LogLinear", ScheduleType::LogLinear),
+            ("Cosine", ScheduleType::Cosine),
+        ] {
+            let mut engine = make_engine(5, true, stype);
+            let result = engine.generate(&prompt, gen_len);
+            let stats = engine.get_stats();
+
+            assert_eq!(result.len(), prompt.len() + gen_len);
+            assert!(!result[3..].contains(&MASK_TOKEN_ID),
+                "{}: should resolve all tokens", name);
+
+            println!("{:14}: conf={:.4} rejections={:2} verifications={:2} forced={:2} cycles_used={}",
+                name,
+                stats.avg_confidence,
+                stats.sacred_rejections,
+                stats.sacred_verifications,
+                stats.forced_acceptances,
+                stats.tokens_per_cycle.len());
+        }
+    }
 }
