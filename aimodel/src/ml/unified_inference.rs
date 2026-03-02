@@ -1268,12 +1268,14 @@ impl UnifiedInferenceEngine {
         // match wrong intermediate values and cause regressions (-4.5% GSM8K).
         // The multi-expert path (score_symbolic_arithmetic) handles math correctly.
         
-        // World knowledge for commonsense questions (PIQA, WinoGrande, etc.)
-        // Threshold raised 0.6→0.75: base score starts at 0.5, so 0.6 fires on just
-        // 2 keyword hits above baseline — too loose for MMLU/TruthfulQA questions.
-        // 0.75 requires stronger physical/commonsense signal before committing.
+        // World knowledge for commonsense questions (PIQA, WinoGrande, CommonsenseQA, etc.)
+        // Threshold 0.75 is too high for the new AtLocation/MotivatedBy/event methods which
+        // cap at 0.6-0.90. Use 0.62 for genuine knowledge questions (contain '?') to commit
+        // when structured triples produce a clear signal. For non-questions (HellaSwag
+        // continuations) keep 0.75 to avoid false positives on continuation tasks.
+        let wk_threshold = if question.contains('?') { 0.62 } else { 0.75 };
         if let Some((idx, conf)) = self.reasoning.score_with_world_knowledge(question, choices) {
-            if conf > 0.75 {
+            if conf > wk_threshold {
                 return (idx, conf);
             }
         }

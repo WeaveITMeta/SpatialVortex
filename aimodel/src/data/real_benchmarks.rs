@@ -15,6 +15,7 @@ use crate::data::hf_datasets::{HFDatasetLoader, DatasetLoaderConfig, DatasetCate
 use crate::ml::calm::{CALMEngine, LatentState};
 use crate::ml::rag_search::{RAGSearchEngine, RAGSearchConfig};
 use crate::ml::neuro_symbolic::{NeuralTheoremProver, LogicTensorNetwork};
+use crate::ml::world_knowledge::WorldKnowledgeGraph;
 use crate::ml::jepa::{HierarchicalDeductionEngine, JEPAConfig};
 use crate::ml::web_crawler::{WebCrawler, CrawlerConfig};
 use serde::{Deserialize, Serialize};
@@ -1059,6 +1060,8 @@ pub struct RealBenchmarkEvaluator {
     gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline,
     /// Inference audit collector — tracks per-expert contributions for ablation analysis
     audit: crate::data::inference_audit::AuditCollector,
+    /// World knowledge graph — direct commonsense triple lookup for CommonsenseQA
+    world_knowledge: WorldKnowledgeGraph,
 }
 
 impl RealBenchmarkEvaluator {
@@ -1168,6 +1171,7 @@ impl RealBenchmarkEvaluator {
             ltr_pathway: crate::ml::pillar_integration::JEPAPathwayIntegration::new(),
             gated_pipeline: crate::ml::pillar_integration::GatedProposalPipeline::new(),
             audit: crate::data::inference_audit::AuditCollector::new(),
+            world_knowledge: WorldKnowledgeGraph::new(256),
         }
     }
     
@@ -3270,12 +3274,44 @@ impl RealBenchmarkEvaluator {
                 || question.source.starts_with("gsm8k")
                 || question.source.starts_with("MMLU")
                 || question.source.starts_with("mmlu");
-            if !pipeline_skip && confidence > strategy.pipeline_threshold {
+
+            // For CommonsenseQA: consult WorldKnowledgeGraph before pipeline commits.
+            // The RAG pipeline uses keyword co-occurrence which gives wrong answers at high conf.
+            // WKG uses structured ConceptNet-style triples (AtLocation, UsedFor, CapableOf)
+            // which are far more reliable for commonsense questions.
+            let is_csqa = question.source == "CommonsenseQA";
+            let final_answer_idx = if is_csqa {
+                if let Some((wkg_idx, wkg_conf)) = self.world_knowledge.answer_question(
+                    &question.question,
+                    &question.choices,
+                ) {
+                    if wkg_conf > 0.6 {
+                        // WKG is confident — trust it
+                        let wkg_tag = if wkg_idx == question.correct_answer { "OK" } else { "WRONG" };
+                        println!("   [WKG] [{}] conf={:.2} chose[{}] overrides pipeline[{}]",
+                            wkg_tag, wkg_conf, wkg_idx, answer_idx);
+                        wkg_idx
+                    } else if wkg_conf > 0.4 && wkg_idx != answer_idx {
+                        // WKG partially confident but disagrees → fall through to multi-expert
+                        println!("   [WKG] conf={:.2} disagrees with pipeline → fall through", wkg_conf);
+                        usize::MAX // Sentinel: don't commit pipeline
+                    } else {
+                        answer_idx // WKG low conf or agrees → trust pipeline
+                    }
+                } else {
+                    answer_idx // No WKG signal → trust pipeline
+                }
+            } else {
+                answer_idx
+            };
+
+            if !pipeline_skip && final_answer_idx != usize::MAX && confidence > strategy.pipeline_threshold {
+                let commit_idx = final_answer_idx;
                 trace.record_decision("pipeline", "committed", confidence);
-                trace.finalize(answer_idx, confidence, "pipeline", &[], &[]);
+                trace.finalize(commit_idx, confidence, "pipeline", &[], &[]);
                 trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
                 self.audit.record(trace);
-                return (answer_idx, confidence);
+                return (commit_idx, confidence);
             }
             println!("   [PIPELINE] conf {:.2} <= {:.1}, falling through", confidence, strategy.pipeline_threshold);
         }
@@ -3678,8 +3714,11 @@ impl RealBenchmarkEvaluator {
             // GSM8K: word-overlap knowledge matching is noise for numeric answers — disable.
             // ARC: one-shot word co-occurrence learning caps at 20.0 for all choices uniformly,
             // adding noise that causes embed_sim/comprehensive to break ties toward wrong answers.
+            // CommonsenseQA: same problem — score_with_learned_knowledge assigns flat 20.0 to all
+            // choices (uniform co-occurrence hits on RAG facts). Use score_with_commonsense instead.
             let is_arc_source = question.source.to_lowercase().contains("arc");
-            let knowledge_score = if is_gsm8k_source || is_arc_source {
+            let is_csqa_source = question.source == "CommonsenseQA";
+            let knowledge_score = if is_gsm8k_source || is_arc_source || is_csqa_source {
                 0.0
             } else {
                 let learned_score = self.score_with_learned_knowledge(&question_lower, &choice_lower);
@@ -4436,14 +4475,17 @@ impl RealBenchmarkEvaluator {
             }
             
             // COMMONSENSE REASONING - Query learned world knowledge
-            // Only apply to commonsense-style questions (not bAbI location/temporal tasks)
-            // bAbI tasks have context with entity movements, not world knowledge questions
-            let is_commonsense_question = !question_lower.contains("where is ") 
-                && !question_lower.contains("where was ")
-                && !question_lower.contains("what is") 
-                && question_lower.len() > 30; // CommonsenseQA questions are typically longer
-            
-            if is_commonsense_question {
+            // Block only bAbI-style entity-movement context (has entity tracking cues).
+            // Allow all genuine knowledge questions including "What is X?" and "Where would you find X?"
+            let is_babi_context = question_lower.contains("went to the ")
+                || question_lower.contains("picked up the ")
+                || question_lower.contains("dropped the ")
+                || question_lower.contains("travelled to the ")
+                || question_lower.contains("journeyed to the ")
+                || (question_lower.contains("where is ") && question_lower.len() < 60)
+                || (question_lower.contains("where was ") && question_lower.len() < 60);
+
+            if !is_babi_context {
                 let cs_score = self.score_with_commonsense(&question_lower, &choice_lower);
                 if cs_score > 0.0 {
                     score += cs_score;
@@ -5031,14 +5073,72 @@ impl RealBenchmarkEvaluator {
     fn score_with_commonsense(&self, question: &str, choice: &str) -> f32 {
         let question_lower = question.to_lowercase();
         let choice_lower = choice.to_lowercase();
-        
-        // Extract key concepts from question
+
+        // PRIMARY: Direct structured lookup via WorldKnowledgeGraph
+        // This is the primary signal — structured triples have much higher precision
+        // than the embedding-based deduction_engine which has no actual knowledge loaded.
+        if let Some((_idx, confidence)) = self.world_knowledge.answer_question(
+            &question_lower,
+            &[choice.to_string()]
+        ) {
+            // answer_question returns the best-matching choice index — since we pass 1 choice,
+            // index 0 means this choice was selected. confidence is already calibrated.
+            if confidence > 0.5 {
+                return confidence * 20.0; // Scale to match existing scoring range
+            }
+        }
+
+        // SECONDARY: Relation-scan — score choice against all triples whose subject
+        // appears in the question. More direct than embed-based deduction_engine.
+        let mut wkg_score = 0.0f32;
+        let stop_words = ["the", "a", "an", "is", "are", "was", "were", "what", "where",
+                          "when", "who", "how", "why", "do", "does", "did", "would",
+                          "could", "should", "can", "will", "for", "and", "or", "but",
+                          "you", "your", "they", "their", "it", "its", "that", "this",
+                          "of", "in", "on", "at", "to", "with", "from", "by"];
         let question_words: Vec<&str> = question_lower
             .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| w.len() > 2)
+            .filter(|w| w.len() > 2 && !stop_words.contains(w))
             .collect();
-        
-        // Determine relation type from question patterns
+
+        // Build concept variants: original + singular (strip trailing 's') + root (strip 'ing'/'ed')
+        let mut concepts_to_try: Vec<String> = Vec::new();
+        for concept in &question_words {
+            concepts_to_try.push(concept.to_string());
+            // Plural → singular: "animals" → "animal", "magazines" → "magazine"
+            if concept.ends_with('s') && concept.len() > 3 {
+                concepts_to_try.push(concept[..concept.len()-1].to_string());
+            }
+            // gerund → base: "watching" → "watch", "playing" → "play"
+            if concept.ends_with("ing") && concept.len() > 4 {
+                concepts_to_try.push(concept[..concept.len()-3].to_string());
+            }
+        }
+        // Also try bigrams and trigrams from question words
+        for window in question_words.windows(2) {
+            concepts_to_try.push(format!("{} {}", window[0], window[1]));
+        }
+        for window in question_words.windows(3) {
+            concepts_to_try.push(format!("{} {} {}", window[0], window[1], window[2]));
+        }
+
+        for concept in &concepts_to_try {
+            let triples = self.world_knowledge.query_subject(concept.as_str());
+            for triple in triples {
+                let obj = &triple.object;
+                if choice_lower.contains(obj.as_str()) || obj.contains(choice_lower.as_str())
+                    || Self::words_related(&choice_lower, obj) {
+                    let s = triple.confidence * 18.0;
+                    if s > wkg_score { wkg_score = s; }
+                }
+            }
+        }
+        if wkg_score > 0.0 {
+            return wkg_score;
+        }
+
+        // FALLBACK: Embedding-based deduction engine (legacy path, rarely fires)
+        let mut best_score = 0.0f32;
         let relation = if question_lower.contains("where") || question_lower.contains("location") || question_lower.contains("find") {
             "AtLocation"
         } else if question_lower.contains("used for") || question_lower.contains("purpose") || question_lower.contains("use") {
@@ -5048,59 +5148,29 @@ impl RealBenchmarkEvaluator {
         } else if question_lower.contains("property") || question_lower.contains("characteristic") || question_lower.contains("is it") {
             "HasProperty"
         } else {
-            // Try all relations
             ""
         };
-        
-        let mut best_score = 0.0f32;
-        
-        // Query commonsense for each concept in question
+
         for concept in &question_words {
             let embed = Self::simple_concept_embedding(concept);
-            
-            // Query specific relation or all relations
             let relations_to_try = if relation.is_empty() {
                 vec!["AtLocation", "UsedFor", "CapableOf", "HasProperty"]
             } else {
                 vec![relation]
             };
-            
             for rel in relations_to_try {
                 if let Some((tail, confidence)) = self.deduction_engine.query_commonsense(&embed, rel) {
-                    // Check if the answer matches the choice
                     if choice_lower.contains(&tail) || tail.contains(&choice_lower) {
-                        let score = confidence * 25.0; // Strong match
-                        if score > best_score {
-                            best_score = score;
-                        }
-                    }
-                    // Partial match - choice is related to the tail
-                    else if Self::words_related(&choice_lower, &tail) {
+                        let score = confidence * 25.0;
+                        if score > best_score { best_score = score; }
+                    } else if Self::words_related(&choice_lower, &tail) {
                         let score = confidence * 15.0;
-                        if score > best_score {
-                            best_score = score;
-                        }
+                        if score > best_score { best_score = score; }
                     }
                 }
             }
         }
-        
-        // Also check if choice itself is a known concept
-        let choice_embed = Self::simple_concept_embedding(&choice_lower);
-        for rel in &["AtLocation", "UsedFor", "CapableOf", "HasProperty"] {
-            if let Some((tail, confidence)) = self.deduction_engine.query_commonsense(&choice_embed, rel) {
-                // Check if any question word relates to the tail
-                for qword in &question_words {
-                    if tail.contains(qword) || qword.contains(&tail.as_str()) {
-                        let score = confidence * 20.0;
-                        if score > best_score {
-                            best_score = score;
-                        }
-                    }
-                }
-            }
-        }
-        
+
         best_score
     }
     

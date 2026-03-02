@@ -260,41 +260,80 @@ impl WorldKnowledgeGraph {
     /// Answer a commonsense question
     pub fn answer_question(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
         let question_lower = question.to_lowercase();
-        
+
         // Physical comparison questions
         if question_lower.contains("heavier") || question_lower.contains("lighter") {
             return self.answer_weight_question(&question_lower, choices);
         }
-        
         if question_lower.contains("bigger") || question_lower.contains("smaller") {
             return self.answer_size_question(&question_lower, choices);
         }
-        
+
+        // Only run knowledge lookups on genuine questions (contain "?" or start with WH-word).
+        // Continuation stems (HellaSwag: "A man is sitting on a roof. he ...") have no "?" and
+        // don't start with WH-words — skip knowledge lookup to avoid false positives.
+        let is_knowledge_question = question_lower.contains('?')
+            || question_lower.starts_with("where")
+            || question_lower.starts_with("what")
+            || question_lower.starts_with("who")
+            || question_lower.starts_with("why")
+            || question_lower.starts_with("how")
+            || question_lower.starts_with("when");
+
+        if is_knowledge_question {
+            // "Where would you find X?" / "Where is X?" — AtLocation lookup
+            if question_lower.contains("where") || question_lower.contains("find")
+                || question_lower.contains("location") || question_lower.contains("located") {
+                if let Some(result) = self.answer_location_question(&question_lower, choices) {
+                    return Some(result);
+                }
+            }
+
+            // "What does X aim/want/need/like?" — MotivatedBy / Desires lookup
+            if question_lower.contains("aim") || question_lower.contains("want")
+                || question_lower.contains("need") || question_lower.contains("motivat")
+                || question_lower.contains("why do") || question_lower.contains("goal") {
+                if let Some(result) = self.answer_motivation_question(&question_lower, choices) {
+                    return Some(result);
+                }
+            }
+
+            // "What do people do at work?" / "What happens when?" — HasSubevent / HasPrerequisite
+            if question_lower.contains("what do") || question_lower.contains("what does")
+                || question_lower.contains("what would") || question_lower.contains("result")
+                || question_lower.contains("happen") || question_lower.contains("typically") {
+                if let Some(result) = self.answer_event_question(&question_lower, choices) {
+                    return Some(result);
+                }
+            }
+        }
+
         // "What is X used for?" questions
-        if question_lower.contains("used for") || question_lower.contains("use a") {
+        if question_lower.contains("used for") || question_lower.contains("use a")
+            || question_lower.contains("purpose") || question_lower.contains("what is a") {
             return self.answer_function_question(&question_lower, choices);
         }
-        
+
         // "What can X do?" questions
-        if question_lower.contains("can a") || question_lower.contains("capable of") {
+        if question_lower.contains("can a") || question_lower.contains("capable of")
+            || question_lower.contains("able to") {
             return self.answer_capability_question(&question_lower, choices);
         }
-        
-        // PIQA-style: "How to accomplish X?" - score physical plausibility
-        if question_lower.contains("how to") || question_lower.contains("how do") || 
-           question_lower.contains("how can") || question_lower.contains("what is the best way") {
+
+        // PIQA-style: "How to accomplish X?"
+        if question_lower.contains("how to") || question_lower.contains("how do")
+            || question_lower.contains("how can") || question_lower.contains("best way") {
             return self.answer_how_to_question(&question_lower, choices);
         }
-        
+
         // WinoGrande-style: Coreference with blank
         if question_lower.contains("_") || question_lower.contains("[blank]") {
             return self.answer_coreference_question(&question_lower, choices);
         }
-        
+
         // General plausibility scoring
         let mut best_idx = 0;
         let mut best_score = 0.0f32;
-        
         for (idx, choice) in choices.iter().enumerate() {
             let score = self.score_choice_plausibility(&question_lower, &choice.to_lowercase());
             if score > best_score {
@@ -302,12 +341,224 @@ impl WorldKnowledgeGraph {
                 best_idx = idx;
             }
         }
-        
         if best_score > 0.55 {
             Some((best_idx, best_score))
         } else {
             None
         }
+    }
+
+    /// Answer "where is/would you find X?" by looking up AtLocation triples
+    fn answer_location_question(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+        // Extract the concept being asked about (key nouns in question)
+        let words: Vec<&str> = question.split_whitespace()
+            .filter(|w| w.len() > 2)
+            .collect();
+
+        let mut best_idx = 0;
+        let mut best_score = 0.0f32;
+
+        for concept in &words {
+            let concept_clean = concept.trim_matches(|c: char| !c.is_alphanumeric());
+            // Look up AtLocation for this concept
+            if let Some(triples) = self.by_subject.get(concept_clean) {
+                for triple in triples {
+                    if triple.relation != RelationType::AtLocation { continue; }
+                    // Check which choice matches this location
+                    for (idx, choice) in choices.iter().enumerate() {
+                        let choice_lower = choice.to_lowercase();
+                        if choice_lower.contains(&triple.object)
+                            || triple.object.contains(&choice_lower)
+                            || Self::words_overlap(&choice_lower, &triple.object) {
+                            let score = triple.confidence * 0.85;
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+            // Also: which choice has the concept AtLocation it?
+            for (idx, choice) in choices.iter().enumerate() {
+                let choice_lower = choice.to_lowercase();
+                // choice is the location — does it contain concept?
+                if let Some(triples) = self.by_object.get(concept_clean) {
+                    for triple in triples {
+                        if triple.relation != RelationType::AtLocation { continue; }
+                        if choice_lower.contains(&triple.subject)
+                            || triple.subject.contains(&choice_lower) {
+                            let score = triple.confidence * 0.75;
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Also try multi-word concepts from question (bigrams/trigrams)
+        for window in words.windows(2) {
+            let bigram = format!("{} {}", window[0], window[1]);
+            if let Some(triples) = self.by_subject.get(bigram.as_str()) {
+                for triple in triples {
+                    if triple.relation != RelationType::AtLocation { continue; }
+                    for (idx, choice) in choices.iter().enumerate() {
+                        let choice_lower = choice.to_lowercase();
+                        if choice_lower.contains(&triple.object)
+                            || triple.object.contains(&choice_lower) {
+                            let score = triple.confidence * 0.90; // Bigram match = higher confidence
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if best_score > 0.6 { Some((best_idx, best_score)) } else { None }
+    }
+
+    /// Answer motivation/desire questions: "What does X aim to do?" / "Why does X?"
+    fn answer_motivation_question(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+        let words: Vec<&str> = question.split_whitespace()
+            .filter(|w| w.len() > 2)
+            .collect();
+
+        let mut best_idx = 0;
+        let mut best_score = 0.0f32;
+
+        let motivation_relations = [RelationType::MotivatedBy, RelationType::Desires, RelationType::HasSubevent];
+
+        for concept in &words {
+            let concept_clean = concept.trim_matches(|c: char| !c.is_alphanumeric());
+            if let Some(triples) = self.by_subject.get(concept_clean) {
+                for triple in triples {
+                    if !motivation_relations.contains(&triple.relation) { continue; }
+                    for (idx, choice) in choices.iter().enumerate() {
+                        let choice_lower = choice.to_lowercase();
+                        if choice_lower.contains(&triple.object)
+                            || triple.object.contains(&choice_lower)
+                            || Self::words_overlap(&choice_lower, &triple.object) {
+                            let score = triple.confidence * 0.80;
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if best_score > 0.6 { Some((best_idx, best_score)) } else { None }
+    }
+
+    /// Answer event/result questions: "What do people typically do while X?"
+    fn answer_event_question(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+        let words: Vec<&str> = question.split_whitespace()
+            .filter(|w| w.len() > 2)
+            .collect();
+
+        let mut best_idx = 0;
+        let mut best_score = 0.0f32;
+
+        let event_relations = [RelationType::HasSubevent, RelationType::Causes,
+                               RelationType::HasPrerequisite, RelationType::MotivatedBy];
+
+        // Also check bigrams
+        let mut concepts: Vec<String> = words.iter()
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .collect();
+        for window in words.windows(2) {
+            concepts.push(format!("{} {}",
+                window[0].trim_matches(|c: char| !c.is_alphanumeric()),
+                window[1].trim_matches(|c: char| !c.is_alphanumeric())));
+        }
+        for window in words.windows(3) {
+            concepts.push(format!("{} {} {}",
+                window[0].trim_matches(|c: char| !c.is_alphanumeric()),
+                window[1].trim_matches(|c: char| !c.is_alphanumeric()),
+                window[2].trim_matches(|c: char| !c.is_alphanumeric())));
+        }
+
+        for concept in &concepts {
+            if let Some(triples) = self.by_subject.get(concept.as_str()) {
+                for triple in triples {
+                    if !event_relations.contains(&triple.relation) { continue; }
+                    for (idx, choice) in choices.iter().enumerate() {
+                        let choice_lower = choice.to_lowercase();
+                        if choice_lower.contains(&triple.object)
+                            || triple.object.contains(&choice_lower)
+                            || Self::words_overlap(&choice_lower, &triple.object) {
+                            let score = triple.confidence * 0.78;
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if best_score > 0.6 { Some((best_idx, best_score)) } else { None }
+    }
+
+    /// Broad scan: for every content word in question, check all relations against all choices
+    fn answer_by_relation_scan(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+        let stop_words = ["the", "a", "an", "is", "are", "was", "were", "what", "where",
+                          "when", "who", "how", "why", "do", "does", "did", "would",
+                          "could", "should", "can", "will", "for", "and", "or", "but",
+                          "you", "your", "they", "their", "it", "its", "that", "this",
+                          "of", "in", "on", "at", "to", "with", "from", "by"];
+
+        let words: Vec<&str> = question.split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.len() > 2 && !stop_words.contains(w))
+            .collect();
+
+        let mut scores = vec![0.0f32; choices.len()];
+
+        for concept in &words {
+            if let Some(triples) = self.by_subject.get(*concept) {
+                for triple in triples {
+                    for (idx, choice) in choices.iter().enumerate() {
+                        let choice_lower = choice.to_lowercase();
+                        if choice_lower.contains(&triple.object)
+                            || triple.object.contains(choice_lower.as_str())
+                            || Self::words_overlap(&choice_lower, &triple.object) {
+                            scores[idx] += triple.confidence * 0.5;
+                        }
+                    }
+                }
+            }
+        }
+
+        let best_idx = scores.iter().enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        // High threshold: broad scan has many false positives on non-commonsense tasks
+        if scores[best_idx] > 0.65 {
+            Some((best_idx, scores[best_idx].min(0.85)))
+        } else {
+            None
+        }
+    }
+
+    /// Check if two strings share at least one meaningful word
+    fn words_overlap(a: &str, b: &str) -> bool {
+        let stop = ["the", "a", "an", "is", "are", "of", "in", "on", "at", "to"];
+        let a_words: std::collections::HashSet<&str> = a.split_whitespace()
+            .filter(|w| w.len() > 2 && !stop.contains(w))
+            .collect();
+        let b_words: std::collections::HashSet<&str> = b.split_whitespace()
+            .filter(|w| w.len() > 2 && !stop.contains(w))
+            .collect();
+        a_words.intersection(&b_words).count() > 0
     }
     
     /// Answer PIQA-style "How to" questions using physical reasoning
@@ -676,6 +927,344 @@ impl WorldKnowledgeGraph {
         self.add_triple("studying", RelationType::MotivatedBy, "knowledge", 0.8);
         self.add_triple("exercising", RelationType::MotivatedBy, "health", 0.9);
         self.add_triple("helping", RelationType::MotivatedBy, "kindness", 0.8);
+
+        // =================================================================
+        // LOCATIONS — where things are found (AtLocation)
+        // =================================================================
+
+        // Buildings and their contents
+        self.add_triple("revolving door", RelationType::AtLocation, "bank", 0.9);
+        self.add_triple("revolving door", RelationType::AtLocation, "office building", 0.9);
+        self.add_triple("revolving door", RelationType::AtLocation, "hotel", 0.8);
+        self.add_triple("magazine", RelationType::AtLocation, "bookstore", 0.9);
+        self.add_triple("magazine", RelationType::AtLocation, "library", 0.9);
+        self.add_triple("magazine", RelationType::AtLocation, "waiting room", 0.8);
+        self.add_triple("hamburger", RelationType::AtLocation, "fast food restaurant", 1.0);
+        self.add_triple("hamburger", RelationType::AtLocation, "restaurant", 0.9);
+        self.add_triple("farmland", RelationType::AtLocation, "midwest", 0.9);
+        self.add_triple("farmland", RelationType::AtLocation, "countryside", 0.9);
+        self.add_triple("glue stick", RelationType::AtLocation, "office", 0.9);
+        self.add_triple("glue stick", RelationType::AtLocation, "classroom", 0.9);
+        self.add_triple("glue stick", RelationType::UsedFor, "craft", 0.9);
+        self.add_triple("pencil", RelationType::AtLocation, "office", 0.9);
+        self.add_triple("pencil", RelationType::AtLocation, "classroom", 0.9);
+        self.add_triple("pencil", RelationType::UsedFor, "writing", 1.0);
+        self.add_triple("book", RelationType::AtLocation, "library", 1.0);
+        self.add_triple("book", RelationType::AtLocation, "bookstore", 1.0);
+        self.add_triple("prescription", RelationType::AtLocation, "pharmacy", 1.0);
+        self.add_triple("medicine", RelationType::AtLocation, "pharmacy", 1.0);
+        self.add_triple("medicine", RelationType::AtLocation, "hospital", 0.9);
+        self.add_triple("painting", RelationType::AtLocation, "museum", 0.9);
+        self.add_triple("painting", RelationType::AtLocation, "art gallery", 1.0);
+        self.add_triple("artwork", RelationType::AtLocation, "museum", 0.9);
+        self.add_triple("cash register", RelationType::AtLocation, "store", 1.0);
+        self.add_triple("cash register", RelationType::AtLocation, "market", 1.0);
+        self.add_triple("treadmill", RelationType::AtLocation, "gym", 1.0);
+        self.add_triple("treadmill", RelationType::AtLocation, "fitness center", 1.0);
+        self.add_triple("weight", RelationType::AtLocation, "gym", 0.9);
+        self.add_triple("swimming pool", RelationType::AtLocation, "gym", 0.8);
+        self.add_triple("swimming pool", RelationType::AtLocation, "hotel", 0.8);
+        self.add_triple("piano", RelationType::AtLocation, "concert hall", 0.8);
+        self.add_triple("piano", RelationType::AtLocation, "music school", 0.9);
+        self.add_triple("microscope", RelationType::AtLocation, "laboratory", 1.0);
+        self.add_triple("microscope", RelationType::AtLocation, "school", 0.8);
+        self.add_triple("telescope", RelationType::AtLocation, "observatory", 1.0);
+        self.add_triple("tree", RelationType::AtLocation, "forest", 1.0);
+        self.add_triple("tree", RelationType::AtLocation, "park", 0.9);
+        self.add_triple("fish", RelationType::AtLocation, "ocean", 0.9);
+        self.add_triple("fish", RelationType::AtLocation, "river", 0.8);
+        self.add_triple("fish", RelationType::AtLocation, "lake", 0.8);
+        self.add_triple("sand", RelationType::AtLocation, "beach", 1.0);
+        self.add_triple("sand", RelationType::AtLocation, "desert", 1.0);
+        self.add_triple("snow", RelationType::AtLocation, "mountain", 0.9);
+        self.add_triple("snow", RelationType::AtLocation, "north pole", 1.0);
+        self.add_triple("grass", RelationType::AtLocation, "field", 1.0);
+        self.add_triple("grass", RelationType::AtLocation, "park", 0.9);
+        self.add_triple("coral", RelationType::AtLocation, "ocean", 1.0);
+        self.add_triple("coral", RelationType::AtLocation, "reef", 1.0);
+        self.add_triple("wine", RelationType::AtLocation, "winery", 1.0);
+        self.add_triple("wine", RelationType::AtLocation, "restaurant", 0.9);
+        self.add_triple("coffee", RelationType::AtLocation, "cafe", 1.0);
+        self.add_triple("coffee", RelationType::AtLocation, "coffee shop", 1.0);
+        self.add_triple("coffee", RelationType::AtLocation, "kitchen", 0.9);
+        self.add_triple("newspaper", RelationType::AtLocation, "newsstand", 0.9);
+        self.add_triple("newspaper", RelationType::AtLocation, "library", 0.8);
+        self.add_triple("zoo", RelationType::HasA, "animal", 1.0);
+        self.add_triple("farm", RelationType::HasA, "animal", 1.0);
+        self.add_triple("farm", RelationType::HasA, "crop", 1.0);
+        self.add_triple("heifer", RelationType::AtLocation, "farm", 1.0);
+        self.add_triple("heifer", RelationType::IsA, "cow", 1.0);
+        self.add_triple("heifer", RelationType::IsA, "animal", 1.0);
+        self.add_triple("cow", RelationType::AtLocation, "farm", 1.0);
+        self.add_triple("horse", RelationType::AtLocation, "farm", 1.0);
+        self.add_triple("horse", RelationType::AtLocation, "stable", 1.0);
+        self.add_triple("pig", RelationType::AtLocation, "farm", 1.0);
+        self.add_triple("chicken", RelationType::AtLocation, "farm", 1.0);
+
+        // =================================================================
+        // TOOLS AND THEIR USES
+        // =================================================================
+
+        self.add_triple("scissors", RelationType::UsedFor, "cutting", 1.0);
+        self.add_triple("broom", RelationType::UsedFor, "sweeping", 1.0);
+        self.add_triple("broom", RelationType::UsedFor, "cleaning", 0.9);
+        self.add_triple("mop", RelationType::UsedFor, "cleaning", 1.0);
+        self.add_triple("shovel", RelationType::UsedFor, "digging", 1.0);
+        self.add_triple("axe", RelationType::UsedFor, "cutting wood", 1.0);
+        self.add_triple("needle", RelationType::UsedFor, "sewing", 1.0);
+        self.add_triple("brush", RelationType::UsedFor, "painting", 0.9);
+        self.add_triple("brush", RelationType::UsedFor, "cleaning", 0.8);
+        self.add_triple("guitar", RelationType::UsedFor, "music", 1.0);
+        self.add_triple("guitar", RelationType::UsedFor, "playing", 1.0);
+        self.add_triple("guitar", RelationType::HasSubevent, "singing", 0.7);
+        self.add_triple("newspaper", RelationType::UsedFor, "reading", 1.0);
+        self.add_triple("newspaper", RelationType::UsedFor, "information", 0.9);
+        self.add_triple("reading", RelationType::HasPrerequisite, "literacy", 1.0);
+        self.add_triple("reading", RelationType::MotivatedBy, "learning", 0.8);
+        self.add_triple("reading newspaper", RelationType::HasSubevent, "literacy", 0.9);
+        self.add_triple("camera", RelationType::UsedFor, "photography", 1.0);
+        self.add_triple("camera", RelationType::UsedFor, "taking pictures", 1.0);
+        self.add_triple("clock", RelationType::UsedFor, "telling time", 1.0);
+        self.add_triple("watch", RelationType::UsedFor, "telling time", 1.0);
+        self.add_triple("map", RelationType::UsedFor, "navigation", 1.0);
+        self.add_triple("umbrella", RelationType::UsedFor, "rain protection", 1.0);
+        self.add_triple("umbrella", RelationType::UsedFor, "protection from rain", 1.0);
+        self.add_triple("ladder", RelationType::UsedFor, "climbing", 1.0);
+        self.add_triple("rope", RelationType::UsedFor, "tying", 0.9);
+        self.add_triple("rope", RelationType::UsedFor, "climbing", 0.8);
+        self.add_triple("key", RelationType::UsedFor, "unlocking", 1.0);
+        self.add_triple("lock", RelationType::UsedFor, "security", 1.0);
+        self.add_triple("lock", RelationType::UsedFor, "protecting", 0.9);
+        self.add_triple("thermometer", RelationType::UsedFor, "measuring temperature", 1.0);
+        self.add_triple("scale", RelationType::UsedFor, "measuring weight", 1.0);
+        self.add_triple("ruler", RelationType::UsedFor, "measuring", 1.0);
+        self.add_triple("calendar", RelationType::UsedFor, "tracking dates", 1.0);
+        self.add_triple("ticket", RelationType::UsedFor, "entry", 1.0);
+        self.add_triple("ticket", RelationType::UsedFor, "transportation", 0.8);
+        self.add_triple("wallet", RelationType::UsedFor, "storing money", 1.0);
+        self.add_triple("bag", RelationType::UsedFor, "carrying", 1.0);
+        self.add_triple("glasses", RelationType::UsedFor, "seeing", 1.0);
+        self.add_triple("glasses", RelationType::UsedFor, "vision correction", 1.0);
+
+        // =================================================================
+        // HUMAN ACTIVITIES AND MOTIVATIONS
+        // =================================================================
+
+        self.add_triple("work", RelationType::MotivatedBy, "money", 0.9);
+        self.add_triple("working", RelationType::MotivatedBy, "income", 0.9);
+        self.add_triple("work", RelationType::MotivatedBy, "complete job", 0.9);
+        self.add_triple("working", RelationType::HasSubevent, "complete job", 0.9);
+        self.add_triple("people", RelationType::MotivatedBy, "complete job", 0.9);
+        self.add_triple("person", RelationType::MotivatedBy, "happiness", 0.9);
+        self.add_triple("person", RelationType::Desires, "attention", 0.8);
+        self.add_triple("person", RelationType::Desires, "love", 0.9);
+        self.add_triple("dog", RelationType::Desires, "attention", 0.9);
+        self.add_triple("dog", RelationType::Desires, "food", 1.0);
+        self.add_triple("dog", RelationType::Desires, "walk", 0.9);
+        self.add_triple("dog", RelationType::Desires, "lots of attention", 0.9);
+        self.add_triple("pet", RelationType::Desires, "attention", 0.9);
+        self.add_triple("watching film", RelationType::MotivatedBy, "entertainment", 0.9);
+        self.add_triple("watching film", RelationType::MotivatedBy, "being entertained", 0.9);
+        self.add_triple("watching movie", RelationType::MotivatedBy, "entertainment", 0.9);
+        self.add_triple("singing", RelationType::MotivatedBy, "expression", 0.8);
+        self.add_triple("traveling", RelationType::MotivatedBy, "exploration", 0.8);
+        self.add_triple("traveling", RelationType::MotivatedBy, "adventure", 0.8);
+        self.add_triple("sleeping", RelationType::MotivatedBy, "rest", 1.0);
+        self.add_triple("sleeping", RelationType::MotivatedBy, "recovery", 0.9);
+        self.add_triple("eating", RelationType::MotivatedBy, "hunger", 1.0);
+        self.add_triple("eating", RelationType::MotivatedBy, "nutrition", 0.9);
+        self.add_triple("drinking", RelationType::MotivatedBy, "thirst", 1.0);
+        self.add_triple("drinking booze", RelationType::HasSubevent, "examine thing", 0.6);
+        self.add_triple("drinking", RelationType::HasSubevent, "conversation", 0.7);
+        self.add_triple("harmony", RelationType::HasPrerequisite, "make peace", 0.9);
+        self.add_triple("peace", RelationType::HasPrerequisite, "cooperation", 0.9);
+        self.add_triple("harmony", RelationType::HasPrerequisite, "make peace", 0.9);
+
+        // =================================================================
+        // SPORTS AND ACTIVITIES
+        // =================================================================
+
+        self.add_triple("fencing", RelationType::Causes, "puncture wound", 0.8);
+        self.add_triple("fencing", RelationType::IsA, "sport", 1.0);
+        self.add_triple("fencing", RelationType::UsedFor, "combat", 0.9);
+        self.add_triple("sword", RelationType::Causes, "puncture wound", 0.9);
+        self.add_triple("swimming", RelationType::HasPrerequisite, "water", 1.0);
+        self.add_triple("swimming", RelationType::AtLocation, "pool", 1.0);
+        self.add_triple("running", RelationType::MotivatedBy, "exercise", 0.9);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.7);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.9);
+        self.add_triple("playing guitar", RelationType::MotivatedBy, "music", 1.0);
+
+        // =================================================================
+        // MATERIALS AND PROPERTIES
+        // =================================================================
+
+        self.add_triple("vinyl", RelationType::UsedFor, "wallpaper", 0.8);
+        self.add_triple("vinyl", RelationType::UsedFor, "flooring", 0.9);
+        self.add_triple("vinyl", RelationType::UsedFor, "record", 0.9);
+        self.add_triple("vinyl", RelationType::MadeOf, "plastic", 0.9);
+        self.add_triple("wood", RelationType::UsedFor, "building", 0.9);
+        self.add_triple("wood", RelationType::UsedFor, "furniture", 0.9);
+        self.add_triple("glass", RelationType::UsedFor, "window", 0.9);
+        self.add_triple("glass", RelationType::HasProperty, "transparent", 1.0);
+        self.add_triple("metal", RelationType::HasProperty, "hard", 1.0);
+        self.add_triple("metal", RelationType::UsedFor, "construction", 0.9);
+        self.add_triple("cotton", RelationType::UsedFor, "clothing", 1.0);
+        self.add_triple("cotton", RelationType::IsA, "fabric", 1.0);
+        self.add_triple("wool", RelationType::UsedFor, "clothing", 1.0);
+        self.add_triple("wool", RelationType::IsA, "fabric", 1.0);
+        self.add_triple("rubber", RelationType::UsedFor, "tires", 0.9);
+        self.add_triple("rubber", RelationType::HasProperty, "elastic", 1.0);
+
+        // =================================================================
+        // SOCIAL STRUCTURES AND PLACES
+        // =================================================================
+
+        self.add_triple("bank", RelationType::UsedFor, "storing money", 1.0);
+        self.add_triple("bank", RelationType::UsedFor, "financial services", 1.0);
+        self.add_triple("bank", RelationType::HasA, "security", 0.9);
+        self.add_triple("bank", RelationType::HasA, "revolving door", 0.8);
+        self.add_triple("library", RelationType::UsedFor, "reading", 1.0);
+        self.add_triple("library", RelationType::UsedFor, "borrowing books", 1.0);
+        self.add_triple("library", RelationType::HasA, "books", 1.0);
+        self.add_triple("library", RelationType::HasA, "magazines", 0.9);
+        self.add_triple("bookstore", RelationType::HasA, "books", 1.0);
+        self.add_triple("bookstore", RelationType::HasA, "magazines", 0.9);
+        self.add_triple("bookstore", RelationType::UsedFor, "buying books", 1.0);
+        self.add_triple("museum", RelationType::UsedFor, "viewing art", 1.0);
+        self.add_triple("museum", RelationType::HasA, "paintings", 0.9);
+        self.add_triple("museum", RelationType::HasA, "artifacts", 0.9);
+        self.add_triple("pharmacy", RelationType::HasA, "medicine", 1.0);
+        self.add_triple("pharmacy", RelationType::UsedFor, "buying medicine", 1.0);
+        self.add_triple("grocery store", RelationType::HasA, "food", 1.0);
+        self.add_triple("market", RelationType::HasA, "food", 1.0);
+        self.add_triple("market", RelationType::UsedFor, "buying food", 1.0);
+        self.add_triple("gym", RelationType::UsedFor, "exercise", 1.0);
+        self.add_triple("gym", RelationType::HasA, "equipment", 0.9);
+        self.add_triple("prison", RelationType::UsedFor, "punishment", 0.9);
+        self.add_triple("prison", RelationType::UsedFor, "containment", 0.9);
+        self.add_triple("courthouse", RelationType::UsedFor, "justice", 0.9);
+        self.add_triple("post office", RelationType::UsedFor, "sending mail", 1.0);
+        self.add_triple("airport", RelationType::UsedFor, "flying", 1.0);
+        self.add_triple("airport", RelationType::UsedFor, "travel", 0.9);
+        self.add_triple("train station", RelationType::UsedFor, "travel", 1.0);
+        self.add_triple("bus stop", RelationType::UsedFor, "travel", 1.0);
+        self.add_triple("hotel", RelationType::UsedFor, "sleeping", 0.9);
+        self.add_triple("hotel", RelationType::UsedFor, "lodging", 1.0);
+        self.add_triple("hotel", RelationType::HasA, "reception area", 1.0);
+        self.add_triple("reception area", RelationType::AtLocation, "hotel", 1.0);
+        self.add_triple("reception area", RelationType::AtLocation, "office", 0.9);
+        self.add_triple("reception area", RelationType::AtLocation, "hospital", 0.9);
+        self.add_triple("reception area", RelationType::HasA, "people", 0.9);
+        self.add_triple("waiting room", RelationType::HasA, "people", 0.9);
+        self.add_triple("park", RelationType::UsedFor, "recreation", 1.0);
+        self.add_triple("park", RelationType::HasA, "trees", 0.9);
+        self.add_triple("church", RelationType::UsedFor, "worship", 1.0);
+        self.add_triple("school", RelationType::HasA, "teacher", 1.0);
+        self.add_triple("school", RelationType::HasA, "students", 1.0);
+        self.add_triple("hospital", RelationType::HasA, "doctor", 1.0);
+        self.add_triple("hospital", RelationType::HasA, "nurse", 1.0);
+
+        // =================================================================
+        // ANIMAL BEHAVIORS
+        // =================================================================
+
+        self.add_triple("animal", RelationType::CapableOf, "listen", 0.9);
+        self.add_triple("animal", RelationType::CapableOf, "hear", 1.0);
+        self.add_triple("animal", RelationType::CapableOf, "sense danger", 0.9);
+        self.add_triple("animal", RelationType::CapableOf, "listen to each other", 0.9);
+        self.add_triple("spider", RelationType::HasA, "eight eyes", 0.9);
+        self.add_triple("spider", RelationType::HasProperty, "many eyes", 0.9);
+        self.add_triple("human", RelationType::HasA, "two eyes", 1.0);
+        self.add_triple("person", RelationType::HasA, "two eyes", 1.0);
+        self.add_triple("people", RelationType::HasA, "two eyes", 1.0);
+        self.add_triple("ferret", RelationType::IsA, "animal", 1.0);
+        self.add_triple("ferret", RelationType::AtLocation, "great britain", 0.8);
+        self.add_triple("ferret", RelationType::CapableOf, "hunt", 0.9);
+        self.add_triple("duck", RelationType::CapableOf, "swim", 0.9);
+        self.add_triple("duck", RelationType::CapableOf, "fly", 0.8);
+        self.add_triple("whale", RelationType::IsA, "animal", 1.0);
+        self.add_triple("whale", RelationType::AtLocation, "ocean", 1.0);
+        self.add_triple("whale", RelationType::HasProperty, "large", 1.0);
+        self.add_triple("bee", RelationType::IsA, "insect", 1.0);
+        self.add_triple("bee", RelationType::CapableOf, "fly", 1.0);
+        self.add_triple("bee", RelationType::Causes, "honey", 0.9);
+        self.add_triple("bee", RelationType::AtLocation, "garden", 0.9);
+        self.add_triple("bee", RelationType::AtLocation, "hive", 1.0);
+        self.add_triple("snake", RelationType::IsA, "animal", 1.0);
+        self.add_triple("snake", RelationType::HasProperty, "dangerous", 0.8);
+        self.add_triple("lion", RelationType::IsA, "animal", 1.0);
+        self.add_triple("lion", RelationType::AtLocation, "africa", 0.9);
+        self.add_triple("lion", RelationType::AtLocation, "savanna", 0.9);
+        self.add_triple("penguin", RelationType::IsA, "animal", 1.0);
+        self.add_triple("penguin", RelationType::AtLocation, "antarctica", 1.0);
+        self.add_triple("penguin", RelationType::CapableOf, "swim", 1.0);
+        self.add_triple("camel", RelationType::IsA, "animal", 1.0);
+        self.add_triple("camel", RelationType::AtLocation, "desert", 1.0);
+
+        // =================================================================
+        // EMOTIONS AND MENTAL STATES
+        // =================================================================
+
+        self.add_triple("sadness", RelationType::Causes, "crying", 0.9);
+        self.add_triple("fear", RelationType::Causes, "running", 0.7);
+        self.add_triple("anger", RelationType::Causes, "conflict", 0.8);
+        self.add_triple("laughter", RelationType::CausedBy, "comedy", 0.9);
+        self.add_triple("laughter", RelationType::CausedBy, "jokes", 0.9);
+        self.add_triple("entertainment", RelationType::Causes, "laughter", 0.7);
+        self.add_triple("boredom", RelationType::Causes, "inactivity", 0.8);
+
+        // =================================================================
+        // GEOGRAPHY AND CONCEPTS
+        // =================================================================
+
+        self.add_triple("mexico", RelationType::HasProperty, "spanish speaking", 1.0);
+        self.add_triple("mexico", RelationType::HasProperty, "north american", 1.0);
+        self.add_triple("coffee", RelationType::AtLocation, "mexico", 0.8);
+        self.add_triple("midwest", RelationType::HasProperty, "farmland", 0.9);
+        self.add_triple("countryside", RelationType::HasProperty, "farmland", 0.9);
+        self.add_triple("great britain", RelationType::IsA, "island country", 1.0);
+        self.add_triple("iceland", RelationType::IsA, "island country", 1.0);
+        self.add_triple("ireland", RelationType::IsA, "island country", 1.0);
+        self.add_triple("japan", RelationType::IsA, "island country", 1.0);
+        self.add_triple("australia", RelationType::IsA, "island country", 1.0);
+        self.add_triple("new york", RelationType::IsA, "city", 1.0);
+        self.add_triple("new york", RelationType::HasProperty, "large", 1.0);
+
+        // =================================================================
+        // PHYSICAL PROPERTIES (expanded)
+        // =================================================================
+
+        let heavy_objects = ["car", "truck", "piano", "refrigerator", "boulder", "anvil"];
+        for obj in heavy_objects {
+            self.physical_properties.insert(obj.to_string(), PhysicalProperties {
+                weight: Some(WeightClass::Heavy),
+                size: Some(SizeClass::Large),
+                ..Default::default()
+            });
+        }
+        let light_objects = ["paper", "balloon", "leaf", "thread", "feather", "cotton"];
+        for obj in light_objects {
+            self.physical_properties.insert(obj.to_string(), PhysicalProperties {
+                weight: Some(WeightClass::VeryLight),
+                size: Some(SizeClass::Small),
+                ..Default::default()
+            });
+        }
+        let large_objects = ["building", "mountain", "ocean", "forest", "airplane", "whale", "elephant", "ship"];
+        for obj in large_objects {
+            self.physical_properties.insert(obj.to_string(), PhysicalProperties {
+                size: Some(SizeClass::Huge),
+                ..Default::default()
+            });
+        }
+        let small_objects = ["coin", "button", "seed", "ant", "bee", "needle", "pea"];
+        for obj in small_objects {
+            self.physical_properties.insert(obj.to_string(), PhysicalProperties {
+                size: Some(SizeClass::Tiny),
+                ..Default::default()
+            });
+        }
     }
     
     /// Get embedding for a concept (generates if not cached)

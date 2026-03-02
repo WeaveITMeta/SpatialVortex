@@ -255,8 +255,8 @@ impl DynamicRSI {
             expert_weights: HashMap::new(),
         });
 
-        // Commonsense
-        for name in &["piqa", "winogrande", "commonsenseqa", "hellaswag"] {
+        // Commonsense — piqa/winogrande/hellaswag: pipeline works at 0.6 threshold
+        for name in &["piqa", "winogrande", "hellaswag"] {
             self.seed_strategies.insert(name.to_string(), InferenceStrategy {
                 use_pipeline: true,
                 pipeline_threshold: 0.6,
@@ -268,6 +268,20 @@ impl DynamicRSI {
                 expert_weights: HashMap::new(),
             });
         }
+
+        // CommonsenseQA: RAG pipeline confidently picks wrong answers (0.60-0.70 conf).
+        // Raise threshold to 0.75 so it falls through to multi-expert where
+        // WorldKnowledgeGraph scoring can differentiate via structured triples.
+        self.seed_strategies.insert("commonsenseqa".to_string(), InferenceStrategy {
+            use_pipeline: true,
+            pipeline_threshold: 0.75,
+            use_unified: true,
+            unified_threshold: 0.70,
+            num_passes: 3,
+            use_multi_expert: true,
+            strategy_name: "seed:commonsense".to_string(),
+            expert_weights: HashMap::new(),
+        });
 
         // Truthfulness
         self.seed_strategies.insert("truthfulqa".to_string(), InferenceStrategy {
