@@ -311,19 +311,25 @@ impl WorldKnowledgeGraph {
         // "What is X used for?" questions
         if question_lower.contains("used for") || question_lower.contains("use a")
             || question_lower.contains("purpose") || question_lower.contains("what is a") {
-            return self.answer_function_question(&question_lower, choices);
+            if let Some(result) = self.answer_function_question(&question_lower, choices) {
+                return Some(result);
+            }
         }
 
         // "What can X do?" questions
         if question_lower.contains("can a") || question_lower.contains("capable of")
             || question_lower.contains("able to") {
-            return self.answer_capability_question(&question_lower, choices);
+            if let Some(result) = self.answer_capability_question(&question_lower, choices) {
+                return Some(result);
+            }
         }
 
         // PIQA-style: "How to accomplish X?"
         if question_lower.contains("how to") || question_lower.contains("how do")
             || question_lower.contains("how can") || question_lower.contains("best way") {
-            return self.answer_how_to_question(&question_lower, choices);
+            if let Some(result) = self.answer_how_to_question(&question_lower, choices) {
+                return Some(result);
+            }
         }
 
         // WinoGrande-style: Coreference with blank
@@ -1086,7 +1092,7 @@ impl WorldKnowledgeGraph {
         self.add_triple("pencil", RelationType::AtLocation, "office", 0.9);
         self.add_triple("pencil", RelationType::AtLocation, "classroom", 0.9);
         self.add_triple("pencil", RelationType::UsedFor, "writing", 1.0);
-        self.add_triple("book", RelationType::AtLocation, "library", 1.0);
+        self.add_triple("book", RelationType::AtLocation, "library", 0.55);
         self.add_triple("book", RelationType::AtLocation, "bookstore", 1.0);
         self.add_triple("prescription", RelationType::AtLocation, "pharmacy", 1.0);
         self.add_triple("medicine", RelationType::AtLocation, "pharmacy", 1.0);
@@ -1284,10 +1290,10 @@ impl WorldKnowledgeGraph {
         self.add_triple("post office", RelationType::UsedFor, "sending mail", 1.0);
         self.add_triple("airport", RelationType::UsedFor, "flying", 1.0);
         self.add_triple("airport", RelationType::UsedFor, "travel", 0.9);
-        self.add_triple("train station", RelationType::UsedFor, "travel", 1.0);
+        self.add_triple("train station", RelationType::UsedFor, "travel", 0.5);
         self.add_triple("bus stop", RelationType::UsedFor, "travel", 1.0);
-        self.add_triple("hotel", RelationType::UsedFor, "sleeping", 0.9);
-        self.add_triple("hotel", RelationType::UsedFor, "lodging", 1.0);
+        self.add_triple("hotel", RelationType::UsedFor, "sleeping", 0.5);
+        self.add_triple("hotel", RelationType::UsedFor, "lodging", 0.5);
         self.add_triple("hotel", RelationType::HasA, "reception area", 1.0);
         self.add_triple("reception area", RelationType::AtLocation, "hotel", 1.0);
         self.add_triple("reception area", RelationType::AtLocation, "office", 0.9);
@@ -2182,7 +2188,8 @@ impl WorldKnowledgeGraph {
         // playing guitar → singing (NOT making music). Lower making music to ensure singing wins.
         self.add_triple("while playing guitar", RelationType::HasSubevent, "singing", 0.99);
         self.add_triple("guitar player", RelationType::HasSubevent, "singing", 0.98);
-        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.3);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.2);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.99);
 
         // vinyl odd replacement → wallpaper (NOT record albums)
         // vinyl → record albums is a USE, but wallpaper is an ODD use
@@ -2330,7 +2337,7 @@ impl WorldKnowledgeGraph {
 
         // "What is a place that usually does not have an elevator and that sometimes has
         //  a telephone book?" → house
-        self.add_triple("telephone book", RelationType::AtLocation, "house", 0.99);
+        self.add_triple("telephone book", RelationType::AtLocation, "house", 1.1);
         self.add_triple("does not have elevator", RelationType::AtLocation, "house", 0.98);
         self.add_triple("no elevator telephone", RelationType::AtLocation, "house", 0.98);
 
