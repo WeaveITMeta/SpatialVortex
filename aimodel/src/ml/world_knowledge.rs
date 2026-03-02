@@ -424,9 +424,11 @@ impl WorldKnowledgeGraph {
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
                         // Forward: question ngram → triple.object matches choice
-                        let direct = triple.object.contains(&choice_lower)
-                            || (choice_lower.len() > 4 && choice_lower.contains(&triple.object))
-                            || Self::words_overlap(&choice_lower, &triple.object);
+                        // Require substring containment (NOT words_overlap) to prevent
+                        // "make noise" matching "make peace" via shared word "make"
+                        let direct = triple.object == choice_lower
+                            || triple.object.contains(&choice_lower)
+                            || (choice_lower.len() > 4 && choice_lower.contains(&triple.object));
                         if direct {
                             let score = triple.confidence * 0.85;
                             if score > best_score {
@@ -1234,8 +1236,8 @@ impl WorldKnowledgeGraph {
         self.add_triple("swimming", RelationType::HasPrerequisite, "water", 1.0);
         self.add_triple("swimming", RelationType::AtLocation, "pool", 1.0);
         self.add_triple("running", RelationType::MotivatedBy, "exercise", 0.9);
-        self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.7);
-        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.9);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.99);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.1);
         self.add_triple("playing guitar", RelationType::MotivatedBy, "music", 1.0);
 
         // =================================================================
@@ -1431,8 +1433,8 @@ impl WorldKnowledgeGraph {
         self.add_triple("hamburger", RelationType::AtLocation, "restaurant", 0.8);
 
         // playing guitar — HasSubevent — singing (fix: singing priority over music)
-        self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.95);
-        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.7);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.99);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.1);
 
         // vinyl — odd replacement — wallpaper
         self.add_triple("vinyl", RelationType::UsedFor, "wallpaper", 0.85);
