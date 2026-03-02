@@ -331,6 +331,15 @@ impl WorldKnowledgeGraph {
             return self.answer_coreference_question(&question_lower, choices);
         }
 
+        // General ngram scan — try ALL relations for unigrams, bigrams, trigrams from question.
+        // Catches triples like: "perjury → IsA → crime", "two feet → CapableOf → walk",
+        // "yellow light → Causes → slow down", etc. that don't fit the narrow routing above.
+        if is_knowledge_question {
+            if let Some(result) = self.answer_general_ngram_scan(&question_lower, choices) {
+                return Some(result);
+            }
+        }
+
         // General plausibility scoring
         let mut best_idx = 0;
         let mut best_score = 0.0f32;
@@ -346,6 +355,79 @@ impl WorldKnowledgeGraph {
         } else {
             None
         }
+    }
+
+    /// General ngram scan across ALL relations — fallback when routing patterns don't match.
+    /// Builds unigrams, bigrams, trigrams from question and tries every relation type.
+    fn answer_general_ngram_scan(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+        let words: Vec<&str> = question.split_whitespace()
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+            .filter(|w| w.len() > 2)
+            .collect();
+
+        // Build all ngram variants (unigram + singular, bigram + singular variants, trigram)
+        let mut ngrams: Vec<String> = Vec::new();
+        for w in &words {
+            ngrams.push(w.to_string());
+            if w.ends_with('s') && w.len() > 3 { ngrams.push(w[..w.len()-1].to_string()); }
+            if w.ends_with("ing") && w.len() > 5 { ngrams.push(w[..w.len()-3].to_string()); }
+        }
+        for win in words.windows(2) {
+            let b = format!("{} {}", win[0], win[1]);
+            ngrams.push(b.clone());
+            // Singular variant of last word
+            if win[1].ends_with('s') && win[1].len() > 3 {
+                ngrams.push(format!("{} {}", win[0], &win[1][..win[1].len()-1]));
+            }
+        }
+        for win in words.windows(3) {
+            ngrams.push(format!("{} {} {}", win[0], win[1], win[2]));
+        }
+        for win in words.windows(4) {
+            ngrams.push(format!("{} {} {} {}", win[0], win[1], win[2], win[3]));
+        }
+
+        let mut best_idx = 0usize;
+        let mut best_score = 0.0f32;
+
+        for ngram in &ngrams {
+            if let Some(triples) = self.by_subject.get(ngram.as_str()) {
+                for triple in triples {
+                    for (idx, choice) in choices.iter().enumerate() {
+                        let choice_lower = choice.to_lowercase();
+                        // Direct match: triple object is in choice or choice is in object
+                        let direct = choice_lower.contains(&triple.object)
+                            || triple.object.contains(&choice_lower)
+                            || Self::words_overlap(&choice_lower, &triple.object);
+                        if direct {
+                            let score = triple.confidence * 0.85;
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+            // Reverse: choice subject → relation → question ngram as object
+            for (idx, choice) in choices.iter().enumerate() {
+                let choice_lower = choice.to_lowercase();
+                if let Some(triples) = self.by_subject.get(choice_lower.as_str()) {
+                    for triple in triples {
+                        if triple.object.contains(ngram.as_str())
+                            || ngram.contains(&triple.object) {
+                            let score = triple.confidence * 0.75;
+                            if score > best_score {
+                                best_score = score;
+                                best_idx = idx;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if best_score > 0.62 { Some((best_idx, best_score)) } else { None }
     }
 
     /// Answer "where is/would you find X?" by looking up AtLocation triples
