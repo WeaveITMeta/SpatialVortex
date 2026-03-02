@@ -471,7 +471,7 @@ impl WorldKnowledgeGraph {
             }
         }
 
-        if best_score > 0.62 { Some((best_idx, best_score)) } else { None }
+        if best_score > 0.50 { Some((best_idx, best_score)) } else { None }
     }
 
     /// Answer "where is/would you find X?" by looking up AtLocation triples
@@ -484,10 +484,16 @@ impl WorldKnowledgeGraph {
         let mut best_idx = 0;
         let mut best_score = 0.0f32;
 
-        // Build concept variants including singular forms
+        // Build concept variants including singular forms and possessive stripping
         let mut concept_variants: Vec<String> = Vec::new();
         for concept in &words {
-            let c = concept.trim_matches(|c: char| !c.is_alphanumeric());
+            let trimmed = concept.trim_matches(|c: char| !c.is_alphanumeric());
+            // Strip possessive: "heifer's" → "heifer"
+            let c = if trimmed.ends_with("'s") {
+                &trimmed[..trimmed.len()-2]
+            } else {
+                trimmed
+            };
             concept_variants.push(c.to_string());
             if c.ends_with('s') && c.len() > 3 { concept_variants.push(c[..c.len()-1].to_string()); }
             if c.ends_with("ing") && c.len() > 4 { concept_variants.push(c[..c.len()-3].to_string()); }
@@ -1307,10 +1313,10 @@ impl WorldKnowledgeGraph {
         self.add_triple("hotel", RelationType::UsedFor, "sleeping", 0.5);
         self.add_triple("hotel", RelationType::UsedFor, "lodging", 0.5);
         self.add_triple("hotel", RelationType::HasA, "reception area", 1.0);
-        self.add_triple("reception area", RelationType::AtLocation, "hotel", 1.0);
-        self.add_triple("reception area", RelationType::AtLocation, "office", 0.9);
-        self.add_triple("reception area", RelationType::AtLocation, "hospital", 0.9);
-        self.add_triple("reception area", RelationType::HasA, "people", 0.9);
+        self.add_triple("reception area", RelationType::AtLocation, "hotel", 0.4);
+        self.add_triple("reception area", RelationType::AtLocation, "office", 0.4);
+        self.add_triple("reception area", RelationType::AtLocation, "hospital", 0.4);
+        self.add_triple("reception area", RelationType::HasA, "people", 1.0);
         self.add_triple("waiting room", RelationType::HasA, "people", 0.9);
         self.add_triple("park", RelationType::UsedFor, "recreation", 1.0);
         self.add_triple("park", RelationType::HasA, "trees", 0.9);
