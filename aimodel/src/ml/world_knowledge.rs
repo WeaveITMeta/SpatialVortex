@@ -358,14 +358,15 @@ impl WorldKnowledgeGraph {
     }
 
     /// General ngram scan across ALL relations — fallback when routing patterns don't match.
-    /// Builds unigrams, bigrams, trigrams from question and tries every relation type.
+    /// Builds unigrams/bigrams/trigrams/fourgrams/fivegrams from question, tries every relation.
+    /// Scores are tracked globally; highest confident match wins.
     fn answer_general_ngram_scan(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
         let words: Vec<&str> = question.split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
             .filter(|w| w.len() > 2)
             .collect();
 
-        // Build all ngram variants (unigram + singular, bigram + singular variants, trigram)
+        // Build all ngram variants (unigram + singular, bigram + singular variants, trigram, fourgram)
         let mut ngrams: Vec<String> = Vec::new();
         for w in &words {
             ngrams.push(w.to_string());
@@ -375,7 +376,6 @@ impl WorldKnowledgeGraph {
         for win in words.windows(2) {
             let b = format!("{} {}", win[0], win[1]);
             ngrams.push(b.clone());
-            // Singular variant of last word
             if win[1].ends_with('s') && win[1].len() > 3 {
                 ngrams.push(format!("{} {}", win[0], &win[1][..win[1].len()-1]));
             }
@@ -386,6 +386,9 @@ impl WorldKnowledgeGraph {
         for win in words.windows(4) {
             ngrams.push(format!("{} {} {} {}", win[0], win[1], win[2], win[3]));
         }
+        for win in words.windows(5) {
+            ngrams.push(format!("{} {} {} {} {}", win[0], win[1], win[2], win[3], win[4]));
+        }
 
         let mut best_idx = 0usize;
         let mut best_score = 0.0f32;
@@ -395,9 +398,9 @@ impl WorldKnowledgeGraph {
                 for triple in triples {
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
-                        // Direct match: triple object is in choice or choice is in object
-                        let direct = choice_lower.contains(&triple.object)
-                            || triple.object.contains(&choice_lower)
+                        // Forward: question ngram → triple.object matches choice
+                        let direct = triple.object.contains(&choice_lower)
+                            || (choice_lower.len() > 4 && choice_lower.contains(&triple.object))
                             || Self::words_overlap(&choice_lower, &triple.object);
                         if direct {
                             let score = triple.confidence * 0.85;
@@ -410,12 +413,16 @@ impl WorldKnowledgeGraph {
                 }
             }
             // Reverse: choice subject → relation → question ngram as object
+            // Only use reverse if the triple object matches the ngram at word boundaries
+            // (prevents "train" matching "training station" etc.)
             for (idx, choice) in choices.iter().enumerate() {
                 let choice_lower = choice.to_lowercase();
                 if let Some(triples) = self.by_subject.get(choice_lower.as_str()) {
                     for triple in triples {
-                        if triple.object.contains(ngram.as_str())
-                            || ngram.contains(&triple.object) {
+                        // Require exact equality or clear word overlap (NOT substring containment)
+                        let rev_match = triple.object == ngram.as_str()
+                            || (triple.object.len() > 3 && Self::words_overlap(ngram, &triple.object));
+                        if rev_match {
                             let score = triple.confidence * 0.75;
                             if score > best_score {
                                 best_score = score;
