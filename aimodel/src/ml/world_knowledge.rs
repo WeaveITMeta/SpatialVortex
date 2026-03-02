@@ -586,9 +586,9 @@ impl WorldKnowledgeGraph {
                     if !motivation_relations.contains(&triple.relation) { continue; }
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
-                        if choice_lower.contains(&triple.object)
-                            || triple.object.contains(&choice_lower)
-                            || Self::words_overlap(&choice_lower, &triple.object) {
+                        if triple.object == choice_lower
+                            || choice_lower.contains(&triple.object)
+                            || (triple.object.len() > 4 && triple.object.contains(&choice_lower)) {
                             let score = triple.confidence * 0.80;
                             if score > best_score {
                                 best_score = score;
@@ -636,9 +636,9 @@ impl WorldKnowledgeGraph {
                     if !event_relations.contains(&triple.relation) { continue; }
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
-                        if choice_lower.contains(&triple.object)
-                            || triple.object.contains(&choice_lower)
-                            || Self::words_overlap(&choice_lower, &triple.object) {
+                        if triple.object == choice_lower
+                            || choice_lower.contains(&triple.object)
+                            || (triple.object.len() > 4 && triple.object.contains(&choice_lower)) {
                             let score = triple.confidence * 0.78;
                             if score > best_score {
                                 best_score = score;
@@ -671,9 +671,9 @@ impl WorldKnowledgeGraph {
                 for triple in triples {
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
-                        if choice_lower.contains(&triple.object)
-                            || triple.object.contains(choice_lower.as_str())
-                            || Self::words_overlap(&choice_lower, &triple.object) {
+                        if triple.object == choice_lower
+                            || choice_lower.contains(&triple.object)
+                            || (triple.object.len() > 4 && triple.object.contains(choice_lower.as_str())) {
                             scores[idx] += triple.confidence * 0.5;
                         }
                     }
