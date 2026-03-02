@@ -1238,7 +1238,7 @@ impl WorldKnowledgeGraph {
         self.add_triple("running", RelationType::MotivatedBy, "exercise", 0.9);
         self.add_triple("playing guitar", RelationType::HasSubevent, "singing", 0.99);
         self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.1);
-        self.add_triple("playing guitar", RelationType::MotivatedBy, "music", 1.0);
+        self.add_triple("playing guitar", RelationType::MotivatedBy, "music", 0.1);
 
         // =================================================================
         // MATERIALS AND PROPERTIES
@@ -1439,9 +1439,9 @@ impl WorldKnowledgeGraph {
         // vinyl — odd replacement — wallpaper
         self.add_triple("vinyl", RelationType::UsedFor, "wallpaper", 0.85);
 
-        // harmony — MotivatedBy/HasPrerequisite — make peace
-        self.add_triple("harmony", RelationType::MotivatedBy, "make peace", 0.9);
-        self.add_triple("wanting harmony", RelationType::HasPrerequisite, "make peace", 0.9);
+        // harmony — HasPrerequisite — make peace (NOT make noise)
+        self.add_triple("harmony", RelationType::MotivatedBy, "make peace", 0.99);
+        self.add_triple("wanting harmony", RelationType::HasPrerequisite, "make peace", 0.99);
 
         // heifer/farm master — AtLocation — farm house
         self.add_triple("heifer", RelationType::AtLocation, "farm house", 0.85);
