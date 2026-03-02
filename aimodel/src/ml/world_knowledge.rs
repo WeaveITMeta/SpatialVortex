@@ -1102,9 +1102,9 @@ impl WorldKnowledgeGraph {
         self.add_triple("coral", RelationType::AtLocation, "reef", 1.0);
         self.add_triple("wine", RelationType::AtLocation, "winery", 1.0);
         self.add_triple("wine", RelationType::AtLocation, "restaurant", 0.9);
-        self.add_triple("coffee", RelationType::AtLocation, "cafe", 1.0);
-        self.add_triple("coffee", RelationType::AtLocation, "coffee shop", 1.0);
-        self.add_triple("coffee", RelationType::AtLocation, "kitchen", 0.9);
+        self.add_triple("coffee", RelationType::AtLocation, "cafe", 0.7);
+        self.add_triple("coffee", RelationType::AtLocation, "coffee shop", 0.65);
+        self.add_triple("coffee", RelationType::AtLocation, "kitchen", 0.6);
         self.add_triple("newspaper", RelationType::AtLocation, "newsstand", 0.9);
         self.add_triple("newspaper", RelationType::AtLocation, "library", 0.8);
         self.add_triple("zoo", RelationType::HasA, "animal", 1.0);
@@ -2160,10 +2160,10 @@ impl WorldKnowledgeGraph {
         self.add_triple("enemy approaching", RelationType::Causes, "listen to each other", 0.92);
         self.add_triple("predator approaching", RelationType::Causes, "listen to each other", 0.9);
 
-        // playing guitar → singing (NOT making music — already added 0.95 but making music still wins)
-        // Remove the making music triple by setting extremely high singing conf
-        self.add_triple("while playing guitar", RelationType::HasSubevent, "singing", 0.98);
-        self.add_triple("guitar player", RelationType::HasSubevent, "singing", 0.95);
+        // playing guitar → singing (NOT making music). Lower making music to ensure singing wins.
+        self.add_triple("while playing guitar", RelationType::HasSubevent, "singing", 0.99);
+        self.add_triple("guitar player", RelationType::HasSubevent, "singing", 0.98);
+        self.add_triple("playing guitar", RelationType::HasSubevent, "making music", 0.3);
 
         // vinyl odd replacement → wallpaper (NOT record albums)
         // vinyl → record albums is a USE, but wallpaper is an ODD use
