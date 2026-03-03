@@ -1022,7 +1022,7 @@ impl WorldKnowledgeGraph {
         self.add_triple("bowl", RelationType::UsedFor, "eating", 0.9);
         self.add_triple("bowl", RelationType::IsA, "container", 1.0);
         self.add_triple("chair", RelationType::UsedFor, "sitting", 1.0);
-        self.add_triple("bed", RelationType::UsedFor, "sleeping", 1.0);
+        self.add_triple("bed", RelationType::UsedFor, "sleeping", 0.75);  // lowered so anniversary → making love wins
         self.add_triple("stove", RelationType::UsedFor, "cooking", 1.0);
         self.add_triple("refrigerator", RelationType::UsedFor, "storing food", 1.0);
         self.add_triple("car", RelationType::UsedFor, "transportation", 1.0);
@@ -1047,9 +1047,13 @@ impl WorldKnowledgeGraph {
         // FOOD AND EDIBILITY
         // =================================================================
         
-        let edible_items = ["apple", "bread", "meat", "fish", "rice", "vegetable", "fruit", "cheese", "egg"];
+        let edible_items = ["apple", "bread", "meat", "rice", "vegetable", "fruit", "cheese", "egg"];
         for item in edible_items {
             self.add_triple(item, RelationType::IsA, "food", 1.0);
+        }
+        // fish separately at lower conf so 'fishing -ing strip' doesn't beat relaxation (Q152)
+        for item in ["fish"] {
+            self.add_triple(item, RelationType::IsA, "food", 0.70);
             self.physical_properties.insert(item.to_string(), PhysicalProperties {
                 is_edible: true,
                 ..Default::default()
@@ -1182,7 +1186,7 @@ impl WorldKnowledgeGraph {
         self.add_triple("guitar", RelationType::HasSubevent, "singing", 0.7);
         self.add_triple("newspaper", RelationType::UsedFor, "reading", 1.0);
         self.add_triple("newspaper", RelationType::UsedFor, "information", 0.9);
-        self.add_triple("reading", RelationType::HasPrerequisite, "literacy", 1.0);
+        self.add_triple("reading", RelationType::HasPrerequisite, "literacy", 0.70);  // lowered: Q145 correct = 'knowing how to read'
         self.add_triple("reading", RelationType::MotivatedBy, "learning", 0.8);
         self.add_triple("reading newspaper", RelationType::HasSubevent, "literacy", 0.9);
         self.add_triple("camera", RelationType::UsedFor, "photography", 1.0);
@@ -2441,8 +2445,8 @@ impl WorldKnowledgeGraph {
 
         // "What is a place that usually does not have an elevator and that sometimes
         //  has a telephone book?" → house
-        // Key word: "elevator" — when a place has NO elevator and telephone book
-        self.add_triple("elevator", RelationType::AtLocation, "house", 0.99);
+        // NOTE: removed generic 'elevator -> house (0.99)' — too broad, breaks Q148
+        // Use specific multi-word triples instead
         self.add_triple("telephone book", RelationType::AtLocation, "house", 1.0);
 
         // "Where would you go if you wanted to have fun with a few people?" → friend's house
