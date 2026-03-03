@@ -508,9 +508,10 @@ impl WorldKnowledgeGraph {
                     // Check which choice matches this location
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
-                        if choice_lower.contains(&triple.object)
-                            || triple.object.contains(&choice_lower)
-                            || Self::words_overlap(&choice_lower, &triple.object) {
+                        let direct = choice_lower == triple.object
+                            || choice_lower.contains(&triple.object)
+                            || (triple.object.len() > 4 && triple.object.contains(&choice_lower));
+                        if direct {
                             let score = triple.confidence * 0.85;
                             if score > best_score {
                                 best_score = score;
@@ -567,9 +568,10 @@ impl WorldKnowledgeGraph {
                     if triple.relation != RelationType::AtLocation { continue; }
                     for (idx, choice) in choices.iter().enumerate() {
                         let choice_lower = choice.to_lowercase();
-                        if choice_lower.contains(&triple.object)
-                            || triple.object.contains(&choice_lower)
-                            || Self::words_overlap(&choice_lower, &triple.object) {
+                        let direct = choice_lower == triple.object
+                            || choice_lower.contains(&triple.object)
+                            || (triple.object.len() > 4 && triple.object.contains(&choice_lower));
+                        if direct {
                             let score = triple.confidence * 0.90;
                             if score > best_score {
                                 best_score = score;
