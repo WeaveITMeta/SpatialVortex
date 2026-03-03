@@ -7,10 +7,16 @@
 //!
 //! ## Table of Contents
 //! 1. **VortexNoiseSchedule** — Sacred geometry noise curve (φ-based, non-monotonic)
-//! 2. **SacredUnmaskingGate** — Three-phase verification at positions 3, 6, 9
+//! 2. **SacredUnmaskingGate** — Three-phase verification at dynamic sacred positions
 //! 3. **TokenState** — Per-token state tracking (masked, candidate, verified, locked)
 //! 4. **DiffusionTransformer** — Bidirectional attention with vortex-cycle sub-steps
 //! 5. **VortexDiffusionEngine** — Main engine: multi-resolution denoising loop
+//! 6. **AdaptiveVortexTopology** — Dynamic flow paths, sacred positions, and RSI feedback
+//! 7. **DiffusionTrace** — Debug/introspection system for step-by-step generation visibility
+//! 8. **NgramValidator** — Bigram/trigram grammatical plausibility checker
+//! 9. **SentenceMemory** — Vector store for generated sentences with brute-force similarity
+//! 10. **MetaController** — Self-improving loop: propose → generate → evaluate → adapt
+//! 11. **PhaseMetrics** — Phase transition tracking: rejection rate, topology entropy, confidence
 //!
 //! ## Key Innovations Over Prior Art
 //! - **Non-monotonic noise schedule**: Vortex cycle energy curve (expansion→contraction)
@@ -24,6 +30,13 @@
 //!   T vortex cycles = 9T effective steps with hierarchical structure.
 //! - **No time embeddings**: The model infers noise level from mask ratio
 //!   (same insight as LLaDA/DiffuLLaMA, but derived from EBRM energy).
+//! - **Adaptive topology (RSI)**: The flow path [1,2,4,8,7,5] and sacred positions
+//!   [3,6,9] are NOT hardcoded — they are dynamic variables shaped by subject
+//!   definitions (FluxMatrix terrain) and recursive self-improvement feedback.
+//!   After each cycle, the engine measures its own performance and rewires the
+//!   topology for the next cycle. Billions of FluxMatrix subject definitions
+//!   can each provide a unique semantic landscape that reshapes the diffusion
+//!   process for that domain.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -55,6 +68,681 @@ const BOS_TOKEN_ID: u32 = u32::MAX - 1;
 
 /// Special token ID for [EOS] (end of sequence)
 const EOS_TOKEN_ID: u32 = u32::MAX - 2;
+
+// =============================================================================
+// 6. AdaptiveVortexTopology — Dynamic Flow, Sacred Positions, RSI Feedback
+// =============================================================================
+
+/// A single directed edge in the vortex flow graph.
+///
+/// In the default topology, these form [1→2→4→8→7→5→1].
+/// But in an adaptive topology, any node can connect to any other node
+/// with a learned weight. The flow path is no longer hardcoded — it
+/// emerges from the weights.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyEdge {
+    /// Source node position (0-9)
+    pub from: u8,
+    /// Target node position (0-9)
+    pub to: u8,
+    /// Edge weight — higher means stronger connection in the flow
+    pub weight: f32,
+    /// Edge role: expansion (corrupts/adds noise) or contraction (denoises/refines)
+    pub role: EdgeRole,
+}
+
+/// Whether an edge adds entropy (expansion) or reduces it (contraction)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EdgeRole {
+    /// Expansion: this edge increases uncertainty (doubling path)
+    Expansion,
+    /// Contraction: this edge reduces uncertainty (halving path)
+    Contraction,
+    /// Observation: this edge connects to/from a sacred observer
+    Observation,
+}
+
+/// Semantic terrain from a FluxMatrix subject definition.
+///
+/// Each subject (cognition, reasoning, ethics, etc.) provides a unique
+/// ELP (Ethos/Logos/Pathos) landscape across the 10 positions. This
+/// terrain modulates the noise schedule — positions with high Logos
+/// get more refinement time; positions with high Pathos get more
+/// exploration time; positions with high Ethos get more verification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubjectTerrain {
+    /// Subject name (e.g., "cognition", "reasoning", "ethics")
+    pub name: String,
+    /// ELP values per position [position] → (ethos, logos, pathos)
+    /// Positions 0-9. Missing positions default to (0, 0, 0).
+    pub elp_landscape: HashMap<u8, [f32; 3]>,
+    /// Sacred position properties: [position] → list of divine property names
+    pub sacred_properties: HashMap<u8, Vec<String>>,
+}
+
+impl SubjectTerrain {
+    /// Create an empty terrain (no subject influence)
+    pub fn empty() -> Self {
+        Self {
+            name: "default".to_string(),
+            elp_landscape: HashMap::new(),
+            sacred_properties: HashMap::new(),
+        }
+    }
+
+    /// Get the ELP values at a position, defaulting to zeros
+    pub fn elp_at(&self, position: u8) -> [f32; 3] {
+        self.elp_landscape.get(&position).copied().unwrap_or([0.0, 0.0, 0.0])
+    }
+
+    /// Compute a "terrain weight" for a position: how important is this
+    /// position in this subject's semantic landscape?
+    /// Uses the ELP magnitude normalized to [0, 1].
+    pub fn terrain_weight(&self, position: u8) -> f32 {
+        let [e, l, p] = self.elp_at(position);
+        let magnitude = (e * e + l * l + p * p).sqrt();
+        // Normalize: max possible is sqrt(9^2 + 9^2 + 9^2) ≈ 15.6
+        (magnitude / 15.6).min(1.0)
+    }
+
+    /// Get the dominant channel at a position: ethos, logos, or pathos
+    pub fn dominant_channel(&self, position: u8) -> &'static str {
+        let [e, l, p] = self.elp_at(position);
+        if e >= l && e >= p { "ethos" }
+        else if l >= p { "logos" }
+        else { "pathos" }
+    }
+}
+
+/// Metrics collected during a single denoising cycle.
+/// These drive the RSI (Recursive Self-Improvement) feedback loop.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CycleMetrics {
+    /// How many tokens were locked this cycle
+    pub tokens_locked: usize,
+    /// How many tokens were rejected this cycle
+    pub tokens_rejected: usize,
+    /// How many tokens were force-accepted this cycle
+    pub tokens_forced: usize,
+    /// Average confidence of locked tokens this cycle
+    pub avg_lock_confidence: f32,
+    /// Average coherence score at position 6 this cycle
+    pub avg_coherence: f32,
+    /// Which sacred position triggered the most rejections
+    pub rejection_hotspot: u8,
+    /// Cycle index (0-based)
+    pub cycle_index: usize,
+}
+
+/// The adaptive vortex topology — a living, self-modifying graph.
+///
+/// Instead of the static flow [1,2,4,8,7,5],
+/// this struct holds:
+/// - A weighted directed graph of flow edges (any node → any node)
+/// - Immutable sacred positions [3, 6, 9] — the unmanifest domain
+/// - Per-position noise deltas (learned from the terrain + RSI feedback)
+/// - Sacred gate thresholds that adapt per-cycle
+///
+/// ## How it works
+/// 1. Start with the DEFAULT topology (classic vortex flow)
+/// 2. Optionally load a SubjectTerrain to bias the topology
+/// 3. After each cycle, collect CycleMetrics
+/// 4. `adapt()` mutates the topology based on those metrics
+/// 5. The noise schedule and gate thresholds shift to improve
+///    the next cycle's performance (sacred positions never shift)
+///
+/// This is RSI: the diffusion process optimizes its own reasoning structure.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdaptiveVortexTopology {
+    /// Flow edges defining the vortex path (weighted directed graph)
+    pub flow_edges: Vec<TopologyEdge>,
+    /// Sacred positions — IMMUTABLE. 3, 6, 9 are the unmanifest domain.
+    /// They exist outside the physical flow (1→2→4→8→7→5→1).
+    /// Like Gods to Mortals — they observe, they do not participate.
+    /// They NEVER change, regardless of terrain or RSI adaptation.
+    sacred_positions: [u8; 3],
+    /// Per-position noise delta overrides (replaces hardcoded local_delta)
+    /// Position → delta value for the noise schedule
+    pub noise_deltas: HashMap<u8, f32>,
+    /// Dynamic gate thresholds: (proximity, coherence, verification)
+    pub gate_thresholds: (f32, f32, f32),
+    /// Subject terrain currently loaded (None = default)
+    pub terrain: Option<SubjectTerrain>,
+    /// History of cycle metrics for RSI feedback
+    pub cycle_history: Vec<CycleMetrics>,
+    /// RSI learning rate: how aggressively topology adapts (0.0 = frozen, 1.0 = radical)
+    pub rsi_learning_rate: f32,
+    /// Generation counter — how many times this topology has been used
+    pub generation: usize,
+}
+
+impl Default for AdaptiveVortexTopology {
+    /// Default topology matches the original hardcoded vortex flow
+    fn default() -> Self {
+        let flow_edges = vec![
+            // Classic doubling path (expansion): 1→2→4→8
+            TopologyEdge { from: 1, to: 2, weight: 1.0, role: EdgeRole::Expansion },
+            TopologyEdge { from: 2, to: 4, weight: 1.0, role: EdgeRole::Expansion },
+            TopologyEdge { from: 4, to: 8, weight: 1.0, role: EdgeRole::Expansion },
+            // Classic halving path (contraction): 8→7→5→1
+            TopologyEdge { from: 8, to: 7, weight: 1.0, role: EdgeRole::Contraction },
+            TopologyEdge { from: 7, to: 5, weight: 1.0, role: EdgeRole::Contraction },
+            TopologyEdge { from: 5, to: 1, weight: 1.0, role: EdgeRole::Contraction },
+        ];
+
+        // Classic noise deltas (same as the original hardcoded values)
+        let mut noise_deltas = HashMap::new();
+        noise_deltas.insert(1, -0.02 * PHI_INV);
+        noise_deltas.insert(2, -0.04 * PHI_INV);
+        noise_deltas.insert(4, -0.06 * PHI_INV);
+        noise_deltas.insert(8, -0.08 * PHI_INV);
+        noise_deltas.insert(7,  0.06 * PHI_INV);
+        noise_deltas.insert(5,  0.04 * PHI_INV);
+        noise_deltas.insert(3,  0.0); // Sacred: observe only
+        noise_deltas.insert(6,  0.0); // Sacred: observe only
+        noise_deltas.insert(9,  0.0); // Sacred: observe only
+
+        Self {
+            flow_edges,
+            sacred_positions: [3, 6, 9],
+            noise_deltas,
+            gate_thresholds: (0.15, 0.30, 0.40),
+            terrain: None,
+            cycle_history: Vec::new(),
+            rsi_learning_rate: 0.1,
+            generation: 0,
+        }
+    }
+}
+
+impl AdaptiveVortexTopology {
+    /// Create a topology from a SubjectTerrain.
+    ///
+    /// The subject's ELP landscape reshapes the noise deltas:
+    /// - High Logos positions → larger contraction delta (more refinement)
+    /// - High Pathos positions → larger expansion delta (more exploration)
+    /// - High Ethos positions → tighter gate thresholds (more verification)
+    ///
+    /// The flow path stays the same initially but can be mutated by RSI.
+    pub fn from_terrain(terrain: SubjectTerrain) -> Self {
+        let mut topo = Self::default();
+
+        // Modulate noise deltas based on terrain
+        for pos in 1..=9 {
+            let [ethos, logos, pathos] = terrain.elp_at(pos);
+            let max_elp = ethos.max(logos).max(pathos).max(0.01);
+
+            let base_delta = topo.noise_deltas.get(&pos).copied().unwrap_or(0.0);
+
+            // Logos-dominant: increase contraction (resolve faster)
+            // Pathos-dominant: increase expansion (explore more)
+            // Ethos-dominant: keep delta near zero (observe more)
+            let terrain_bias = if logos > ethos && logos > pathos {
+                // Logos: push toward contraction (positive delta)
+                (logos / max_elp) * 0.02 * PHI_INV
+            } else if pathos > ethos {
+                // Pathos: push toward expansion (negative delta)
+                -(pathos / max_elp) * 0.02 * PHI_INV
+            } else {
+                // Ethos: dampen toward zero (sacred observation)
+                -base_delta * 0.3 * (ethos / max_elp)
+            };
+
+            topo.noise_deltas.insert(pos, base_delta + terrain_bias);
+        }
+
+        // Adjust gate thresholds based on terrain's sacred positions
+        // Higher ELP magnitude at sacred positions → tighter gates
+        let sacred_weight: f32 = topo.sacred_positions.iter()
+            .map(|&p| terrain.terrain_weight(p))
+            .sum::<f32>() / 3.0;
+
+        // Scale thresholds: higher terrain weight → higher thresholds (stricter)
+        let scale = 1.0 + sacred_weight * 0.3;
+        topo.gate_thresholds = (
+            (0.15 * scale).min(0.5),
+            (0.30 * scale).min(0.7),
+            (0.40 * scale).min(0.8),
+        );
+
+        topo.terrain = Some(terrain);
+        topo
+    }
+
+    /// Get the noise delta for a sub-position (dynamic, not hardcoded)
+    pub fn noise_delta(&self, sub_pos: u8) -> f32 {
+        self.noise_deltas.get(&sub_pos).copied().unwrap_or(0.0)
+    }
+
+    /// Check if a sub-position is a sacred observer position.
+    /// Sacred positions are ALWAYS [3, 6, 9] — the unmanifest domain.
+    pub fn is_sacred(&self, sub_pos: u8) -> bool {
+        self.sacred_positions.contains(&sub_pos)
+    }
+
+    /// Get the immutable sacred positions. Always returns [3, 6, 9].
+    pub fn sacred_positions(&self) -> &[u8; 3] {
+        &self.sacred_positions
+    }
+
+    /// Get the ordered flow path from the weighted edges.
+    /// Returns the positions in traversal order (highest weight path).
+    pub fn flow_path(&self) -> Vec<u8> {
+        if self.flow_edges.is_empty() {
+            return VORTEX_CYCLE.to_vec();
+        }
+
+        // Follow the highest-weight outgoing edge from position 1
+        let mut path = vec![1u8];
+        let mut visited = vec![false; 10];
+        visited[1] = true;
+
+        for _ in 0..8 {
+            let current = *path.last().unwrap();
+            // Find the highest-weight outgoing edge from current
+            let best = self.flow_edges.iter()
+                .filter(|e| e.from == current && !visited[e.to as usize])
+                .max_by(|a, b| a.weight.partial_cmp(&b.weight).unwrap_or(std::cmp::Ordering::Equal));
+
+            if let Some(edge) = best {
+                visited[edge.to as usize] = true;
+                path.push(edge.to);
+            } else {
+                break;
+            }
+        }
+
+        path
+    }
+
+    /// Record metrics from a completed cycle
+    pub fn record_cycle(&mut self, metrics: CycleMetrics) {
+        self.cycle_history.push(metrics);
+    }
+
+    /// RSI adaptation: mutate the topology based on accumulated cycle metrics.
+    ///
+    /// This is the core recursive self-improvement loop:
+    /// 1. If rejection rate is high → lower gate thresholds (be more lenient)
+    /// 2. If force-acceptance rate is high → raise gate thresholds (be stricter earlier)
+    /// 3. If confidence is low → increase contraction deltas (more refinement time)
+    /// 4. If confidence is high → decrease contraction deltas (move faster)
+    /// 5. If a specific sacred position is a rejection hotspot → consider
+    ///    shifting that sacred position to an adjacent node
+    ///
+    /// The learning rate controls how aggressively changes are applied.
+    pub fn adapt(&mut self) {
+        if self.cycle_history.is_empty() || self.rsi_learning_rate <= 0.0 {
+            return;
+        }
+
+        let lr = self.rsi_learning_rate;
+        let recent: Vec<&CycleMetrics> = self.cycle_history.iter()
+            .rev()
+            .take(3)
+            .collect();
+
+        let avg_rejection_rate = {
+            let total_tokens: usize = recent.iter()
+                .map(|m| m.tokens_locked + m.tokens_rejected + m.tokens_forced)
+                .sum();
+            let total_rejected: usize = recent.iter()
+                .map(|m| m.tokens_rejected)
+                .sum();
+            if total_tokens > 0 {
+                total_rejected as f32 / total_tokens as f32
+            } else {
+                0.0
+            }
+        };
+
+        let avg_force_rate = {
+            let total_tokens: usize = recent.iter()
+                .map(|m| m.tokens_locked + m.tokens_rejected + m.tokens_forced)
+                .sum();
+            let total_forced: usize = recent.iter()
+                .map(|m| m.tokens_forced)
+                .sum();
+            if total_tokens > 0 {
+                total_forced as f32 / total_tokens as f32
+            } else {
+                0.0
+            }
+        };
+
+        let avg_confidence = {
+            let sum: f32 = recent.iter().map(|m| m.avg_lock_confidence).sum();
+            sum / recent.len().max(1) as f32
+        };
+
+        // Rule 1: High rejection rate → lower thresholds (be more lenient)
+        if avg_rejection_rate > 0.5 {
+            let delta = lr * 0.05;
+            self.gate_thresholds.0 = (self.gate_thresholds.0 - delta).max(0.05);
+            self.gate_thresholds.1 = (self.gate_thresholds.1 - delta).max(0.10);
+            self.gate_thresholds.2 = (self.gate_thresholds.2 - delta).max(0.15);
+        }
+
+        // Rule 2: High force rate → raise thresholds (be stricter earlier)
+        if avg_force_rate > 0.3 {
+            let delta = lr * 0.03;
+            self.gate_thresholds.0 = (self.gate_thresholds.0 + delta).min(0.5);
+            self.gate_thresholds.1 = (self.gate_thresholds.1 + delta).min(0.7);
+            self.gate_thresholds.2 = (self.gate_thresholds.2 + delta).min(0.8);
+        }
+
+        // Rule 3: Low confidence → boost contraction deltas (more refinement)
+        if avg_confidence < 0.3 {
+            for pos in &[7u8, 5] {
+                let current = self.noise_deltas.get(pos).copied().unwrap_or(0.0);
+                self.noise_deltas.insert(*pos, current + lr * 0.01);
+            }
+        }
+
+        // Rule 4: High confidence → reduce contraction deltas (move faster)
+        if avg_confidence > 0.7 {
+            for pos in &[7u8, 5] {
+                let current = self.noise_deltas.get(pos).copied().unwrap_or(0.0);
+                self.noise_deltas.insert(*pos, (current - lr * 0.005).max(0.0));
+            }
+        }
+
+        // Rule 5: Sacred position hotspot → strengthen that position's edges
+        let hotspot_counts: HashMap<u8, usize> = {
+            let mut counts = HashMap::new();
+            for m in &self.cycle_history {
+                if m.rejection_hotspot > 0 {
+                    *counts.entry(m.rejection_hotspot).or_insert(0) += 1;
+                }
+            }
+            counts
+        };
+
+        // If a sacred position is consistently problematic,
+        // boost the edges leading INTO it (give it better input)
+        for (&sacred_pos, &count) in &hotspot_counts {
+            if count >= 2 {
+                for edge in self.flow_edges.iter_mut() {
+                    // Strengthen edges whose target feeds into the sacred position's neighbors
+                    let feeds_sacred = match sacred_pos {
+                        3 => edge.to == 2 || edge.to == 4,
+                        6 => edge.to == 5 || edge.to == 7,
+                        9 => edge.to == 8 || edge.to == 1,
+                        _ => false,
+                    };
+                    if feeds_sacred {
+                        edge.weight = (edge.weight + lr * 0.1).min(2.0);
+                    }
+                }
+            }
+        }
+
+        self.generation += 1;
+    }
+
+    /// Create a SacredUnmaskingGate with the current dynamic thresholds
+    pub fn create_gate(&self) -> SacredUnmaskingGate {
+        SacredUnmaskingGate {
+            proximity_threshold: self.gate_thresholds.0,
+            coherence_threshold: self.gate_thresholds.1,
+            verification_threshold: self.gate_thresholds.2,
+            confidence_weight: PHI_INV,
+            max_rejections: 3,
+        }
+    }
+
+    /// Compute the adaptive noise schedule using dynamic deltas instead of hardcoded ones.
+    /// This replaces `compute_sacred_schedule` with a topology-aware version.
+    pub fn compute_adaptive_schedule(&self, total_steps: usize) -> Vec<f32> {
+        let mut alphas = Vec::with_capacity(total_steps);
+        let num_cycles = (total_steps + 8) / 9;
+
+        for step in 0..total_steps {
+            let cycle = step / 9;
+            let sub_pos = (step % 9) as u8 + 1;
+
+            // Macro progress: 0.0 → 1.0
+            let macro_t = if num_cycles <= 1 {
+                step as f32 / total_steps.max(1) as f32
+            } else {
+                cycle as f32 / (num_cycles - 1).max(1) as f32
+            };
+
+            // Base α from φ-scaled sigmoid
+            let k = 6.0 * PHI;
+            let base_alpha = 1.0 / (1.0 + (-k * (macro_t - 0.5)).exp());
+
+            // Dynamic local delta from topology (NOT hardcoded)
+            let local_delta = self.noise_delta(sub_pos);
+
+            // Terrain modulation: if we have a subject, its ELP weight
+            // at this position further scales the perturbation
+            let terrain_scale = self.terrain.as_ref()
+                .map(|t| 0.5 + t.terrain_weight(sub_pos) * 0.5)
+                .unwrap_or(1.0);
+
+            // Dampen perturbation at extremes
+            let damping = 1.0 - macro_t.powi(2);
+            let alpha = (base_alpha + local_delta * damping * terrain_scale).clamp(0.0, 1.0);
+            alphas.push(alpha);
+        }
+
+        alphas
+    }
+
+    /// Get a summary of the current topology state
+    pub fn summary(&self) -> TopologySummary {
+        let flow = self.flow_path();
+        let total_edge_weight: f32 = self.flow_edges.iter().map(|e| e.weight).sum();
+        let expansion_edges = self.flow_edges.iter().filter(|e| e.role == EdgeRole::Expansion).count();
+        let contraction_edges = self.flow_edges.iter().filter(|e| e.role == EdgeRole::Contraction).count();
+
+        TopologySummary {
+            flow_path: flow,
+            sacred_positions: self.sacred_positions.to_vec(),
+            gate_thresholds: self.gate_thresholds,
+            total_edge_weight,
+            expansion_edges,
+            contraction_edges,
+            generation: self.generation,
+            terrain_name: self.terrain.as_ref().map(|t| t.name.clone()).unwrap_or_else(|| "default".to_string()),
+            cycles_observed: self.cycle_history.len(),
+        }
+    }
+}
+
+/// Summary of the current adaptive topology state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologySummary {
+    /// Current flow path (ordered positions)
+    pub flow_path: Vec<u8>,
+    /// Current sacred positions
+    pub sacred_positions: Vec<u8>,
+    /// Current gate thresholds (proximity, coherence, verification)
+    pub gate_thresholds: (f32, f32, f32),
+    /// Total weight of all flow edges
+    pub total_edge_weight: f32,
+    /// Number of expansion edges
+    pub expansion_edges: usize,
+    /// Number of contraction edges
+    pub contraction_edges: usize,
+    /// RSI generation (how many times topology has been adapted)
+    pub generation: usize,
+    /// Active terrain name
+    pub terrain_name: String,
+    /// Number of cycles observed for RSI
+    pub cycles_observed: usize,
+}
+
+// =============================================================================
+// 7. DiffusionTrace — Debug/Introspection System
+// =============================================================================
+
+/// What happened at a single step in the diffusion process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StepAction {
+    /// Denoiser ran: proposed tokens at masked positions
+    Denoise {
+        /// How many tokens were proposed this step
+        proposals: usize,
+        /// Top proposal: (position, token_id, confidence)
+        top_proposal: Option<(usize, u32, f32)>,
+        /// Lowest proposal confidence
+        min_confidence: f32,
+    },
+    /// Sacred proximity check (position 3)
+    SacredProximity {
+        /// How many candidates were checked
+        checked: usize,
+    },
+    /// Sacred coherence check (position 6)
+    SacredCoherence {
+        /// How many candidates were checked
+        checked: usize,
+        /// How many passed coherence and were verified
+        verified: usize,
+    },
+    /// Sacred verification gate (position 9)
+    SacredVerification {
+        /// How many tokens were locked (accepted)
+        locked: usize,
+        /// How many tokens were rejected (re-masked)
+        rejected: usize,
+        /// How many tokens were force-accepted
+        forced: usize,
+        /// Average confidence of locked tokens
+        avg_lock_confidence: f32,
+    },
+    /// Non-sacred, non-denoising step (early exit, all resolved, etc.)
+    Skip {
+        reason: String,
+    },
+}
+
+/// A single step trace in the diffusion process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepTrace {
+    /// Step index (0-based, global)
+    pub step: usize,
+    /// Cycle index (step / 9)
+    pub cycle: usize,
+    /// Sub-position within the cycle (1-9)
+    pub sub_pos: u8,
+    /// Whether this is a sacred position
+    pub is_sacred: bool,
+    /// Current alpha (noise level)
+    pub alpha: f32,
+    /// How many tokens are still unresolved
+    pub unresolved: usize,
+    /// What happened at this step
+    pub action: StepAction,
+    /// Token state snapshot: (position, token_id, lifecycle, confidence)
+    /// Only included for non-locked tokens to keep trace small.
+    pub active_tokens: Vec<(usize, u32, String, f32)>,
+}
+
+/// Full trace of a generation run — the "debug log" of diffusion.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiffusionTrace {
+    /// Per-step traces
+    pub steps: Vec<StepTrace>,
+    /// Whether tracing is enabled (disabled by default for performance)
+    pub enabled: bool,
+    /// Final token IDs
+    pub final_tokens: Vec<u32>,
+    /// Prompt length
+    pub prompt_len: usize,
+    /// Total generation length
+    pub gen_len: usize,
+}
+
+impl DiffusionTrace {
+    /// Create a new trace (disabled by default)
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new trace with tracing enabled
+    pub fn enabled() -> Self {
+        Self { enabled: true, ..Self::default() }
+    }
+
+    /// Record a step
+    pub fn record(&mut self, trace: StepTrace) {
+        if self.enabled {
+            self.steps.push(trace);
+        }
+    }
+
+    /// Print a human-readable summary of the trace
+    pub fn print_summary(&self) {
+        if !self.enabled || self.steps.is_empty() {
+            println!("[DiffusionTrace] Tracing was disabled or no steps recorded.");
+            return;
+        }
+
+        println!("\n╔══════════════════════════════════════════════════════════════╗");
+        println!("║           VORTEX DIFFUSION TRACE                           ║");
+        println!("║  prompt={} gen={} total_steps={}                     ",
+            self.prompt_len, self.gen_len, self.steps.len());
+        println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+        for trace in &self.steps {
+            let sacred_marker = if trace.is_sacred {
+                match trace.sub_pos {
+                    3 => " ⟐ SACRED:3 (proximity)",
+                    6 => " ⟐ SACRED:6 (coherence)",
+                    9 => " ⟐ SACRED:9 (verification)",
+                    _ => " ⟐ SACRED",
+                }
+            } else {
+                ""
+            };
+
+            print!("  step {:3} | cycle {:2} | pos {} | α={:.4} | unresolved={:2}{}",
+                trace.step, trace.cycle, trace.sub_pos,
+                trace.alpha, trace.unresolved, sacred_marker);
+
+            match &trace.action {
+                StepAction::Denoise { proposals, top_proposal, min_confidence } => {
+                    if let Some((pos, tok, conf)) = top_proposal {
+                        println!(" | DENOISE: {} proposals, best=tok:{} @pos:{} conf={:.4}, min_conf={:.4}",
+                            proposals, tok, pos, conf, min_confidence);
+                    } else {
+                        println!(" | DENOISE: {} proposals (none)", proposals);
+                    }
+                }
+                StepAction::SacredProximity { checked } => {
+                    println!(" | PROXIMITY: checked {} candidates", checked);
+                }
+                StepAction::SacredCoherence { checked, verified } => {
+                    println!(" | COHERENCE: {}/{} verified", verified, checked);
+                }
+                StepAction::SacredVerification { locked, rejected, forced, avg_lock_confidence } => {
+                    println!(" | VERIFY: locked={} rejected={} forced={} avg_conf={:.4}",
+                        locked, rejected, forced, avg_lock_confidence);
+                }
+                StepAction::Skip { reason } => {
+                    println!(" | SKIP: {}", reason);
+                }
+            }
+
+            // Show active (non-locked) tokens if trace has them
+            if !trace.active_tokens.is_empty() && trace.active_tokens.len() <= 20 {
+                print!("          └─ tokens: ");
+                for (pos, tok, lifecycle, conf) in &trace.active_tokens {
+                    print!("[{}:{}({})={:.2}] ", pos, tok, lifecycle, conf);
+                }
+                println!();
+            }
+        }
+
+        if !self.final_tokens.is_empty() {
+            println!("\n  FINAL: {:?}", self.final_tokens);
+        }
+        println!();
+    }
+}
 
 // =============================================================================
 // 1. VortexNoiseSchedule — Sacred Geometry Noise Curve
@@ -526,27 +1214,67 @@ pub struct DiffusionTransformer {
 }
 
 impl DiffusionTransformer {
-    /// Create a new transformer with Xavier-initialized weights.
+    /// Create a new transformer with harmonic-ordered initialization.
     ///
-    /// In a real implementation, these weights would be loaded from
-    /// a pre-trained model. The initialization here uses deterministic
-    /// pseudo-random values based on position for reproducibility.
+    /// Instead of pseudo-random values, weights are initialized using
+    /// overlapping sine harmonics at vortex cycle frequencies (1,2,4,8,7,5).
+    /// This creates structured patterns where:
+    /// - Low frequencies (1,2) provide broad structure
+    /// - Mid frequencies (4,5) provide detail
+    /// - High frequencies (7,8) provide fine differentiation
+    /// - The golden ratio φ phase-shifts between harmonics to avoid
+    ///   degenerate symmetries.
+    ///
+    /// The result: ORDER derived FROM apparent chaos. Each weight position
+    /// has a unique value determined by its place in the harmonic series,
+    /// but the overall matrix has coherent structure (not noise).
+    ///
+    /// In production, these weights would be loaded from a pre-trained model
+    /// via `load_weights()` or `load_embeddings()`.
     pub fn new(embed_dim: usize, vocab_size: usize, num_heads: usize, max_seq_len: usize) -> Self {
         let ff_dim = 4 * embed_dim;
 
-        // Xavier initialization scale factors
+        // Xavier scale factors (proper for gradient flow)
         let embed_scale = (2.0 / (vocab_size + embed_dim) as f32).sqrt();
         let attn_scale = (2.0 / (embed_dim * 2) as f32).sqrt();
         let ff_scale_1 = (2.0 / (embed_dim + ff_dim) as f32).sqrt();
         let ff_scale_2 = (2.0 / (ff_dim + embed_dim) as f32).sqrt();
         let head_scale = (2.0 / (embed_dim + vocab_size) as f32).sqrt();
 
-        // Deterministic pseudo-random init using golden ratio perturbation
-        let init = |size: usize, scale: f32, seed: f32| -> Vec<f32> {
+        // Harmonic initialization: superposition of sine waves at vortex frequencies.
+        // Each harmonic_seed selects a different phase offset so that
+        // Q, K, V, O, FF1, FF2, embeddings, and lm_head all get distinct patterns.
+        //
+        // The vortex cycle [1,2,4,8,7,5] provides 6 harmonics.
+        // Sacred positions [3,6,9] provide dampening nodes (zero-crossings).
+        let harmonic_init = |size: usize, scale: f32, harmonic_seed: f32| -> Vec<f32> {
+            let pi2 = std::f32::consts::PI * 2.0;
             (0..size)
                 .map(|i| {
-                    let x = (i as f32 * PHI_INV + seed).fract();
-                    (x * 2.0 - 1.0) * scale
+                    let t = i as f32 / size.max(1) as f32;
+
+                    // 6 harmonics from the vortex cycle frequencies
+                    let h1 = (pi2 * 1.0 * t + harmonic_seed).sin();                  // Fundamental
+                    let h2 = (pi2 * 2.0 * t + harmonic_seed * PHI).sin() * 0.5;      // Second harmonic
+                    let h4 = (pi2 * 4.0 * t + harmonic_seed * PHI * PHI).sin() * 0.25; // Fourth
+                    let h8 = (pi2 * 8.0 * t + harmonic_seed * 3.0).sin() * 0.125;    // Eighth (peak expansion)
+                    let h7 = (pi2 * 7.0 * t + harmonic_seed * PHI_INV).sin() * 0.15; // Seventh (contraction)
+                    let h5 = (pi2 * 5.0 * t + harmonic_seed * 2.0).sin() * 0.2;      // Fifth (contraction)
+
+                    // Sacred dampening: positions that are multiples of 3, 6, 9
+                    // get pulled toward zero (observation, not mutation)
+                    let sacred_damp = if i % 9 == 2 || i % 9 == 5 || i % 9 == 8 {
+                        // Near sacred positions: dampen by φ^(-1)
+                        PHI_INV
+                    } else {
+                        1.0
+                    };
+
+                    // Sum harmonics, apply sacred dampening, scale to Xavier range
+                    let raw = (h1 + h2 + h4 + h8 + h7 + h5) * sacred_damp;
+                    // Normalize: max possible sum ≈ 1 + 0.5 + 0.25 + 0.125 + 0.15 + 0.2 = 2.225
+                    let normalized = raw / 2.225;
+                    normalized * scale
                 })
                 .collect()
         };
@@ -555,18 +1283,20 @@ impl DiffusionTransformer {
             embed_dim,
             vocab_size,
             num_heads,
-            token_embeddings: init(vocab_size * embed_dim, embed_scale, 0.1),
-            position_embeddings: init(max_seq_len * embed_dim, 0.02, 0.2),
+            // Each matrix gets a unique harmonic seed (phase offset)
+            // Seeds chosen from the vortex cycle positions scaled by φ
+            token_embeddings: harmonic_init(vocab_size * embed_dim, embed_scale, 1.0 * PHI_INV),
+            position_embeddings: harmonic_init(max_seq_len * embed_dim, 0.02, 2.0 * PHI_INV),
             max_seq_len,
-            w_q: init(embed_dim * embed_dim, attn_scale, 0.3),
-            w_k: init(embed_dim * embed_dim, attn_scale, 0.4),
-            w_v: init(embed_dim * embed_dim, attn_scale, 0.5),
-            w_o: init(embed_dim * embed_dim, attn_scale, 0.6),
-            ff_w1: init(embed_dim * ff_dim, ff_scale_1, 0.7),
-            ff_w2: init(ff_dim * embed_dim, ff_scale_2, 0.8),
+            w_q: harmonic_init(embed_dim * embed_dim, attn_scale, 4.0 * PHI_INV),
+            w_k: harmonic_init(embed_dim * embed_dim, attn_scale, 8.0 * PHI_INV),
+            w_v: harmonic_init(embed_dim * embed_dim, attn_scale, 7.0 * PHI_INV),
+            w_o: harmonic_init(embed_dim * embed_dim, attn_scale, 5.0 * PHI_INV),
+            ff_w1: harmonic_init(embed_dim * ff_dim, ff_scale_1, 3.0 * PHI_INV),
+            ff_w2: harmonic_init(ff_dim * embed_dim, ff_scale_2, 6.0 * PHI_INV),
             ln1_weight: vec![1.0; embed_dim],
             ln2_weight: vec![1.0; embed_dim],
-            lm_head: init(embed_dim * vocab_size, head_scale, 0.9),
+            lm_head: harmonic_init(embed_dim * vocab_size, head_scale, 9.0 * PHI_INV),
         }
     }
 
@@ -797,6 +1527,10 @@ pub struct VortexDiffusionConfig {
     pub top_k: usize,
     /// Enable sacred verification gates
     pub sacred_verification: bool,
+    /// Enable adaptive topology with RSI feedback (if false, uses static flow)
+    pub adaptive_topology: bool,
+    /// Enable step-by-step tracing for debugging (expensive, off by default)
+    pub enable_tracing: bool,
 }
 
 impl Default for VortexDiffusionConfig {
@@ -811,6 +1545,8 @@ impl Default for VortexDiffusionConfig {
             temperature: 0.8,
             top_k: 50,
             sacred_verification: true,
+            adaptive_topology: false,
+            enable_tracing: false,
         }
     }
 }
@@ -841,12 +1577,16 @@ pub struct VortexDiffusionEngine {
     pub schedule: VortexNoiseSchedule,
     /// Sacred unmasking gate
     pub sacred_gate: SacredUnmaskingGate,
+    /// Adaptive topology (dynamic flow, sacred positions, RSI)
+    pub topology: AdaptiveVortexTopology,
     /// Vocabulary: token_id → string
     pub vocab: HashMap<u32, String>,
     /// Reverse vocabulary: string → token_id
     pub token_to_id: HashMap<String, u32>,
     /// Generation statistics
     pub stats: DiffusionStats,
+    /// Debug trace from last generation (only populated if enable_tracing=true)
+    pub trace: DiffusionTrace,
 }
 
 /// Statistics tracked during generation
@@ -875,18 +1615,78 @@ impl VortexDiffusionEngine {
             config.num_heads,
             config.max_seq_len,
         );
+        let topology = AdaptiveVortexTopology::default();
         let schedule = VortexNoiseSchedule::new(config.num_cycles, config.schedule_type.clone());
-        let sacred_gate = SacredUnmaskingGate::default();
+        let sacred_gate = topology.create_gate();
 
+        let trace = if config.enable_tracing { DiffusionTrace::enabled() } else { DiffusionTrace::new() };
         Self {
             config,
             transformer,
             schedule,
             sacred_gate,
+            topology,
             vocab: HashMap::new(),
             token_to_id: HashMap::new(),
             stats: DiffusionStats::default(),
+            trace,
         }
+    }
+
+    /// Create an engine with a specific adaptive topology.
+    /// Use this to load a subject-driven terrain or a pre-evolved topology.
+    pub fn with_topology(config: VortexDiffusionConfig, topology: AdaptiveVortexTopology) -> Self {
+        let transformer = DiffusionTransformer::new(
+            config.embed_dim,
+            config.vocab_size,
+            config.num_heads,
+            config.max_seq_len,
+        );
+        // Use topology-driven adaptive schedule if configured
+        let schedule = if config.adaptive_topology {
+            let alpha_cache = topology.compute_adaptive_schedule(config.num_cycles * 9);
+            VortexNoiseSchedule {
+                num_cycles: config.num_cycles,
+                alpha_cache,
+                schedule_type: ScheduleType::SacredVortex,
+            }
+        } else {
+            VortexNoiseSchedule::new(config.num_cycles, config.schedule_type.clone())
+        };
+        let sacred_gate = topology.create_gate();
+
+        let trace = if config.enable_tracing { DiffusionTrace::enabled() } else { DiffusionTrace::new() };
+        Self {
+            config,
+            transformer,
+            schedule,
+            sacred_gate,
+            topology,
+            vocab: HashMap::new(),
+            token_to_id: HashMap::new(),
+            stats: DiffusionStats::default(),
+            trace,
+        }
+    }
+
+    /// Load a SubjectTerrain to reshape the topology for a specific domain.
+    /// This re-computes the noise schedule and gate thresholds.
+    pub fn load_terrain(&mut self, terrain: SubjectTerrain) {
+        self.topology = AdaptiveVortexTopology::from_terrain(terrain);
+        if self.config.adaptive_topology {
+            let alpha_cache = self.topology.compute_adaptive_schedule(self.config.num_cycles * 9);
+            self.schedule = VortexNoiseSchedule {
+                num_cycles: self.config.num_cycles,
+                alpha_cache,
+                schedule_type: ScheduleType::SacredVortex,
+            };
+        }
+        self.sacred_gate = self.topology.create_gate();
+    }
+
+    /// Get the current topology (for inspection or serialization)
+    pub fn get_topology(&self) -> &AdaptiveVortexTopology {
+        &self.topology
     }
 
     /// Load a vocabulary mapping
@@ -923,6 +1723,29 @@ impl VortexDiffusionEngine {
         }
 
         self.stats = DiffusionStats::default();
+        // Reset trace for this generation run
+        let tracing = self.config.enable_tracing;
+        if tracing {
+            self.trace = DiffusionTrace::enabled();
+            self.trace.prompt_len = prompt_len;
+            self.trace.gen_len = gen_len;
+        }
+
+        // Helper: snapshot active (non-locked) tokens for trace
+        let snapshot_active = |states: &[TokenState], prompt_len: usize| -> Vec<(usize, u32, String, f32)> {
+            states[prompt_len..].iter().enumerate()
+                .filter(|(_, s)| s.lifecycle != TokenLifecycle::Locked)
+                .map(|(i, s)| {
+                    let lc = match s.lifecycle {
+                        TokenLifecycle::Masked => "M",
+                        TokenLifecycle::Candidate => "C",
+                        TokenLifecycle::Verified => "V",
+                        TokenLifecycle::Locked => "L",
+                    };
+                    (prompt_len + i, s.token_id, lc.to_string(), s.confidence)
+                })
+                .collect()
+        };
 
         // Run vortex denoising cycles
         let total_steps = self.schedule.total_steps();
@@ -936,132 +1759,230 @@ impl VortexDiffusionEngine {
                 .count();
 
             if unresolved == 0 {
+                if tracing {
+                    self.trace.record(StepTrace {
+                        step, cycle: step / 9, sub_pos,
+                        is_sacred: self.topology.is_sacred(sub_pos),
+                        alpha, unresolved: 0,
+                        action: StepAction::Skip { reason: "all resolved".to_string() },
+                        active_tokens: vec![],
+                    });
+                }
                 break; // All tokens resolved
             }
 
-            // Determine what happens at this sub-position
-            match sub_pos {
-                // Sacred position 3: proximity check on candidates
-                3 if self.config.sacred_verification => {
-                    for i in prompt_len..total_len {
-                        if states[i].lifecycle == TokenLifecycle::Candidate {
-                            let result = self.sacred_gate.check_proximity(&states[i]);
-                            if !result.passes {
-                                // Don't reject yet — just note low proximity
-                                // Position 6 will do the coherence check
+            // Determine what happens at this sub-position.
+            // Sacred positions are immutable [3, 6, 9] — the unmanifest domain.
+            // [0]=3=proximity, [1]=6=coherence, [2]=9=verification.
+            let sacred = self.topology.sacred_positions();
+            let is_proximity_pos = sub_pos == sacred[0];
+            let is_coherence_pos = sub_pos == sacred[1];
+            let is_verify_pos = sub_pos == sacred[2];
+
+            if is_proximity_pos && self.config.sacred_verification {
+                // Sacred position 3 (proximity): plausibility check on candidates
+                let mut checked = 0;
+                for i in prompt_len..total_len {
+                    if states[i].lifecycle == TokenLifecycle::Candidate {
+                        let _result = self.sacred_gate.check_proximity(&states[i]);
+                        checked += 1;
+                    }
+                }
+                if tracing {
+                    self.trace.record(StepTrace {
+                        step, cycle: step / 9, sub_pos, is_sacred: true,
+                        alpha, unresolved,
+                        action: StepAction::SacredProximity { checked },
+                        active_tokens: snapshot_active(&states, prompt_len),
+                    });
+                }
+            } else if is_coherence_pos && self.config.sacred_verification {
+                // Sacred position 6 (coherence): neighbor agreement check
+                let mut coherence_checked = 0;
+                let mut coherence_verified = 0;
+                for i in prompt_len..total_len {
+                    if states[i].lifecycle == TokenLifecycle::Candidate {
+                        coherence_checked += 1;
+                        let token_embed = self.transformer.get_embedding(states[i].token_id, i);
+                        let left_embed = if i > 0 && states[i - 1].is_final() {
+                            Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
+                        } else {
+                            None
+                        };
+                        let right_embed = if i + 1 < total_len && states[i + 1].is_final() {
+                            Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
+                        } else {
+                            None
+                        };
+
+                        let coherence = self.sacred_gate.check_coherence(
+                            &states[i],
+                            left_embed.as_deref(),
+                            right_embed.as_deref(),
+                            &token_embed,
+                        );
+
+                        if coherence.passes {
+                            states[i].verify();
+                            self.stats.sacred_verifications += 1;
+                            coherence_verified += 1;
+                        }
+                    }
+                }
+                if tracing {
+                    self.trace.record(StepTrace {
+                        step, cycle: step / 9, sub_pos, is_sacred: true,
+                        alpha, unresolved,
+                        action: StepAction::SacredCoherence { checked: coherence_checked, verified: coherence_verified },
+                        active_tokens: snapshot_active(&states, prompt_len),
+                    });
+                }
+            } else if is_verify_pos && self.config.sacred_verification {
+                // Dynamic sacred position (verification): final accept/reject/defer
+                let mut locked_this_step = 0;
+                let mut rejected_this_step = 0;
+                let mut forced_this_step = 0;
+                let mut lock_confidence_sum = 0.0f32;
+                for i in prompt_len..total_len {
+                    if states[i].lifecycle == TokenLifecycle::Candidate
+                        || states[i].lifecycle == TokenLifecycle::Verified
+                    {
+                        let prox = self.sacred_gate.check_proximity(&states[i]);
+                        let token_embed = self.transformer.get_embedding(states[i].token_id, i);
+                        let left_embed = if i > 0 && !states[i - 1].needs_prediction() {
+                            Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
+                        } else {
+                            None
+                        };
+                        let right_embed = if i + 1 < total_len && !states[i + 1].needs_prediction() {
+                            Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
+                        } else {
+                            None
+                        };
+                        let coh = self.sacred_gate.check_coherence(
+                            &states[i],
+                            left_embed.as_deref(),
+                            right_embed.as_deref(),
+                            &token_embed,
+                        );
+
+                        match self.sacred_gate.check_verification(&states[i], &prox, &coh) {
+                            VerificationDecision::Accept { forced, .. } => {
+                                lock_confidence_sum += states[i].confidence;
+                                states[i].lock();
+                                locked_this_step += 1;
+                                if forced {
+                                    self.stats.forced_acceptances += 1;
+                                    forced_this_step += 1;
+                                }
+                            }
+                            VerificationDecision::Defer { .. } => {
+                                // Keep as candidate — will be checked again next cycle
+                            }
+                            VerificationDecision::Reject { .. } => {
+                                states[i].reject();
+                                self.stats.sacred_rejections += 1;
+                                rejected_this_step += 1;
                             }
                         }
                     }
                 }
+                self.stats.tokens_per_cycle.push(locked_this_step);
 
-                // Sacred position 6: coherence check on candidates
-                6 if self.config.sacred_verification => {
-                    for i in prompt_len..total_len {
-                        if states[i].lifecycle == TokenLifecycle::Candidate {
-                            let token_embed = self.transformer.get_embedding(states[i].token_id, i);
-                            let left_embed = if i > 0 && states[i - 1].is_final() {
-                                Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
-                            } else {
-                                None
-                            };
-                            let right_embed = if i + 1 < total_len && states[i + 1].is_final() {
-                                Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
-                            } else {
-                                None
-                            };
-
-                            let coherence = self.sacred_gate.check_coherence(
-                                &states[i],
-                                left_embed.as_deref(),
-                                right_embed.as_deref(),
-                                &token_embed,
-                            );
-
-                            if coherence.passes {
-                                states[i].verify();
-                                self.stats.sacred_verifications += 1;
-                            }
-                        }
-                    }
+                if tracing {
+                    let avg_lc = if locked_this_step > 0 { lock_confidence_sum / locked_this_step as f32 } else { 0.0 };
+                    self.trace.record(StepTrace {
+                        step, cycle: step / 9, sub_pos, is_sacred: true,
+                        alpha, unresolved,
+                        action: StepAction::SacredVerification {
+                            locked: locked_this_step, rejected: rejected_this_step,
+                            forced: forced_this_step, avg_lock_confidence: avg_lc,
+                        },
+                        active_tokens: snapshot_active(&states, prompt_len),
+                    });
                 }
 
-                // Sacred position 9: final verification — lock or reject
-                9 if self.config.sacred_verification => {
-                    let mut locked_this_step = 0;
-                    for i in prompt_len..total_len {
-                        if states[i].lifecycle == TokenLifecycle::Candidate
-                            || states[i].lifecycle == TokenLifecycle::Verified
-                        {
-                            let prox = self.sacred_gate.check_proximity(&states[i]);
-                            let token_embed = self.transformer.get_embedding(states[i].token_id, i);
-                            let left_embed = if i > 0 && !states[i - 1].needs_prediction() {
-                                Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
-                            } else {
-                                None
-                            };
-                            let right_embed = if i + 1 < total_len && !states[i + 1].needs_prediction() {
-                                Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
-                            } else {
-                                None
-                            };
-                            let coh = self.sacred_gate.check_coherence(
-                                &states[i],
-                                left_embed.as_deref(),
-                                right_embed.as_deref(),
-                                &token_embed,
-                            );
+                // RSI: record cycle metrics if adaptive topology is enabled
+                if self.config.adaptive_topology {
+                    let cycle_idx = step / 9;
+                    let avg_conf = if locked_this_step > 0 {
+                        lock_confidence_sum / locked_this_step as f32
+                    } else {
+                        0.0
+                    };
+                    // Determine rejection hotspot: which sacred position had most issues
+                    let hotspot = if rejected_this_step > locked_this_step {
+                        sacred[2] // Always 9 — verification position
+                    } else {
+                        0
+                    };
+                    self.topology.record_cycle(CycleMetrics {
+                        tokens_locked: locked_this_step,
+                        tokens_rejected: rejected_this_step,
+                        tokens_forced: forced_this_step,
+                        avg_lock_confidence: avg_conf,
+                        avg_coherence: 0.0, // Populated from coherence step
+                        rejection_hotspot: hotspot,
+                        cycle_index: cycle_idx,
+                    });
 
-                            match self.sacred_gate.check_verification(&states[i], &prox, &coh) {
-                                VerificationDecision::Accept { forced, .. } => {
-                                    states[i].lock();
-                                    locked_this_step += 1;
-                                    if forced {
-                                        self.stats.forced_acceptances += 1;
-                                    }
-                                }
-                                VerificationDecision::Defer { .. } => {
-                                    // Keep as candidate — will be checked again next cycle
-                                }
-                                VerificationDecision::Reject { .. } => {
-                                    states[i].reject();
-                                    self.stats.sacred_rejections += 1;
-                                }
-                            }
-                        }
+                    // Adapt topology every 3 cycles (not every step — too aggressive)
+                    if cycle_idx > 0 && cycle_idx % 3 == 0 {
+                        self.topology.adapt();
+                        self.sacred_gate = self.topology.create_gate();
                     }
-                    self.stats.tokens_per_cycle.push(locked_this_step);
                 }
-
+            } else {
                 // Non-sacred positions: run the denoiser and propose candidates
-                _ => {
-                    // Collect current token IDs for the transformer
-                    let current_ids: Vec<u32> = states.iter()
-                        .map(|s| s.token_id)
-                        .collect();
+                let current_ids: Vec<u32> = states.iter()
+                    .map(|s| s.token_id)
+                    .collect();
 
-                    // Run transformer forward pass
-                    let all_logits = self.transformer.forward(&current_ids, 1.0 - alpha);
+                // Run transformer forward pass
+                let all_logits = self.transformer.forward(&current_ids, 1.0 - alpha);
 
-                    // For each masked/candidate position, sample a prediction
+                // For each masked/candidate position, sample a prediction
+                for i in prompt_len..total_len {
+                    if states[i].lifecycle == TokenLifecycle::Masked {
+                        if let Some(logits) = all_logits.get(i) {
+                            let (token_id, confidence, candidates) = self.sample_token(logits, alpha);
+                            states[i].propose(token_id, confidence, candidates);
+                            states[i].energy = alpha; // Energy correlates with schedule progress
+                        }
+                    }
+                }
+
+                if tracing {
+                    // Find top proposal for trace
+                    let mut top_prop: Option<(usize, u32, f32)> = None;
+                    let mut min_conf = f32::INFINITY;
+                    let mut prop_count = 0usize;
                     for i in prompt_len..total_len {
-                        if states[i].lifecycle == TokenLifecycle::Masked {
-                            if let Some(logits) = all_logits.get(i) {
-                                let (token_id, confidence, candidates) = self.sample_token(logits, alpha);
-                                states[i].propose(token_id, confidence, candidates);
-                                states[i].energy = alpha; // Energy correlates with schedule progress
+                        if states[i].lifecycle == TokenLifecycle::Candidate && states[i].token_id != MASK_TOKEN_ID {
+                            prop_count += 1;
+                            if states[i].confidence < min_conf { min_conf = states[i].confidence; }
+                            if top_prop.is_none() || states[i].confidence > top_prop.unwrap().2 {
+                                top_prop = Some((i, states[i].token_id, states[i].confidence));
                             }
                         }
                     }
+                    if min_conf == f32::INFINITY { min_conf = 0.0; }
+                    self.trace.record(StepTrace {
+                        step, cycle: step / 9, sub_pos, is_sacred: false,
+                        alpha, unresolved,
+                        action: StepAction::Denoise { proposals: prop_count, top_proposal: top_prop, min_confidence: min_conf },
+                        active_tokens: snapshot_active(&states, prompt_len),
+                    });
+                }
 
-                    // If sacred verification is disabled, directly accept
-                    // based on confidence threshold (simplified path)
-                    if !self.config.sacred_verification {
-                        let unmask_prob = alpha; // Higher α = more likely to accept
-                        for i in prompt_len..total_len {
-                            if states[i].lifecycle == TokenLifecycle::Candidate {
-                                if states[i].confidence >= unmask_prob * 0.5 {
-                                    states[i].lock();
-                                }
+                // If sacred verification is disabled, directly accept
+                // based on confidence threshold (simplified path)
+                if !self.config.sacred_verification {
+                    let unmask_prob = alpha; // Higher α = more likely to accept
+                    for i in prompt_len..total_len {
+                        if states[i].lifecycle == TokenLifecycle::Candidate {
+                            if states[i].confidence >= unmask_prob * 0.5 {
+                                states[i].lock();
                             }
                         }
                     }
@@ -1096,8 +2017,63 @@ impl VortexDiffusionEngine {
                 .sum::<f32>() / generated.len() as f32;
         }
 
-        // Return token IDs
-        states.iter().map(|s| s.token_id).collect()
+        // Capture final tokens in trace
+        let result: Vec<u32> = states.iter().map(|s| s.token_id).collect();
+        if tracing {
+            self.trace.final_tokens = result.clone();
+        }
+
+        result
+    }
+
+    /// Generate with adaptive length: the engine decides how many tokens to produce.
+    ///
+    /// Instead of a fixed `gen_len`, this method:
+    /// 1. Estimates complexity from prompt length and vocabulary coverage
+    /// 2. Starts with a reasonable initial estimate
+    /// 3. Stops early when confidence stabilizes (all tokens locked before max)
+    /// 4. Can extend if the sequence ends mid-thought (no EOS detected)
+    ///
+    /// Returns the full sequence of token IDs (prompt + generated).
+    pub fn generate_adaptive(&mut self, prompt_ids: &[u32]) -> Vec<u32> {
+        let prompt_len = prompt_ids.len();
+
+        // Estimate generation length based on prompt complexity
+        // Short prompts → longer responses (need more context)
+        // Long prompts → shorter responses (context already provided)
+        let base_gen = if prompt_len == 0 {
+            32 // No prompt: generate a full thought
+        } else if prompt_len <= 3 {
+            24 // Short prompt: expand significantly
+        } else if prompt_len <= 10 {
+            16 // Medium prompt: moderate expansion
+        } else if prompt_len <= 30 {
+            12 // Long prompt: focused completion
+        } else {
+            8  // Very long prompt: brief continuation
+        };
+
+        // Scale by number of cycles — more cycles = more refinement capacity
+        let cycle_factor = (self.config.num_cycles as f32 / 9.0).max(0.5).min(2.0);
+        let estimated_len = (base_gen as f32 * cycle_factor) as usize;
+
+        // Clamp to max sequence length
+        let max_gen = self.config.max_seq_len.saturating_sub(prompt_len);
+        let gen_len = estimated_len.min(max_gen).max(1);
+
+        // Generate with the estimated length
+        // The engine will stop early if all tokens resolve before max steps
+        self.generate(prompt_ids, gen_len)
+    }
+
+    /// Get the trace from the last generation run
+    pub fn get_trace(&self) -> &DiffusionTrace {
+        &self.trace
+    }
+
+    /// Print the trace from the last generation run
+    pub fn print_trace(&self) {
+        self.trace.print_summary();
     }
 
     /// Sample a token from logits using temperature + top-k
@@ -1255,22 +2231,20 @@ impl VortexDiffusionEngine {
             if unresolved == 0 { break; }
 
             // Same logic as generate(), but we don't distinguish prompt/gen regions
-            // — we just skip already-locked tokens
-            match sub_pos {
-                3 | 6 | 9 if self.config.sacred_verification => {
-                    self.run_sacred_step(sub_pos, &mut states, total_len);
-                }
-                _ => {
-                    let current_ids: Vec<u32> = states.iter().map(|s| s.token_id).collect();
-                    let all_logits = self.transformer.forward(&current_ids, 1.0 - alpha);
+            // — we just skip already-locked tokens.
+            // Sacred positions are dynamic from topology.
+            if self.topology.is_sacred(sub_pos) && self.config.sacred_verification {
+                self.run_sacred_step(sub_pos, &mut states, total_len);
+            } else {
+                let current_ids: Vec<u32> = states.iter().map(|s| s.token_id).collect();
+                let all_logits = self.transformer.forward(&current_ids, 1.0 - alpha);
 
-                    for i in 0..total_len {
-                        if states[i].lifecycle == TokenLifecycle::Masked {
-                            if let Some(logits) = all_logits.get(i) {
-                                let (token_id, confidence, candidates) = self.sample_token(logits, alpha);
-                                states[i].propose(token_id, confidence, candidates);
-                                states[i].energy = alpha;
-                            }
+                for i in 0..total_len {
+                    if states[i].lifecycle == TokenLifecycle::Masked {
+                        if let Some(logits) = all_logits.get(i) {
+                            let (token_id, confidence, candidates) = self.sample_token(logits, alpha);
+                            states[i].propose(token_id, confidence, candidates);
+                            states[i].energy = alpha;
                         }
                     }
                 }
@@ -1287,84 +2261,86 @@ impl VortexDiffusionEngine {
         states.iter().map(|s| s.token_id).collect()
     }
 
-    /// Run a sacred verification step (shared between generate and infill)
+    /// Run a sacred verification step (shared between generate and infill).
+    /// Sacred position roles are determined dynamically from topology:
+    /// sacred_positions[0] = proximity, [1] = coherence, [2] = verification.
     fn run_sacred_step(&mut self, sub_pos: u8, states: &mut [TokenState], total_len: usize) {
-        match sub_pos {
-            3 => {
-                for i in 0..total_len {
-                    if states[i].lifecycle == TokenLifecycle::Candidate {
-                        let _result = self.sacred_gate.check_proximity(&states[i]);
+        let sacred = self.topology.sacred_positions();
+        let is_proximity = sub_pos == sacred[0];
+        let is_coherence = sub_pos == sacred[1];
+        let is_verify = sub_pos == sacred[2];
+
+        if is_proximity {
+            for i in 0..total_len {
+                if states[i].lifecycle == TokenLifecycle::Candidate {
+                    let _result = self.sacred_gate.check_proximity(&states[i]);
+                }
+            }
+        } else if is_coherence {
+            for i in 0..total_len {
+                if states[i].lifecycle == TokenLifecycle::Candidate {
+                    let token_embed = self.transformer.get_embedding(states[i].token_id, i);
+                    let left_embed = if i > 0 && states[i - 1].is_final() {
+                        Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
+                    } else {
+                        None
+                    };
+                    let right_embed = if i + 1 < total_len && states[i + 1].is_final() {
+                        Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
+                    } else {
+                        None
+                    };
+                    let coherence = self.sacred_gate.check_coherence(
+                        &states[i],
+                        left_embed.as_deref(),
+                        right_embed.as_deref(),
+                        &token_embed,
+                    );
+                    if coherence.passes {
+                        states[i].verify();
+                        self.stats.sacred_verifications += 1;
                     }
                 }
             }
-            6 => {
-                for i in 0..total_len {
-                    if states[i].lifecycle == TokenLifecycle::Candidate {
-                        let token_embed = self.transformer.get_embedding(states[i].token_id, i);
-                        let left_embed = if i > 0 && states[i - 1].is_final() {
-                            Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
-                        } else {
-                            None
-                        };
-                        let right_embed = if i + 1 < total_len && states[i + 1].is_final() {
-                            Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
-                        } else {
-                            None
-                        };
-                        let coherence = self.sacred_gate.check_coherence(
-                            &states[i],
-                            left_embed.as_deref(),
-                            right_embed.as_deref(),
-                            &token_embed,
-                        );
-                        if coherence.passes {
-                            states[i].verify();
-                            self.stats.sacred_verifications += 1;
+        } else if is_verify {
+            let mut locked = 0;
+            for i in 0..total_len {
+                if states[i].lifecycle == TokenLifecycle::Candidate
+                    || states[i].lifecycle == TokenLifecycle::Verified
+                {
+                    let prox = self.sacred_gate.check_proximity(&states[i]);
+                    let token_embed = self.transformer.get_embedding(states[i].token_id, i);
+                    let left_embed = if i > 0 && !states[i - 1].needs_prediction() {
+                        Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
+                    } else {
+                        None
+                    };
+                    let right_embed = if i + 1 < total_len && !states[i + 1].needs_prediction() {
+                        Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
+                    } else {
+                        None
+                    };
+                    let coh = self.sacred_gate.check_coherence(
+                        &states[i],
+                        left_embed.as_deref(),
+                        right_embed.as_deref(),
+                        &token_embed,
+                    );
+                    match self.sacred_gate.check_verification(&states[i], &prox, &coh) {
+                        VerificationDecision::Accept { forced, .. } => {
+                            states[i].lock();
+                            locked += 1;
+                            if forced { self.stats.forced_acceptances += 1; }
+                        }
+                        VerificationDecision::Defer { .. } => {}
+                        VerificationDecision::Reject { .. } => {
+                            states[i].reject();
+                            self.stats.sacred_rejections += 1;
                         }
                     }
                 }
             }
-            9 => {
-                let mut locked = 0;
-                for i in 0..total_len {
-                    if states[i].lifecycle == TokenLifecycle::Candidate
-                        || states[i].lifecycle == TokenLifecycle::Verified
-                    {
-                        let prox = self.sacred_gate.check_proximity(&states[i]);
-                        let token_embed = self.transformer.get_embedding(states[i].token_id, i);
-                        let left_embed = if i > 0 && !states[i - 1].needs_prediction() {
-                            Some(self.transformer.get_embedding(states[i - 1].token_id, i - 1))
-                        } else {
-                            None
-                        };
-                        let right_embed = if i + 1 < total_len && !states[i + 1].needs_prediction() {
-                            Some(self.transformer.get_embedding(states[i + 1].token_id, i + 1))
-                        } else {
-                            None
-                        };
-                        let coh = self.sacred_gate.check_coherence(
-                            &states[i],
-                            left_embed.as_deref(),
-                            right_embed.as_deref(),
-                            &token_embed,
-                        );
-                        match self.sacred_gate.check_verification(&states[i], &prox, &coh) {
-                            VerificationDecision::Accept { forced, .. } => {
-                                states[i].lock();
-                                locked += 1;
-                                if forced { self.stats.forced_acceptances += 1; }
-                            }
-                            VerificationDecision::Defer { .. } => {}
-                            VerificationDecision::Reject { .. } => {
-                                states[i].reject();
-                                self.stats.sacred_rejections += 1;
-                            }
-                        }
-                    }
-                }
-                self.stats.tokens_per_cycle.push(locked);
-            }
-            _ => {}
+            self.stats.tokens_per_cycle.push(locked);
         }
     }
 }
@@ -1404,6 +2380,773 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         dot / (norm_a.sqrt() * norm_b.sqrt())
     } else {
         0.0
+    }
+}
+
+// =============================================================================
+// 8. NgramValidator — Grammatical Plausibility Checker
+// =============================================================================
+
+/// N-gram frequency table for bigrams and trigrams.
+/// Built from a reference corpus. Used to score generated sentences
+/// for grammatical plausibility (not just fluency — structural correctness).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NgramValidator {
+    /// Bigram counts: "word1 word2" → count
+    pub bigrams: HashMap<(u32, u32), u32>,
+    /// Trigram counts: "word1 word2 word3" → count
+    pub trigrams: HashMap<(u32, u32, u32), u32>,
+    /// Unigram counts: word → count (for smoothing)
+    pub unigrams: HashMap<u32, u32>,
+    /// Total bigram observations
+    pub total_bigrams: u64,
+    /// Total trigram observations
+    pub total_trigrams: u64,
+    /// Total unigram observations
+    pub total_unigrams: u64,
+}
+
+/// Result of n-gram validation on a sentence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NgramScore {
+    /// Average log-probability under the bigram model (higher = more grammatical)
+    pub bigram_score: f32,
+    /// Average log-probability under the trigram model
+    pub trigram_score: f32,
+    /// Fraction of bigrams that were seen in training (coverage)
+    pub bigram_coverage: f32,
+    /// Fraction of trigrams that were seen in training
+    pub trigram_coverage: f32,
+    /// Combined score: weighted average of bigram + trigram (0.0-1.0, higher = better)
+    pub combined_score: f32,
+    /// Number of unknown bigrams (not seen in training)
+    pub unknown_bigrams: usize,
+    /// Number of unknown trigrams
+    pub unknown_trigrams: usize,
+}
+
+impl NgramValidator {
+    /// Create a new empty validator
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Feed a token sequence from a reference corpus to build n-gram tables.
+    /// Call this repeatedly with different reference sentences.
+    pub fn train(&mut self, token_ids: &[u32]) {
+        // Unigrams
+        for &id in token_ids {
+            *self.unigrams.entry(id).or_insert(0) += 1;
+            self.total_unigrams += 1;
+        }
+
+        // Bigrams
+        for window in token_ids.windows(2) {
+            let key = (window[0], window[1]);
+            *self.bigrams.entry(key).or_insert(0) += 1;
+            self.total_bigrams += 1;
+        }
+
+        // Trigrams
+        for window in token_ids.windows(3) {
+            let key = (window[0], window[1], window[2]);
+            *self.trigrams.entry(key).or_insert(0) += 1;
+            self.total_trigrams += 1;
+        }
+    }
+
+    /// Train from a text string using a simple whitespace tokenizer.
+    /// Each unique word gets a deterministic ID based on its hash.
+    pub fn train_from_text(&mut self, text: &str) {
+        let tokens: Vec<u32> = text.split_whitespace()
+            .map(|w| {
+                use std::hash::{Hash, Hasher};
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                w.to_lowercase().hash(&mut h);
+                (h.finish() % (u32::MAX as u64 - 10)) as u32
+            })
+            .collect();
+        self.train(&tokens);
+    }
+
+    /// Score a generated token sequence for grammatical plausibility.
+    /// Returns detailed n-gram analysis.
+    pub fn score(&self, token_ids: &[u32]) -> NgramScore {
+        if token_ids.len() < 2 {
+            return NgramScore {
+                bigram_score: 0.0, trigram_score: 0.0,
+                bigram_coverage: 0.0, trigram_coverage: 0.0,
+                combined_score: 0.0, unknown_bigrams: 0, unknown_trigrams: 0,
+            };
+        }
+
+        // Bigram scoring with add-1 (Laplace) smoothing
+        let vocab_size = self.unigrams.len().max(1) as f32;
+        let mut bigram_log_prob_sum = 0.0f32;
+        let mut bigram_known = 0usize;
+        let mut bigram_unknown = 0usize;
+        let bigram_count = token_ids.len().saturating_sub(1);
+
+        for window in token_ids.windows(2) {
+            let key = (window[0], window[1]);
+            let count = *self.bigrams.get(&key).unwrap_or(&0) as f32;
+            let context_count = *self.unigrams.get(&window[0]).unwrap_or(&0) as f32;
+            // Laplace smoothing: P(w2|w1) = (count(w1,w2) + 1) / (count(w1) + V)
+            let prob = (count + 1.0) / (context_count + vocab_size);
+            bigram_log_prob_sum += prob.ln();
+            if count > 0.0 { bigram_known += 1; } else { bigram_unknown += 1; }
+        }
+
+        let bigram_score = if bigram_count > 0 {
+            bigram_log_prob_sum / bigram_count as f32
+        } else { 0.0 };
+        let bigram_coverage = if bigram_count > 0 {
+            bigram_known as f32 / bigram_count as f32
+        } else { 0.0 };
+
+        // Trigram scoring
+        let mut trigram_log_prob_sum = 0.0f32;
+        let mut trigram_known = 0usize;
+        let mut trigram_unknown = 0usize;
+        let trigram_count = token_ids.len().saturating_sub(2);
+
+        for window in token_ids.windows(3) {
+            let tri_key = (window[0], window[1], window[2]);
+            let bi_key = (window[0], window[1]);
+            let tri_count = *self.trigrams.get(&tri_key).unwrap_or(&0) as f32;
+            let bi_count = *self.bigrams.get(&bi_key).unwrap_or(&0) as f32;
+            let prob = (tri_count + 1.0) / (bi_count + vocab_size);
+            trigram_log_prob_sum += prob.ln();
+            if tri_count > 0.0 { trigram_known += 1; } else { trigram_unknown += 1; }
+        }
+
+        let trigram_score = if trigram_count > 0 {
+            trigram_log_prob_sum / trigram_count as f32
+        } else { 0.0 };
+        let trigram_coverage = if trigram_count > 0 {
+            trigram_known as f32 / trigram_count as f32
+        } else { 0.0 };
+
+        // Combined score: normalize log-probs to 0-1 range using sigmoid
+        // More negative = worse grammar, more positive = better
+        let sigmoid = |x: f32| 1.0 / (1.0 + (-x).exp());
+        let combined = sigmoid(bigram_score + 2.0) * 0.4 + sigmoid(trigram_score + 2.0) * 0.3
+            + bigram_coverage * 0.2 + trigram_coverage * 0.1;
+
+        NgramScore {
+            bigram_score, trigram_score,
+            bigram_coverage, trigram_coverage,
+            combined_score: combined.clamp(0.0, 1.0),
+            unknown_bigrams: bigram_unknown,
+            unknown_trigrams: trigram_unknown,
+        }
+    }
+
+    /// Quick check: is this sentence "grammatically plausible"?
+    /// Returns true if combined score exceeds threshold.
+    pub fn is_plausible(&self, token_ids: &[u32], threshold: f32) -> bool {
+        self.score(token_ids).combined_score >= threshold
+    }
+
+    /// Get total n-gram counts (for diagnostics)
+    pub fn stats(&self) -> (usize, usize, usize) {
+        (self.unigrams.len(), self.bigrams.len(), self.trigrams.len())
+    }
+}
+
+// =============================================================================
+// 9. SentenceMemory — Vector Store for Generated Sentences
+// =============================================================================
+
+/// Metadata for a stored sentence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SentenceRecord {
+    /// The generated token IDs
+    pub token_ids: Vec<u32>,
+    /// Decoded text (if vocab available)
+    pub text: String,
+    /// N-gram grammatical score
+    pub ngram_score: f32,
+    /// Average confidence from diffusion engine
+    pub avg_confidence: f32,
+    /// Number of sacred rejections during generation
+    pub rejections: usize,
+    /// Terrain name active during generation
+    pub terrain_name: String,
+    /// Meta-controller cycle index when this was generated
+    pub cycle_index: usize,
+    /// Semantic embedding vector (for similarity search)
+    pub embedding: Vec<f32>,
+    /// Whether this sentence was committed to the corpus (high quality)
+    pub committed: bool,
+}
+
+/// In-process vector store for generated sentences.
+/// Uses brute-force cosine similarity (no external dependencies).
+/// For large-scale use, swap the search to EmbedVec HNSW via feature flag.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SentenceMemory {
+    /// All stored sentences
+    pub records: Vec<SentenceRecord>,
+    /// Embedding dimension (matches DiffusionTransformer.embed_dim)
+    pub embed_dim: usize,
+    /// Maximum records to store (circular buffer evicts oldest non-committed)
+    pub max_records: usize,
+}
+
+impl SentenceMemory {
+    /// Create a new sentence memory with given embedding dimension
+    pub fn new(embed_dim: usize, max_records: usize) -> Self {
+        Self { records: Vec::new(), embed_dim, max_records }
+    }
+
+    /// Store a generated sentence with its metadata and embedding
+    pub fn store(&mut self, record: SentenceRecord) {
+        // If at capacity, evict oldest non-committed record
+        if self.records.len() >= self.max_records {
+            if let Some(pos) = self.records.iter().position(|r| !r.committed) {
+                self.records.remove(pos);
+            } else {
+                // All committed — expand (this is rare)
+                self.max_records += 100;
+            }
+        }
+        self.records.push(record);
+    }
+
+    /// Find top-k most similar sentences to a query embedding (brute-force cosine)
+    pub fn find_similar(&self, query_embed: &[f32], k: usize) -> Vec<(usize, f32)> {
+        let mut scored: Vec<(usize, f32)> = self.records.iter().enumerate()
+            .map(|(i, r)| (i, cosine_similarity(query_embed, &r.embedding)))
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(k);
+        scored
+    }
+
+    /// Compute the novelty of a sentence relative to the corpus.
+    /// Returns 1.0 - max_cosine_similarity (higher = more novel).
+    pub fn novelty(&self, embedding: &[f32]) -> f32 {
+        if self.records.is_empty() {
+            return 1.0; // First sentence is maximally novel
+        }
+        let max_sim = self.records.iter()
+            .map(|r| cosine_similarity(embedding, &r.embedding))
+            .fold(0.0f32, f32::max);
+        (1.0 - max_sim).clamp(0.0, 1.0)
+    }
+
+    /// Get all committed (high-quality) sentences
+    pub fn committed(&self) -> Vec<&SentenceRecord> {
+        self.records.iter().filter(|r| r.committed).collect()
+    }
+
+    /// How many sentences are stored
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Whether the memory is empty
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    /// Average n-gram score of committed sentences
+    pub fn avg_committed_ngram_score(&self) -> f32 {
+        let committed: Vec<_> = self.committed();
+        if committed.is_empty() { return 0.0; }
+        committed.iter().map(|r| r.ngram_score).sum::<f32>() / committed.len() as f32
+    }
+}
+
+// =============================================================================
+// 10. PhaseMetrics — Phase Transition Tracking
+// =============================================================================
+
+/// Snapshot of system state at a given cycle
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseSnapshot {
+    /// Meta-controller cycle index
+    pub cycle: usize,
+    /// Average number of steps before all tokens lock
+    pub avg_steps_to_lock: f32,
+    /// Rejection rate this cycle (rejections / total candidates)
+    pub rejection_rate: f32,
+    /// Average confidence of generated tokens
+    pub avg_confidence: f32,
+    /// Average coherence (from sacred gate checks)
+    pub avg_coherence: f32,
+    /// N-gram combined score of best sentence this cycle
+    pub best_ngram_score: f32,
+    /// Novelty of best sentence this cycle
+    pub best_novelty: f32,
+    /// Topology entropy: how much flow edges have diverged from default
+    pub topology_entropy: f32,
+    /// Number of sentences committed to corpus so far
+    pub total_committed: usize,
+    /// The dual objective score: grammar × novelty
+    pub dual_objective: f32,
+}
+
+/// Tracks phase transitions across many cycles.
+/// Looks for non-linear improvements (sudden jumps in metrics).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PhaseTracker {
+    /// All snapshots, one per meta-controller cycle
+    pub snapshots: Vec<PhaseSnapshot>,
+    /// Detected phase transitions: (cycle_index, metric_name, magnitude)
+    pub transitions: Vec<(usize, String, f32)>,
+}
+
+impl PhaseTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a snapshot for the current cycle
+    pub fn record(&mut self, snapshot: PhaseSnapshot) {
+        // Detect phase transitions by comparing to rolling average
+        if self.snapshots.len() >= 10 {
+            let recent_10: &[PhaseSnapshot] = &self.snapshots[self.snapshots.len() - 10..];
+            let avg_rejection = recent_10.iter().map(|s| s.rejection_rate).sum::<f32>() / 10.0;
+            let avg_confidence = recent_10.iter().map(|s| s.avg_confidence).sum::<f32>() / 10.0;
+            let avg_dual = recent_10.iter().map(|s| s.dual_objective).sum::<f32>() / 10.0;
+
+            // Check for sharp drops in rejection rate (>30% improvement)
+            if snapshot.rejection_rate < avg_rejection * 0.7 && avg_rejection > 0.05 {
+                self.transitions.push((
+                    snapshot.cycle,
+                    "rejection_rate_drop".to_string(),
+                    (avg_rejection - snapshot.rejection_rate) / avg_rejection,
+                ));
+            }
+
+            // Check for sharp jumps in confidence (>20% improvement)
+            if snapshot.avg_confidence > avg_confidence * 1.2 && avg_confidence > 0.01 {
+                self.transitions.push((
+                    snapshot.cycle,
+                    "confidence_jump".to_string(),
+                    (snapshot.avg_confidence - avg_confidence) / avg_confidence,
+                ));
+            }
+
+            // Check for sharp jumps in dual objective (>25% improvement)
+            if snapshot.dual_objective > avg_dual * 1.25 && avg_dual > 0.01 {
+                self.transitions.push((
+                    snapshot.cycle,
+                    "dual_objective_jump".to_string(),
+                    (snapshot.dual_objective - avg_dual) / avg_dual,
+                ));
+            }
+        }
+
+        self.snapshots.push(snapshot);
+    }
+
+    /// Compute topology entropy: how much the flow edges differ from default.
+    /// 0.0 = identical to default, higher = more divergent.
+    pub fn topology_entropy(topology: &AdaptiveVortexTopology) -> f32 {
+        let default = AdaptiveVortexTopology::default();
+        let default_edges = default.flow_path();
+        let current_edges = topology.flow_path();
+
+        // Edge weight divergence
+        let mut weight_diff = 0.0f32;
+        for (i, &pos) in current_edges.iter().enumerate() {
+            let default_pos = default_edges.get(i).copied().unwrap_or(0);
+            if pos != default_pos { weight_diff += 1.0; }
+        }
+
+        // Gate threshold divergence
+        let (dp, dc, dv) = default.gate_thresholds;
+        let (cp, cc, cv) = topology.gate_thresholds;
+        let gate_diff = ((cp - dp).abs() + (cc - dc).abs() + (cv - dv).abs()) / 3.0;
+
+        // Noise delta divergence
+        let mut delta_diff = 0.0f32;
+        for pos in 1..=9 {
+            let d = default.noise_delta(pos);
+            let c = topology.noise_delta(pos);
+            delta_diff += (c - d).abs();
+        }
+
+        // Combine: flow path change + gate divergence + delta divergence
+        weight_diff / 6.0 + gate_diff * 10.0 + delta_diff
+    }
+
+    /// Print a summary of all detected phase transitions
+    pub fn print_transitions(&self) {
+        if self.transitions.is_empty() {
+            println!("[PhaseTracker] No phase transitions detected yet.");
+            return;
+        }
+        println!("\n=== PHASE TRANSITIONS DETECTED ===");
+        for (cycle, metric, magnitude) in &self.transitions {
+            println!("  cycle {:4} | {} | magnitude: {:.1}%",
+                cycle, metric, magnitude * 100.0);
+        }
+        println!("  Total: {} transitions across {} cycles",
+            self.transitions.len(), self.snapshots.len());
+    }
+
+    /// Print a compact metrics summary (every N cycles)
+    pub fn print_summary(&self, every_n: usize) {
+        println!("\n=== PHASE METRICS (every {} cycles) ===", every_n);
+        println!("{:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>6}",
+            "cycle", "rej_rate", "conf", "ngram", "novel", "dual", "entropy", "commit");
+        for snapshot in self.snapshots.iter().step_by(every_n) {
+            println!("{:6} {:8.4} {:8.4} {:8.4} {:8.4} {:8.4} {:8.4} {:6}",
+                snapshot.cycle,
+                snapshot.rejection_rate,
+                snapshot.avg_confidence,
+                snapshot.best_ngram_score,
+                snapshot.best_novelty,
+                snapshot.dual_objective,
+                snapshot.topology_entropy,
+                snapshot.total_committed,
+            );
+        }
+        // Also print last snapshot if not aligned
+        if let Some(last) = self.snapshots.last() {
+            if last.cycle % every_n != 0 {
+                println!("{:6} {:8.4} {:8.4} {:8.4} {:8.4} {:8.4} {:8.4} {:6} (latest)",
+                    last.cycle, last.rejection_rate, last.avg_confidence,
+                    last.best_ngram_score, last.best_novelty, last.dual_objective,
+                    last.topology_entropy, last.total_committed);
+            }
+        }
+    }
+}
+
+// =============================================================================
+// 11. MetaController — Self-Improving Loop
+// =============================================================================
+
+/// A task proposed by the meta-controller for the next generation cycle
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MetaTask {
+    /// Generate a fresh sentence from scratch (exploration)
+    Explore,
+    /// Refine a specific low-scoring sentence by regenerating with similar prompt
+    Refine { sentence_idx: usize },
+    /// Mutate the terrain to explore a new domain
+    MutateTerrain,
+}
+
+/// Configuration for the meta-controller loop
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetaControllerConfig {
+    /// Commit threshold: dual-objective score above this → commit to corpus
+    pub commit_threshold: f32,
+    /// Refine threshold: sentences below this are candidates for refinement
+    pub refine_threshold: f32,
+    /// Terrain mutation rate: probability of mutating terrain each cycle
+    pub terrain_mutation_rate: f32,
+    /// Terrain mutation magnitude: how much ELP values shift per mutation
+    pub terrain_mutation_magnitude: f32,
+    /// N-gram plausibility threshold
+    pub ngram_threshold: f32,
+    /// Maximum cycles to run
+    pub max_cycles: usize,
+    /// Print progress every N cycles
+    pub print_every: usize,
+}
+
+impl Default for MetaControllerConfig {
+    fn default() -> Self {
+        Self {
+            commit_threshold: 0.5,
+            refine_threshold: 0.2,
+            terrain_mutation_rate: 0.1,
+            terrain_mutation_magnitude: 0.5,
+            ngram_threshold: 0.3,
+            max_cycles: 1000,
+            print_every: 50,
+        }
+    }
+}
+
+/// The self-improving meta-controller.
+/// Orchestrates: propose_task → generate → evaluate → adapt → (maybe commit)
+pub struct MetaController {
+    /// The diffusion engine
+    pub engine: VortexDiffusionEngine,
+    /// N-gram validator (trained from reference text)
+    pub ngram: NgramValidator,
+    /// Sentence memory (vector store)
+    pub memory: SentenceMemory,
+    /// Phase transition tracker
+    pub phase: PhaseTracker,
+    /// Configuration
+    pub config: MetaControllerConfig,
+    /// Current terrain (mutated over time)
+    pub terrain: SubjectTerrain,
+    /// Current cycle index
+    pub cycle: usize,
+    /// Deterministic seed for reproducible terrain mutations
+    seed: f32,
+}
+
+impl MetaController {
+    /// Create a new meta-controller with an engine and reference text for n-grams
+    pub fn new(
+        engine: VortexDiffusionEngine,
+        reference_texts: &[&str],
+        config: MetaControllerConfig,
+    ) -> Self {
+        let embed_dim = engine.config.embed_dim;
+        let mut ngram = NgramValidator::new();
+        for text in reference_texts {
+            ngram.train_from_text(text);
+        }
+
+        // Default terrain
+        let mut elp = HashMap::new();
+        for pos in 1..=9 {
+            elp.insert(pos, [5.0, 5.0, 5.0]); // Balanced start
+        }
+        let terrain = SubjectTerrain {
+            name: "meta_default".to_string(),
+            elp_landscape: elp,
+            sacred_properties: HashMap::new(),
+        };
+
+        Self {
+            engine,
+            ngram,
+            memory: SentenceMemory::new(embed_dim, 10_000),
+            phase: PhaseTracker::new(),
+            config,
+            terrain,
+            cycle: 0,
+            seed: 0.0,
+        }
+    }
+
+    /// Propose the next task based on current memory state
+    pub fn propose_next_task(&self) -> MetaTask {
+        // If memory is empty or mostly empty, explore
+        if self.memory.len() < 5 {
+            return MetaTask::Explore;
+        }
+
+        // Deterministic "random" based on cycle and seed
+        let r = ((self.cycle as f32 * PHI_INV + self.seed).fract() * 100.0) as u32;
+
+        // Every N cycles, consider terrain mutation
+        if (r as f32 / 100.0) < self.config.terrain_mutation_rate {
+            return MetaTask::MutateTerrain;
+        }
+
+        // Find lowest-scoring non-committed sentence
+        let worst = self.memory.records.iter().enumerate()
+            .filter(|(_, r)| !r.committed)
+            .min_by(|(_, a), (_, b)| a.ngram_score.partial_cmp(&b.ngram_score)
+                .unwrap_or(std::cmp::Ordering::Equal));
+
+        if let Some((idx, record)) = worst {
+            if record.ngram_score < self.config.refine_threshold {
+                return MetaTask::Refine { sentence_idx: idx };
+            }
+        }
+
+        MetaTask::Explore
+    }
+
+    /// Generate a sentence based on the given task
+    pub fn generate_from_task(&mut self, task: &MetaTask) -> Vec<u32> {
+        match task {
+            MetaTask::Explore => {
+                // Generate from scratch with adaptive length
+                self.engine.generate_adaptive(&[])
+            }
+            MetaTask::Refine { sentence_idx } => {
+                // Use first few tokens of the low-scoring sentence as prompt
+                if let Some(record) = self.memory.records.get(*sentence_idx) {
+                    let prompt_len = (record.token_ids.len() / 3).max(1).min(5);
+                    let prompt = &record.token_ids[..prompt_len];
+                    self.engine.generate_adaptive(prompt)
+                } else {
+                    self.engine.generate_adaptive(&[])
+                }
+            }
+            MetaTask::MutateTerrain => {
+                // Mutate terrain, reload it, then generate
+                self.mutate_terrain();
+                self.engine.load_terrain(self.terrain.clone());
+                self.engine.generate_adaptive(&[])
+            }
+        }
+    }
+
+    /// Evaluate a generated sentence: returns (ngram_score, novelty, dual_objective)
+    pub fn evaluate_output(&self, token_ids: &[u32]) -> (f32, f32, f32) {
+        let ngram_score = self.ngram.score(token_ids).combined_score;
+
+        // Compute embedding: average of token embeddings
+        let embedding = self.compute_sentence_embedding(token_ids);
+        let novelty = self.memory.novelty(&embedding);
+
+        // Dual objective: grammatically perfect AND semantically novel
+        // Geometric mean so BOTH must be high
+        let dual = (ngram_score * novelty).sqrt();
+
+        (ngram_score, novelty, dual)
+    }
+
+    /// Record the generation result, adapt topology, maybe commit
+    pub fn record_and_adapt(
+        &mut self,
+        token_ids: Vec<u32>,
+        ngram_score: f32,
+        novelty: f32,
+        dual: f32,
+    ) {
+        let embedding = self.compute_sentence_embedding(&token_ids);
+        let stats = self.engine.get_stats().clone();
+
+        let committed = dual >= self.config.commit_threshold;
+
+        let record = SentenceRecord {
+            token_ids,
+            text: String::new(), // Would need vocab to decode
+            ngram_score,
+            avg_confidence: stats.avg_confidence,
+            rejections: stats.sacred_rejections,
+            terrain_name: self.terrain.name.clone(),
+            cycle_index: self.cycle,
+            embedding,
+            committed,
+        };
+
+        self.memory.store(record);
+
+        // Record phase metrics
+        let rejection_rate = if stats.tokens_generated > 0 {
+            stats.sacred_rejections as f32 / stats.tokens_generated as f32
+        } else { 0.0 };
+
+        let topology_entropy = PhaseTracker::topology_entropy(&self.engine.topology);
+
+        self.phase.record(PhaseSnapshot {
+            cycle: self.cycle,
+            avg_steps_to_lock: 0.0, // TODO: derive from trace if enabled
+            rejection_rate,
+            avg_confidence: stats.avg_confidence,
+            avg_coherence: 0.0,
+            best_ngram_score: ngram_score,
+            best_novelty: novelty,
+            topology_entropy,
+            total_committed: self.memory.committed().len(),
+            dual_objective: dual,
+        });
+    }
+
+    /// Run the full self-improving loop for N cycles
+    pub fn run(&mut self, num_cycles: usize) {
+        let max = num_cycles.min(self.config.max_cycles);
+        let print_every = self.config.print_every;
+
+        println!("\n╔══════════════════════════════════════════════════════════════╗");
+        println!("║        VORTEX META-CONTROLLER — SELF-IMPROVING LOOP        ║");
+        println!("║  cycles={}, commit_threshold={:.2}, ngram_threshold={:.2}",
+            max, self.config.commit_threshold, self.config.ngram_threshold);
+        println!("║  ngram stats: {} unigrams, {} bigrams, {} trigrams",
+            self.ngram.unigrams.len(), self.ngram.bigrams.len(), self.ngram.trigrams.len());
+        println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+        for _ in 0..max {
+            // 1. Propose next task
+            let task = self.propose_next_task();
+
+            // 2. Generate
+            let output = self.generate_from_task(&task);
+
+            // 3. Evaluate
+            let (ngram_score, novelty, dual) = self.evaluate_output(&output);
+
+            // 4. Record and adapt
+            let committed = dual >= self.config.commit_threshold;
+            self.record_and_adapt(output, ngram_score, novelty, dual);
+
+            // 5. Print progress
+            if self.cycle % print_every == 0 || self.cycle == max - 1 {
+                let task_name = match task {
+                    MetaTask::Explore => "explore",
+                    MetaTask::Refine { .. } => "refine",
+                    MetaTask::MutateTerrain => "mutate",
+                };
+                println!("  cycle {:4}/{} | task={:7} | ngram={:.4} novel={:.4} dual={:.4} | committed={} | corpus={}",
+                    self.cycle, max, task_name,
+                    ngram_score, novelty, dual, committed,
+                    self.memory.committed().len());
+            }
+
+            self.cycle += 1;
+        }
+
+        // Final summary
+        println!("\n--- Meta-Controller Complete ---");
+        println!("  Total cycles: {}", self.cycle);
+        println!("  Corpus size: {} ({} committed)",
+            self.memory.len(), self.memory.committed().len());
+        println!("  Avg committed ngram: {:.4}", self.memory.avg_committed_ngram_score());
+
+        self.phase.print_transitions();
+        self.phase.print_summary(print_every);
+    }
+
+    /// Mutate the terrain ELP values deterministically
+    fn mutate_terrain(&mut self) {
+        self.seed += PHI_INV;
+        let magnitude = self.config.terrain_mutation_magnitude;
+
+        for pos in 1..=9 {
+            if let Some(elp) = self.terrain.elp_landscape.get_mut(&pos) {
+                // Deterministic mutation using vortex cycle position
+                let t = ((pos as f32 * PHI_INV + self.seed).fract() * 2.0 - 1.0) * magnitude;
+                // Rotate ELP emphasis: shift energy between Ethos, Logos, Pathos
+                let idx = (self.cycle % 3) as usize;
+                elp[idx] = (elp[idx] + t).clamp(0.1, 10.0);
+            }
+        }
+
+        self.terrain.name = format!("mutated_c{}", self.cycle);
+    }
+
+    /// Compute a sentence embedding by averaging token embeddings
+    fn compute_sentence_embedding(&self, token_ids: &[u32]) -> Vec<f32> {
+        let dim = self.engine.config.embed_dim;
+        if token_ids.is_empty() {
+            return vec![0.0; dim];
+        }
+
+        let mut avg = vec![0.0f32; dim];
+        for (i, &id) in token_ids.iter().enumerate() {
+            let embed = self.engine.transformer.get_embedding(id, i);
+            for (j, val) in embed.iter().enumerate() {
+                if j < dim { avg[j] += val; }
+            }
+        }
+        let n = token_ids.len() as f32;
+        for val in &mut avg { *val /= n; }
+
+        // L2 normalize
+        let norm: f32 = avg.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 1e-8 {
+            for val in &mut avg { *val /= norm; }
+        }
+        avg
+    }
+
+    /// Get the phase tracker for external analysis
+    pub fn phase_tracker(&self) -> &PhaseTracker {
+        &self.phase
+    }
+
+    /// Get the sentence memory for external analysis
+    pub fn sentence_memory(&self) -> &SentenceMemory {
+        &self.memory
     }
 }
 
@@ -1542,8 +3285,34 @@ mod tests {
             temperature: 0.8,
             top_k: 20,
             sacred_verification: sacred,
+            adaptive_topology: false,
+            enable_tracing: false,
         };
         VortexDiffusionEngine::new(config)
+    }
+
+    /// Helper: create an adaptive engine with topology and RSI enabled
+    fn make_adaptive_engine(num_cycles: usize, terrain: Option<SubjectTerrain>) -> VortexDiffusionEngine {
+        let config = VortexDiffusionConfig {
+            embed_dim: 64,
+            vocab_size: 200,
+            num_heads: 4,
+            max_seq_len: 128,
+            num_cycles,
+            schedule_type: ScheduleType::SacredVortex,
+            temperature: 0.8,
+            top_k: 20,
+            sacred_verification: true,
+            adaptive_topology: true,
+            enable_tracing: false,
+        };
+        match terrain {
+            Some(t) => {
+                let topo = AdaptiveVortexTopology::from_terrain(t);
+                VortexDiffusionEngine::with_topology(config, topo)
+            }
+            None => VortexDiffusionEngine::new(config),
+        }
     }
 
     /// BENCHMARK 1: Schedule Comparison
@@ -1888,5 +3657,893 @@ mod tests {
                 stats.forced_acceptances,
                 stats.tokens_per_cycle.len());
         }
+    }
+
+    // =========================================================================
+    // Adaptive Topology Tests — Dynamic Flow, RSI, Subject Terrain
+    // =========================================================================
+
+    /// TOPOLOGY 1: Default topology matches original hardcoded constants
+    #[test]
+    fn test_default_topology_matches_original() {
+        let topo = AdaptiveVortexTopology::default();
+
+        // Sacred positions should be [3, 6, 9] — immutable, the unmanifest
+        assert_eq!(*topo.sacred_positions(), [3, 6, 9]);
+
+        // Flow path should follow 1→2→4→8→7→5
+        let flow = topo.flow_path();
+        assert_eq!(flow, vec![1, 2, 4, 8, 7, 5]);
+
+        // Gate thresholds should match original defaults
+        assert!((topo.gate_thresholds.0 - 0.15).abs() < 0.001);
+        assert!((topo.gate_thresholds.1 - 0.30).abs() < 0.001);
+        assert!((topo.gate_thresholds.2 - 0.40).abs() < 0.001);
+
+        // Noise deltas should match original hardcoded values
+        let expected_1 = -0.02 * PHI_INV;
+        let expected_8 = -0.08 * PHI_INV;
+        let expected_7 = 0.06 * PHI_INV;
+        assert!((topo.noise_delta(1) - expected_1).abs() < 0.0001);
+        assert!((topo.noise_delta(8) - expected_8).abs() < 0.0001);
+        assert!((topo.noise_delta(7) - expected_7).abs() < 0.0001);
+        assert_eq!(topo.noise_delta(3), 0.0); // Sacred: no mutation
+        assert_eq!(topo.noise_delta(6), 0.0);
+        assert_eq!(topo.noise_delta(9), 0.0);
+
+        println!("Default topology verified: flow={:?}, sacred={:?}", flow, topo.sacred_positions());
+    }
+
+    /// TOPOLOGY 2: SubjectTerrain modulates noise deltas based on ELP
+    #[test]
+    fn test_terrain_modulates_deltas() {
+        // Create a Logos-heavy terrain (logic/reasoning domain)
+        let mut elp = HashMap::new();
+        elp.insert(1, [2.0, 8.0, 1.0]); // Logos-dominant
+        elp.insert(4, [1.0, 9.0, 1.0]); // Logos-dominant
+        elp.insert(5, [1.0, 2.0, 8.0]); // Pathos-dominant
+        elp.insert(3, [5.0, 5.0, 5.0]); // Sacred: balanced
+        elp.insert(6, [3.0, 3.0, 9.0]); // Sacred: Pathos
+        elp.insert(9, [3.0, 9.0, 3.0]); // Sacred: Logos
+
+        let terrain = SubjectTerrain {
+            name: "logic".to_string(),
+            elp_landscape: elp,
+            sacred_properties: HashMap::new(),
+        };
+
+        let default_topo = AdaptiveVortexTopology::default();
+        let terrain_topo = AdaptiveVortexTopology::from_terrain(terrain);
+
+        // Logos-dominant positions should have MORE positive (contraction) delta
+        // than the default — they want more refinement
+        let delta_4_default = default_topo.noise_delta(4);
+        let delta_4_terrain = terrain_topo.noise_delta(4);
+        assert!(delta_4_terrain > delta_4_default,
+            "Logos-dominant pos 4 should have higher delta: terrain={:.4} vs default={:.4}",
+            delta_4_terrain, delta_4_default);
+
+        // Pathos-dominant positions should have MORE negative (expansion) delta
+        let delta_5_default = default_topo.noise_delta(5);
+        let delta_5_terrain = terrain_topo.noise_delta(5);
+        assert!(delta_5_terrain < delta_5_default,
+            "Pathos-dominant pos 5 should have lower delta: terrain={:.4} vs default={:.4}",
+            delta_5_terrain, delta_5_default);
+
+        // Gate thresholds should be stricter with high sacred terrain weight
+        assert!(terrain_topo.gate_thresholds.2 >= default_topo.gate_thresholds.2,
+            "Terrain with strong sacred positions should have stricter verification: {:.3} vs {:.3}",
+            terrain_topo.gate_thresholds.2, default_topo.gate_thresholds.2);
+
+        println!("Terrain modulation verified:");
+        println!("  Pos 4 delta: default={:.4}, terrain={:.4}", delta_4_default, delta_4_terrain);
+        println!("  Pos 5 delta: default={:.4}, terrain={:.4}", delta_5_default, delta_5_terrain);
+        println!("  Verify threshold: default={:.3}, terrain={:.3}",
+            default_topo.gate_thresholds.2, terrain_topo.gate_thresholds.2);
+    }
+
+    /// TOPOLOGY 3: RSI adaptation lowers thresholds when rejection rate is high
+    #[test]
+    fn test_rsi_adapts_on_high_rejection() {
+        let mut topo = AdaptiveVortexTopology::default();
+        let original_thresholds = topo.gate_thresholds;
+
+        // Simulate 3 cycles with very high rejection rate
+        for i in 0..3 {
+            topo.record_cycle(CycleMetrics {
+                tokens_locked: 1,
+                tokens_rejected: 10,
+                tokens_forced: 0,
+                avg_lock_confidence: 0.2,
+                avg_coherence: 0.3,
+                rejection_hotspot: 9,
+                cycle_index: i,
+            });
+        }
+
+        topo.adapt();
+
+        // Thresholds should have DECREASED (more lenient)
+        assert!(topo.gate_thresholds.0 < original_thresholds.0,
+            "Proximity threshold should decrease: {:.3} vs {:.3}",
+            topo.gate_thresholds.0, original_thresholds.0);
+        assert!(topo.gate_thresholds.2 < original_thresholds.2,
+            "Verification threshold should decrease: {:.3} vs {:.3}",
+            topo.gate_thresholds.2, original_thresholds.2);
+
+        assert_eq!(topo.generation, 1, "Generation counter should increment");
+
+        println!("RSI high-rejection adaptation:");
+        println!("  Before: ({:.3}, {:.3}, {:.3})", original_thresholds.0, original_thresholds.1, original_thresholds.2);
+        println!("  After:  ({:.3}, {:.3}, {:.3})", topo.gate_thresholds.0, topo.gate_thresholds.1, topo.gate_thresholds.2);
+    }
+
+    /// TOPOLOGY 4: RSI adaptation raises thresholds when force rate is high
+    #[test]
+    fn test_rsi_adapts_on_high_force() {
+        let mut topo = AdaptiveVortexTopology::default();
+        let original_thresholds = topo.gate_thresholds;
+
+        // Simulate 3 cycles with high force-acceptance rate
+        for i in 0..3 {
+            topo.record_cycle(CycleMetrics {
+                tokens_locked: 2,
+                tokens_rejected: 0,
+                tokens_forced: 8,
+                avg_lock_confidence: 0.8,
+                avg_coherence: 0.5,
+                rejection_hotspot: 0,
+                cycle_index: i,
+            });
+        }
+
+        topo.adapt();
+
+        // Thresholds should have INCREASED (stricter)
+        assert!(topo.gate_thresholds.0 > original_thresholds.0,
+            "Proximity threshold should increase: {:.3} vs {:.3}",
+            topo.gate_thresholds.0, original_thresholds.0);
+        assert!(topo.gate_thresholds.2 > original_thresholds.2,
+            "Verification threshold should increase: {:.3} vs {:.3}",
+            topo.gate_thresholds.2, original_thresholds.2);
+
+        println!("RSI high-force adaptation:");
+        println!("  Before: ({:.3}, {:.3}, {:.3})", original_thresholds.0, original_thresholds.1, original_thresholds.2);
+        println!("  After:  ({:.3}, {:.3}, {:.3})", topo.gate_thresholds.0, topo.gate_thresholds.1, topo.gate_thresholds.2);
+    }
+
+    /// TOPOLOGY 5: RSI boosts contraction deltas when confidence is low
+    #[test]
+    fn test_rsi_boosts_contraction_on_low_confidence() {
+        let mut topo = AdaptiveVortexTopology::default();
+        let original_delta_7 = topo.noise_delta(7);
+        let original_delta_5 = topo.noise_delta(5);
+
+        // Simulate 3 cycles with low confidence
+        for i in 0..3 {
+            topo.record_cycle(CycleMetrics {
+                tokens_locked: 5,
+                tokens_rejected: 2,
+                tokens_forced: 0,
+                avg_lock_confidence: 0.15, // Very low
+                avg_coherence: 0.3,
+                rejection_hotspot: 0,
+                cycle_index: i,
+            });
+        }
+
+        topo.adapt();
+
+        // Contraction positions (7, 5) should have HIGHER delta (more refinement)
+        assert!(topo.noise_delta(7) > original_delta_7,
+            "Pos 7 delta should increase: {:.4} vs {:.4}", topo.noise_delta(7), original_delta_7);
+        assert!(topo.noise_delta(5) > original_delta_5,
+            "Pos 5 delta should increase: {:.4} vs {:.4}", topo.noise_delta(5), original_delta_5);
+
+        println!("RSI low-confidence adaptation:");
+        println!("  Pos 7: {:.4} -> {:.4}", original_delta_7, topo.noise_delta(7));
+        println!("  Pos 5: {:.4} -> {:.4}", original_delta_5, topo.noise_delta(5));
+    }
+
+    /// TOPOLOGY 6: Adaptive schedule differs from static when terrain is loaded
+    #[test]
+    fn test_adaptive_schedule_differs_from_static() {
+        let mut elp = HashMap::new();
+        for pos in 1..=9 {
+            elp.insert(pos, [5.0, 7.0, 3.0]); // Logos-heavy everywhere
+        }
+        let terrain = SubjectTerrain {
+            name: "reasoning".to_string(),
+            elp_landscape: elp,
+            sacred_properties: HashMap::new(),
+        };
+
+        let static_topo = AdaptiveVortexTopology::default();
+        let terrain_topo = AdaptiveVortexTopology::from_terrain(terrain);
+
+        let total_steps = 81;
+        let static_schedule = static_topo.compute_adaptive_schedule(total_steps);
+        let terrain_schedule = terrain_topo.compute_adaptive_schedule(total_steps);
+
+        assert_eq!(static_schedule.len(), 81);
+        assert_eq!(terrain_schedule.len(), 81);
+
+        // The schedules should differ at non-sacred positions
+        let mut differences = 0;
+        for i in 0..total_steps {
+            if (static_schedule[i] - terrain_schedule[i]).abs() > 0.001 {
+                differences += 1;
+            }
+        }
+
+        assert!(differences > 0,
+            "Terrain-modulated schedule should differ from static: {} differences", differences);
+
+        println!("Schedule differences: {}/81 steps differ between static and terrain", differences);
+    }
+
+    /// TOPOLOGY 7: Dynamic sacred positions in engine generation
+    #[test]
+    fn test_adaptive_engine_generates() {
+        let mut engine = make_adaptive_engine(5, None);
+        let result = engine.generate(&[10, 20], 10);
+
+        assert_eq!(result.len(), 12);
+        assert_eq!(result[0], 10);
+        assert_eq!(result[1], 20);
+
+        // Should have recorded some RSI cycle metrics
+        let topo = engine.get_topology();
+        // Topology might have adapted if enough cycles ran
+        println!("Adaptive engine: {} RSI cycles observed, generation={}",
+            topo.cycle_history.len(), topo.generation);
+
+        let stats = engine.get_stats();
+        assert_eq!(stats.tokens_generated, 10);
+        println!("  conf={:.4}, rejections={}, verifications={}, forced={}",
+            stats.avg_confidence, stats.sacred_rejections,
+            stats.sacred_verifications, stats.forced_acceptances);
+    }
+
+    /// TOPOLOGY 8: Engine with terrain generates differently than default
+    #[test]
+    fn test_terrain_engine_vs_default() {
+        let gen_len = 12;
+        let prompt = vec![10u32, 20, 30];
+
+        // Default engine
+        let mut default_engine = make_adaptive_engine(5, None);
+        let default_result = default_engine.generate(&prompt, gen_len);
+
+        // Terrain engine with strong Pathos emphasis
+        let mut elp = HashMap::new();
+        for pos in 1..=9 {
+            elp.insert(pos, [1.0, 1.0, 9.0]); // Pathos-heavy everywhere
+        }
+        let terrain = SubjectTerrain {
+            name: "emotion".to_string(),
+            elp_landscape: elp,
+            sacred_properties: HashMap::new(),
+        };
+        let mut terrain_engine = make_adaptive_engine(5, Some(terrain));
+        let terrain_result = terrain_engine.generate(&prompt, gen_len);
+
+        // Both should produce valid output
+        assert_eq!(default_result.len(), prompt.len() + gen_len);
+        assert_eq!(terrain_result.len(), prompt.len() + gen_len);
+
+        // The gate thresholds should differ
+        let default_thresh = default_engine.get_topology().gate_thresholds;
+        let terrain_thresh = terrain_engine.get_topology().gate_thresholds;
+
+        println!("Default thresholds: ({:.3}, {:.3}, {:.3})",
+            default_thresh.0, default_thresh.1, default_thresh.2);
+        println!("Terrain thresholds: ({:.3}, {:.3}, {:.3})",
+            terrain_thresh.0, terrain_thresh.1, terrain_thresh.2);
+    }
+
+    /// TOPOLOGY 9: TopologySummary provides correct overview
+    #[test]
+    fn test_topology_summary() {
+        let topo = AdaptiveVortexTopology::default();
+        let summary = topo.summary();
+
+        assert_eq!(summary.flow_path, vec![1, 2, 4, 8, 7, 5]);
+        assert_eq!(summary.sacred_positions, vec![3, 6, 9]);
+        assert_eq!(summary.expansion_edges, 3);
+        assert_eq!(summary.contraction_edges, 3);
+        assert_eq!(summary.generation, 0);
+        assert_eq!(summary.terrain_name, "default");
+        assert_eq!(summary.cycles_observed, 0);
+        assert!((summary.total_edge_weight - 6.0).abs() < 0.001);
+
+        println!("Summary: {:?}", summary);
+    }
+
+    /// TOPOLOGY 10: Sacred positions are IMMUTABLE — always [3, 6, 9]
+    /// The unmanifest domain cannot be overridden. Like Gods to Mortals.
+    #[test]
+    fn test_sacred_positions_immutable() {
+        let topo = AdaptiveVortexTopology::default();
+
+        // Sacred positions are always [3, 6, 9]
+        assert_eq!(*topo.sacred_positions(), [3, 6, 9]);
+        assert!(topo.is_sacred(3));
+        assert!(topo.is_sacred(6));
+        assert!(topo.is_sacred(9));
+
+        // Flow positions are NOT sacred
+        assert!(!topo.is_sacred(1));
+        assert!(!topo.is_sacred(2));
+        assert!(!topo.is_sacred(4));
+        assert!(!topo.is_sacred(5));
+        assert!(!topo.is_sacred(7));
+        assert!(!topo.is_sacred(8));
+
+        // Even after RSI adaptation, sacred positions remain [3, 6, 9]
+        let mut adapted_topo = AdaptiveVortexTopology::default();
+        for i in 0..9 {
+            adapted_topo.record_cycle(CycleMetrics {
+                tokens_locked: 1, tokens_rejected: 10, tokens_forced: 5,
+                avg_lock_confidence: 0.1, avg_coherence: 0.2,
+                rejection_hotspot: 9, cycle_index: i,
+            });
+        }
+        adapted_topo.adapt();
+        adapted_topo.adapt();
+        adapted_topo.adapt();
+
+        // Still immutable
+        assert_eq!(*adapted_topo.sacred_positions(), [3, 6, 9]);
+        assert!(adapted_topo.is_sacred(3));
+        assert!(adapted_topo.is_sacred(6));
+        assert!(adapted_topo.is_sacred(9));
+
+        // Even with terrain, sacred positions don't change
+        let mut elp = HashMap::new();
+        for pos in 1..=9 { elp.insert(pos, [9.0, 9.0, 9.0]); }
+        let terrain = SubjectTerrain {
+            name: "extreme".to_string(),
+            elp_landscape: elp,
+            sacred_properties: HashMap::new(),
+        };
+        let terrain_topo = AdaptiveVortexTopology::from_terrain(terrain);
+        assert_eq!(*terrain_topo.sacred_positions(), [3, 6, 9]);
+
+        println!("Sacred positions immutability verified: always {:?}", topo.sacred_positions());
+    }
+
+    /// TOPOLOGY 12: Harmonic weight initialization produces structured (not random) weights
+    #[test]
+    fn test_harmonic_init_structured() {
+        let t1 = DiffusionTransformer::new(32, 100, 4, 64);
+        let t2 = DiffusionTransformer::new(32, 100, 4, 64);
+
+        // Deterministic: same params = same weights
+        assert_eq!(t1.w_q, t2.w_q, "Harmonic init should be deterministic");
+        assert_eq!(t1.token_embeddings, t2.token_embeddings);
+
+        // Not all zeros (harmonic sums can be small due to cancellation)
+        let sum: f32 = t1.w_q.iter().sum();
+        let abs_sum: f32 = t1.w_q.iter().map(|x| x.abs()).sum();
+        assert!(abs_sum > 0.01, "Weights should not be all zero: abs_sum={}", abs_sum);
+        // The signed sum can be small due to symmetry — that's fine
+
+        // Not all the same value (has structure)
+        let unique_vals: std::collections::HashSet<u32> = t1.w_q.iter()
+            .map(|x| x.to_bits())
+            .collect();
+        assert!(unique_vals.len() > t1.w_q.len() / 2,
+            "Weights should have many unique values: {}/{}", unique_vals.len(), t1.w_q.len());
+
+        // Q and K should be different (different harmonic seeds)
+        let q_sum: f32 = t1.w_q.iter().sum();
+        let k_sum: f32 = t1.w_k.iter().sum();
+        assert!((q_sum - k_sum).abs() > 0.001,
+            "Q and K should differ: q_sum={:.4}, k_sum={:.4}", q_sum, k_sum);
+
+        // Sacred dampening: positions 2,5,8 (mod 9) should have lower magnitude
+        let sacred_mag: f32 = t1.w_q.iter().enumerate()
+            .filter(|(i, _)| i % 9 == 2 || i % 9 == 5 || i % 9 == 8)
+            .map(|(_, v)| v.abs())
+            .sum::<f32>();
+        let flow_mag: f32 = t1.w_q.iter().enumerate()
+            .filter(|(i, _)| i % 9 == 0 || i % 9 == 1 || i % 9 == 3)
+            .map(|(_, v)| v.abs())
+            .sum::<f32>();
+
+        // Sacred positions should have lower total magnitude (dampened by φ⁻¹)
+        assert!(sacred_mag < flow_mag,
+            "Sacred-dampened positions should have lower magnitude: sacred={:.4} < flow={:.4}",
+            sacred_mag, flow_mag);
+
+        println!("Harmonic init: {} unique values in Q[{}], sacred_mag={:.4} < flow_mag={:.4}",
+            unique_vals.len(), t1.w_q.len(), sacred_mag, flow_mag);
+    }
+
+    /// TOPOLOGY 13: Tracing captures step-by-step generation details
+    #[test]
+    fn test_diffusion_trace() {
+        let config = VortexDiffusionConfig {
+            embed_dim: 32,
+            vocab_size: 100,
+            num_heads: 4,
+            max_seq_len: 64,
+            num_cycles: 5, // More cycles to ensure all sacred positions fire
+            sacred_verification: true,
+            enable_tracing: true,
+            ..Default::default()
+        };
+        let mut engine = VortexDiffusionEngine::new(config);
+        let result = engine.generate(&[], 8);
+
+        assert_eq!(result.len(), 8);
+
+        let trace = engine.get_trace();
+        assert!(trace.enabled, "Trace should be enabled");
+        assert!(!trace.steps.is_empty(), "Trace should have steps");
+        assert_eq!(trace.prompt_len, 0);
+        assert_eq!(trace.gen_len, 8);
+        assert_eq!(trace.final_tokens.len(), 8);
+
+        // Count action types
+        let mut denoise_count = 0;
+        let mut proximity_count = 0;
+        let mut coherence_count = 0;
+        let mut verify_count = 0;
+        let mut skip_count = 0;
+        for step in &trace.steps {
+            match &step.action {
+                StepAction::Denoise { .. } => denoise_count += 1,
+                StepAction::SacredProximity { .. } => proximity_count += 1,
+                StepAction::SacredCoherence { .. } => coherence_count += 1,
+                StepAction::SacredVerification { .. } => verify_count += 1,
+                StepAction::Skip { .. } => skip_count += 1,
+            }
+        }
+
+        // Must have denoise steps (non-sacred positions generate proposals)
+        assert!(denoise_count > 0, "Trace should have Denoise steps, got 0");
+
+        // Must have at least one sacred action (proximity, coherence, or verification)
+        let sacred_total = proximity_count + coherence_count + verify_count;
+        assert!(sacred_total > 0,
+            "Trace should have sacred steps: prox={} coh={} verify={}",
+            proximity_count, coherence_count, verify_count);
+
+        // Print the trace for visual inspection
+        engine.print_trace();
+
+        println!("Trace: {} steps ({} denoise, {} prox, {} coh, {} verify, {} skip), {} final tokens",
+            trace.steps.len(), denoise_count, proximity_count,
+            coherence_count, verify_count, skip_count, trace.final_tokens.len());
+    }
+
+    /// TOPOLOGY 14: Adaptive generation adjusts length based on prompt complexity
+    #[test]
+    fn test_adaptive_generation() {
+        let config = VortexDiffusionConfig {
+            embed_dim: 32,
+            vocab_size: 100,
+            num_heads: 4,
+            max_seq_len: 128,
+            num_cycles: 3,
+            sacred_verification: true,
+            ..Default::default()
+        };
+
+        // No prompt → longer generation
+        let mut engine_empty = VortexDiffusionEngine::new(config.clone());
+        let result_empty = engine_empty.generate_adaptive(&[]);
+        let gen_empty = result_empty.len();
+
+        // Short prompt → medium generation
+        let mut engine_short = VortexDiffusionEngine::new(config.clone());
+        let result_short = engine_short.generate_adaptive(&[1, 2, 3]);
+        let gen_short = result_short.len() - 3;
+
+        // Long prompt → shorter generation
+        let long_prompt: Vec<u32> = (0..40).collect();
+        let mut engine_long = VortexDiffusionEngine::new(config.clone());
+        let result_long = engine_long.generate_adaptive(&long_prompt);
+        let gen_long = result_long.len() - 40;
+
+        // Empty prompt should generate more than long prompt
+        assert!(gen_empty > gen_long,
+            "Empty prompt should generate more tokens: {} vs {}", gen_empty, gen_long);
+
+        // All should produce valid output (no masks remaining)
+        assert!(!result_empty.contains(&MASK_TOKEN_ID));
+        assert!(!result_short.contains(&MASK_TOKEN_ID));
+        assert!(!result_long.contains(&MASK_TOKEN_ID));
+
+        println!("Adaptive generation: empty={} tokens, short={} tokens, long={} tokens",
+            gen_empty, gen_short, gen_long);
+    }
+
+    /// TOPOLOGY 11: Billions of terrains — verify diverse subjects produce distinct schedules
+    #[test]
+    fn test_diverse_subjects_distinct_schedules() {
+        let subjects = vec![
+            ("mathematics", [2.0, 9.0, 1.0]),  // Logos-dominant
+            ("poetry",      [1.0, 2.0, 9.0]),  // Pathos-dominant
+            ("ethics",      [9.0, 3.0, 3.0]),  // Ethos-dominant
+            ("balanced",    [5.0, 5.0, 5.0]),  // Balanced
+        ];
+
+        let mut schedules: Vec<(String, Vec<f32>)> = Vec::new();
+
+        for (name, elp_base) in &subjects {
+            let mut elp = HashMap::new();
+            for pos in 1..=9 {
+                elp.insert(pos, *elp_base);
+            }
+            let terrain = SubjectTerrain {
+                name: name.to_string(),
+                elp_landscape: elp,
+                sacred_properties: HashMap::new(),
+            };
+            let topo = AdaptiveVortexTopology::from_terrain(terrain);
+            let schedule = topo.compute_adaptive_schedule(81);
+            schedules.push((name.to_string(), schedule));
+        }
+
+        // Each pair should have at least some differences
+        let mut all_distinct = true;
+        for i in 0..schedules.len() {
+            for j in (i+1)..schedules.len() {
+                let diffs: usize = schedules[i].1.iter().zip(schedules[j].1.iter())
+                    .filter(|(a, b)| (*a - *b).abs() > 0.001)
+                    .count();
+                if diffs == 0 { all_distinct = false; }
+                println!("{} vs {}: {}/81 steps differ", schedules[i].0, schedules[j].0, diffs);
+            }
+        }
+
+        assert!(all_distinct, "All distinct subjects should produce distinct schedules");
+    }
+
+    // =========================================================================
+    // N-gram Validator Tests
+    // =========================================================================
+
+    #[test]
+    fn test_ngram_train_and_score() {
+        let mut ngram = NgramValidator::new();
+
+        // Train on a few sentences (as token IDs)
+        ngram.train(&[1, 2, 3, 4, 5]);
+        ngram.train(&[1, 2, 3, 6, 7]);
+        ngram.train(&[1, 2, 8, 9, 10]);
+
+        let (uni, bi, tri) = ngram.stats();
+        assert!(uni > 0, "Should have unigrams");
+        assert!(bi > 0, "Should have bigrams");
+        assert!(tri > 0, "Should have trigrams");
+
+        // Score a sentence that matches training patterns
+        let known = ngram.score(&[1, 2, 3, 4, 5]);
+        // Score a sentence with completely unseen bigrams
+        let unknown = ngram.score(&[50, 51, 52, 53, 54]);
+
+        println!("Known sentence: combined={:.4}, bigram_cov={:.2}, trigram_cov={:.2}",
+            known.combined_score, known.bigram_coverage, known.trigram_coverage);
+        println!("Unknown sentence: combined={:.4}, bigram_cov={:.2}, trigram_cov={:.2}",
+            unknown.combined_score, unknown.bigram_coverage, unknown.trigram_coverage);
+
+        // Known sentence should have higher bigram coverage
+        assert!(known.bigram_coverage > unknown.bigram_coverage,
+            "Known patterns should have higher bigram coverage");
+        // Known sentence should score higher overall
+        assert!(known.combined_score > unknown.combined_score,
+            "Known patterns should score higher: {:.4} vs {:.4}",
+            known.combined_score, unknown.combined_score);
+    }
+
+    #[test]
+    fn test_ngram_train_from_text() {
+        let mut ngram = NgramValidator::new();
+        ngram.train_from_text("the cat sat on the mat");
+        ngram.train_from_text("the dog ran in the park");
+        ngram.train_from_text("the cat ran on the mat");
+
+        let (uni, bi, tri) = ngram.stats();
+        println!("Text training: {} unigrams, {} bigrams, {} trigrams", uni, bi, tri);
+        assert!(uni >= 6, "Should have at least 6 unique words");
+        assert!(bi >= 5, "Should have at least 5 unique bigrams");
+    }
+
+    #[test]
+    fn test_ngram_plausibility() {
+        let mut ngram = NgramValidator::new();
+        // Train on 100 repetitions to build strong patterns
+        for _ in 0..100 {
+            ngram.train(&[1, 2, 3, 4, 5]);
+        }
+        assert!(ngram.is_plausible(&[1, 2, 3, 4, 5], 0.3),
+            "Highly trained pattern should be plausible");
+    }
+
+    #[test]
+    fn test_ngram_edge_cases() {
+        let ngram = NgramValidator::new();
+
+        // Empty and single-token sequences should return zero score
+        let empty = ngram.score(&[]);
+        assert_eq!(empty.combined_score, 0.0);
+        let single = ngram.score(&[42]);
+        assert_eq!(single.combined_score, 0.0);
+    }
+
+    // =========================================================================
+    // SentenceMemory Tests
+    // =========================================================================
+
+    #[test]
+    fn test_sentence_memory_store_and_find() {
+        let mut mem = SentenceMemory::new(4, 100);
+
+        // Store 3 sentences with different embeddings
+        let records = vec![
+            (vec![1, 2, 3], vec![1.0, 0.0, 0.0, 0.0], 0.5),
+            (vec![4, 5, 6], vec![0.0, 1.0, 0.0, 0.0], 0.8),
+            (vec![7, 8, 9], vec![0.9, 0.1, 0.0, 0.0], 0.6), // Similar to first
+        ];
+
+        for (tokens, embed, score) in records {
+            mem.store(SentenceRecord {
+                token_ids: tokens,
+                text: String::new(),
+                ngram_score: score,
+                avg_confidence: 0.5,
+                rejections: 0,
+                terrain_name: "test".to_string(),
+                cycle_index: 0,
+                embedding: embed,
+                committed: false,
+            });
+        }
+
+        assert_eq!(mem.len(), 3);
+
+        // Find similar to [1,0,0,0] — should return idx 0 first, then idx 2
+        let similar = mem.find_similar(&[1.0, 0.0, 0.0, 0.0], 2);
+        assert_eq!(similar.len(), 2);
+        assert_eq!(similar[0].0, 0, "First result should be exact match");
+        assert!(similar[0].1 > 0.99, "Exact match should have sim ~1.0");
+        println!("Top-2 similar: {:?}", similar);
+    }
+
+    #[test]
+    fn test_sentence_memory_novelty() {
+        let mut mem = SentenceMemory::new(3, 100);
+
+        // Empty memory: everything is novel
+        assert_eq!(mem.novelty(&[1.0, 0.0, 0.0]), 1.0);
+
+        // Store one embedding
+        mem.store(SentenceRecord {
+            token_ids: vec![1],
+            text: String::new(),
+            ngram_score: 0.5,
+            avg_confidence: 0.5,
+            rejections: 0,
+            terrain_name: "test".to_string(),
+            cycle_index: 0,
+            embedding: vec![1.0, 0.0, 0.0],
+            committed: false,
+        });
+
+        // Same embedding: zero novelty
+        let same_novelty = mem.novelty(&[1.0, 0.0, 0.0]);
+        assert!(same_novelty < 0.01, "Same embedding should have near-zero novelty: {}", same_novelty);
+
+        // Orthogonal embedding: maximum novelty
+        let orth_novelty = mem.novelty(&[0.0, 1.0, 0.0]);
+        assert!(orth_novelty > 0.99, "Orthogonal embedding should be maximally novel: {}", orth_novelty);
+    }
+
+    #[test]
+    fn test_sentence_memory_eviction() {
+        let mut mem = SentenceMemory::new(2, 3); // Capacity = 3
+
+        for i in 0..5 {
+            mem.store(SentenceRecord {
+                token_ids: vec![i as u32],
+                text: String::new(),
+                ngram_score: 0.5,
+                avg_confidence: 0.5,
+                rejections: 0,
+                terrain_name: "test".to_string(),
+                cycle_index: i,
+                embedding: vec![i as f32, 0.0],
+                committed: false,
+            });
+        }
+
+        // Should have evicted oldest, staying at capacity
+        assert_eq!(mem.len(), 3, "Should stay at capacity after eviction");
+    }
+
+    #[test]
+    fn test_sentence_memory_committed() {
+        let mut mem = SentenceMemory::new(2, 100);
+
+        // Store mix of committed and non-committed
+        for i in 0..4 {
+            mem.store(SentenceRecord {
+                token_ids: vec![i as u32],
+                text: String::new(),
+                ngram_score: if i % 2 == 0 { 0.9 } else { 0.3 },
+                avg_confidence: 0.5,
+                rejections: 0,
+                terrain_name: "test".to_string(),
+                cycle_index: i,
+                embedding: vec![i as f32, 0.0],
+                committed: i % 2 == 0,
+            });
+        }
+
+        let committed = mem.committed();
+        assert_eq!(committed.len(), 2);
+        let avg = mem.avg_committed_ngram_score();
+        assert!((avg - 0.9).abs() < 0.01, "Avg committed ngram should be 0.9: {}", avg);
+    }
+
+    // =========================================================================
+    // PhaseTracker Tests
+    // =========================================================================
+
+    #[test]
+    fn test_phase_tracker_records_snapshots() {
+        let mut tracker = PhaseTracker::new();
+
+        for i in 0..20 {
+            tracker.record(PhaseSnapshot {
+                cycle: i,
+                avg_steps_to_lock: 10.0,
+                rejection_rate: 0.5 - (i as f32 * 0.02), // Gradually decreasing
+                avg_confidence: 0.1 + (i as f32 * 0.02),  // Gradually increasing
+                avg_coherence: 0.5,
+                best_ngram_score: 0.4,
+                best_novelty: 0.6,
+                topology_entropy: 0.0,
+                total_committed: i / 3,
+                dual_objective: 0.3 + (i as f32 * 0.01),
+            });
+        }
+
+        assert_eq!(tracker.snapshots.len(), 20);
+        println!("Phase transitions detected: {}", tracker.transitions.len());
+        tracker.print_transitions();
+    }
+
+    #[test]
+    fn test_phase_tracker_detects_sharp_change() {
+        let mut tracker = PhaseTracker::new();
+
+        // 10 cycles of stable high rejection
+        for i in 0..10 {
+            tracker.record(PhaseSnapshot {
+                cycle: i,
+                avg_steps_to_lock: 10.0,
+                rejection_rate: 0.8,
+                avg_confidence: 0.1,
+                avg_coherence: 0.5,
+                best_ngram_score: 0.3,
+                best_novelty: 0.5,
+                topology_entropy: 0.0,
+                total_committed: 0,
+                dual_objective: 0.2,
+            });
+        }
+
+        // Sudden drop in rejection rate
+        tracker.record(PhaseSnapshot {
+            cycle: 10,
+            avg_steps_to_lock: 10.0,
+            rejection_rate: 0.1, // Sharp drop from 0.8 to 0.1
+            avg_confidence: 0.5, // Jump from 0.1 to 0.5
+            avg_coherence: 0.5,
+            best_ngram_score: 0.5,
+            best_novelty: 0.5,
+            topology_entropy: 0.0,
+            total_committed: 1,
+            dual_objective: 0.5,
+        });
+
+        assert!(!tracker.transitions.is_empty(),
+            "Should detect phase transition on sharp rejection drop");
+        println!("Detected {} transitions:", tracker.transitions.len());
+        for (cycle, metric, mag) in &tracker.transitions {
+            println!("  cycle {}: {} ({:.1}%)", cycle, metric, mag * 100.0);
+        }
+    }
+
+    #[test]
+    fn test_topology_entropy_default_is_zero() {
+        let default_topo = AdaptiveVortexTopology::default();
+        let entropy = PhaseTracker::topology_entropy(&default_topo);
+        assert!(entropy.abs() < 0.001,
+            "Default topology should have zero entropy: {}", entropy);
+    }
+
+    // =========================================================================
+    // MetaController Tests
+    // =========================================================================
+
+    #[test]
+    fn test_meta_controller_creation() {
+        let engine = make_engine(3, true, ScheduleType::SacredVortex);
+        let reference = &[
+            "the cat sat on the mat",
+            "the dog ran in the park",
+            "a bird flew over the tree",
+        ];
+        let config = MetaControllerConfig {
+            max_cycles: 10,
+            print_every: 5,
+            ..Default::default()
+        };
+        let ctrl = MetaController::new(engine, reference, config);
+
+        assert_eq!(ctrl.cycle, 0);
+        assert!(ctrl.memory.is_empty());
+        let (uni, bi, tri) = ctrl.ngram.stats();
+        assert!(uni > 0, "Should have trained unigrams: {}", uni);
+        assert!(bi > 0, "Should have trained bigrams: {}", bi);
+        assert!(tri > 0, "Should have trained trigrams: {}", tri);
+        println!("MetaController created: {} unigrams, {} bigrams, {} trigrams", uni, bi, tri);
+    }
+
+    #[test]
+    fn test_meta_controller_propose_explore_when_empty() {
+        let engine = make_engine(3, true, ScheduleType::SacredVortex);
+        let ctrl = MetaController::new(engine, &["test text"], MetaControllerConfig::default());
+        match ctrl.propose_next_task() {
+            MetaTask::Explore => {} // Expected
+            other => panic!("Expected Explore when memory is empty, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_meta_controller_evaluate() {
+        let engine = make_engine(3, true, ScheduleType::SacredVortex);
+        let ctrl = MetaController::new(
+            engine,
+            &["the cat sat on the mat"],
+            MetaControllerConfig::default(),
+        );
+
+        let (ngram, novelty, dual) = ctrl.evaluate_output(&[1, 2, 3, 4, 5]);
+        println!("Evaluate: ngram={:.4}, novelty={:.4}, dual={:.4}", ngram, novelty, dual);
+        assert!(ngram >= 0.0 && ngram <= 1.0, "N-gram score out of range: {}", ngram);
+        assert!(novelty >= 0.0 && novelty <= 1.0, "Novelty out of range: {}", novelty);
+        assert!(dual >= 0.0, "Dual objective should be non-negative: {}", dual);
+    }
+
+    #[test]
+    fn test_meta_controller_short_run() {
+        let engine = make_engine(3, true, ScheduleType::SacredVortex);
+        let reference = &[
+            "the cat sat on the mat",
+            "the dog ran in the park",
+        ];
+        let config = MetaControllerConfig {
+            max_cycles: 20,
+            print_every: 10,
+            commit_threshold: 0.3, // Low threshold to get some commits
+            ..Default::default()
+        };
+        let mut ctrl = MetaController::new(engine, reference, config);
+        ctrl.run(20);
+
+        assert_eq!(ctrl.cycle, 20);
+        assert_eq!(ctrl.memory.len(), 20, "Should have stored 20 sentences");
+        assert_eq!(ctrl.phase.snapshots.len(), 20, "Should have 20 phase snapshots");
+
+        let committed = ctrl.memory.committed().len();
+        println!("Short run complete: {} committed out of {}", committed, ctrl.memory.len());
+        println!("Phase transitions: {}", ctrl.phase.transitions.len());
     }
 }

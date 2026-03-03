@@ -250,4 +250,11 @@ pub use vortex_diffusion::{
     DiffusionTransformer, DiffusionStats,
     VerificationDecision, RejectionReason,
     ProximityResult, CoherenceResult,
+    AdaptiveVortexTopology, TopologyEdge, EdgeRole,
+    SubjectTerrain, CycleMetrics, TopologySummary,
+    DiffusionTrace, StepTrace, StepAction,
+    NgramValidator, NgramScore,
+    SentenceMemory, SentenceRecord,
+    PhaseTracker, PhaseSnapshot,
+    MetaController, MetaControllerConfig, MetaTask,
 };

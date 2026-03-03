@@ -4,6 +4,8 @@ trigger: always_on
 
 Always improve the benchmark scores, if regression revert and try again.
 Never directly hardcode correct answers into the AI, only generalize the correct way of thinking, right principles.
+Do not make the AI Model Multiple Choice Centric, instead make it auto-regressive generative for the correct answer. For Multiple Choice Problems, map the choice to the closest answer it gave and fill in the gap to it's architecture.
+Move away from being a benchmark test taker to a true AI Model, that we can chat to.
 If hardcoded answers exist, remove them and follow the instructions below.
 
 Best Instructions for Generative AI Models to Promote Generalized Learning

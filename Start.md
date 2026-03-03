@@ -2,6 +2,9 @@
 
 ---
 
+# Full Benchmark
+.\target\release\spatialvortex-eval.exe --tasks mmlu,gsm8k,arc-challenge,hellaswag,truthfulqa,humaneval,commonsenseqa,squad,babi1,babi2,babi3,babi4,babi5,babi6,babi7,babi8,babi9,babi10,babi11,babi12,babi13,babi14,babi15,babi16,babi17,babi18,babi19,babi20,winogrande,piqa --limit 100 --eval-only --audit --skip-hf
+
 ## 🏆 Ultimate Production Setup (v1.6.0 "Memory Palace")
 
 **Complete system with GPU acceleration, consciousness streaming, and full persistence.**
