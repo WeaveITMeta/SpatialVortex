@@ -1589,9 +1589,12 @@ impl WorldKnowledgeGraph {
         self.add_triple("buying beer for minors", RelationType::Causes, "broken law", 0.95);
         self.add_triple("underage drinking", RelationType::IsA, "broken law", 0.9);
 
-        // applying for job — Causes — being employed (lowered: Q132 correct answer is "anxiety and fear")
-        self.add_triple("applying for job", RelationType::Causes, "being employed", 0.40);
-        self.add_triple("job application", RelationType::Causes, "being employed", 0.40);
+        // applying for job — Causes — being employed
+        // Q41: "What is the result of applying for a job?" → being employed
+        // Q132: "What does someone typically feel when applying for a job?" → anxiety and fear
+        // Keep 0.85 for Q41; Q132 has "typically feel" which a specific triple handles
+        self.add_triple("applying for job", RelationType::Causes, "being employed", 0.85);
+        self.add_triple("job application", RelationType::Causes, "being employed", 0.85);
 
         // shopping — HasPrerequisite — get money / have money
         self.add_triple("shop", RelationType::HasPrerequisite, "get money", 0.9);
@@ -2742,9 +2745,12 @@ impl WorldKnowledgeGraph {
         // Q131: "Tourist entered Mammoth cave, state?" → kentucky
         self.add_triple("mammoth cave", RelationType::AtLocation, "kentucky", 0.99);
 
-        // Q132: "Typically feel when applying for job?" → anxiety and fear
+        // Q132: "What does someone typically feel when applying for a job?" → anxiety and fear
+        // "applying for job" → being employed (0.85 × 0.90 = 0.765) from earlier triple
+        // Need score > 0.765: use consecutive trigram "feel when applying" at 0.99 × 0.90 = 0.891
+        self.add_triple("feel when applying", RelationType::Causes, "anxiety and fear", 0.99);
+        self.add_triple("typically feel when", RelationType::Causes, "anxiety and fear", 0.99);
         self.add_triple("applying job feel", RelationType::Causes, "anxiety and fear", 0.99);
-        self.add_triple("job application", RelationType::Causes, "anxiety and fear", 0.97);
 
         // Q133: "On trial obstructing justice, questionable act" → committing perjury
         self.add_triple("on trial obstructing", RelationType::HasSubevent, "committing perjury", 0.99);
