@@ -3307,6 +3307,10 @@ impl RealBenchmarkEvaluator {
 
             if !pipeline_skip && final_answer_idx != usize::MAX && confidence > strategy.pipeline_threshold {
                 let commit_idx = final_answer_idx;
+                // DEBUG: print full question when pipeline commits wrong answer
+                if is_csqa && commit_idx != question.correct_answer {
+                    eprintln!("[PIPE-WRONG] q={:?}", question.question);
+                }
                 trace.record_decision("pipeline", "committed", confidence);
                 trace.finalize(commit_idx, confidence, "pipeline", &[], &[]);
                 trace.elapsed_ms = trace_start.elapsed().as_millis() as u64;
