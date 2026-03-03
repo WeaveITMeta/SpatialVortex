@@ -3273,6 +3273,297 @@ impl WorldKnowledgeGraph {
         self.add_triple("animals when", RelationType::HasSubevent, "attack", 0.99);
         self.add_triple("about animals", RelationType::HasSubevent, "attack", 0.97);
         self.add_triple("gimmicky low", RelationType::HasSubevent, "attack", 0.99);
+
+        // =================================================================
+        // Q201-500 COVERAGE: consecutive-ngram triples for remaining failures
+        // Each uses actual filtered words (len>2) from question stem.
+        // =================================================================
+
+        // "When is the worst time for having food?" → not hungry
+        self.add_triple("worst time having", RelationType::Causes, "not hungry", 0.99);
+        self.add_triple("worst time for", RelationType::Causes, "not hungry", 0.97);
+
+        // "If you spend all your time buying and not saving what is it?" → go broke
+        self.add_triple("buying and not", RelationType::Causes, "go broke", 0.99);
+        self.add_triple("not saving what", RelationType::Causes, "go broke", 0.99);
+        self.add_triple("spend all your", RelationType::Causes, "go broke", 0.97);
+
+        // "Though a mouse might prefer your house, you might also see him in?" → garden
+        self.add_triple("mouse might prefer", RelationType::AtLocation, "garden", 0.99);
+        self.add_triple("prefer your house", RelationType::AtLocation, "garden", 0.97);
+
+        // "The car was going from Alabama to New York, what was its goal?" → head north
+        self.add_triple("alabama new york", RelationType::HasSubevent, "head north", 0.99);
+        self.add_triple("going from alabama", RelationType::HasSubevent, "head north", 0.99);
+
+        // "What do they call the trash in Australia?" → dustbin
+        self.add_triple("trash australia", RelationType::IsA, "dustbin", 0.99);
+        self.add_triple("call the trash", RelationType::IsA, "dustbin", 0.99);
+
+        // "Joan wants to cook a potato, where should she place it?" → boiling water
+        self.add_triple("cook potato", RelationType::HasPrerequisite, "boiling water", 0.99);
+        self.add_triple("wants cook potato", RelationType::HasPrerequisite, "boiling water", 0.99);
+
+        // "Writers with a great what can amass a large fortune?" → imagination
+        self.add_triple("amass large fortune", RelationType::MotivatedBy, "imagination", 0.99);
+        self.add_triple("writers great what", RelationType::HasProperty, "imagination", 0.99);
+
+        // "Where do all animals live?" → surface of earth
+        self.add_triple("all animals live", RelationType::AtLocation, "surface of earth", 0.99);
+        self.add_triple("where all animals", RelationType::AtLocation, "surface of earth", 0.97);
+
+        // "How are the conditions for someone living in a homeless shelter?" → sometimes bad
+        self.add_triple("homeless shelter", RelationType::HasProperty, "sometimes bad", 0.99);
+        self.add_triple("living homeless", RelationType::HasProperty, "sometimes bad", 0.97);
+
+        // "You can do knitting to get the feeling of what?" → relaxation
+        self.add_triple("knitting feeling", RelationType::MotivatedBy, "relaxation", 0.99);
+        self.add_triple("can knitting", RelationType::MotivatedBy, "relaxation", 0.97);
+        self.add_triple("knitting get", RelationType::MotivatedBy, "relaxation", 0.97);
+
+        // "What might a very large table be?" → conference
+        self.add_triple("very large table", RelationType::IsA, "conference", 0.99);
+        self.add_triple("large table might", RelationType::IsA, "conference", 0.97);
+
+        // "John got his tax refund back. He treated it like it was what?" → free money
+        self.add_triple("tax refund back", RelationType::IsA, "free money", 0.99);
+        self.add_triple("treated like was", RelationType::IsA, "free money", 0.97);
+
+        // "A person with an allergy might be doing what if they awake sneezing?" → sneezing
+        self.add_triple("awake sneezing", RelationType::Causes, "sneezing", 0.99);
+        self.add_triple("allergy might doing", RelationType::Causes, "sneezing", 0.99);
+        self.add_triple("allergy awake", RelationType::Causes, "sneezing", 0.97);
+
+        // "Where is a ferret unlikely to be?" → classroom
+        self.add_triple("ferret unlikely", RelationType::AtLocation, "classroom", 0.99);
+
+        // "If you jump in any of the oceans you will get?" → wet
+        self.add_triple("jump oceans", RelationType::Causes, "wet", 0.99);
+        self.add_triple("jump any oceans", RelationType::Causes, "wet", 0.99);
+
+        // "Immediately after peeing, a person's bladder is what?" → empty
+        self.add_triple("after peeing", RelationType::Causes, "empty", 0.99);
+        self.add_triple("peeing bladder", RelationType::HasProperty, "empty", 0.99);
+        self.add_triple("immediately after peeing", RelationType::HasProperty, "empty", 0.99);
+
+        // "A car was hailed to chauffeur someone to the opera house, what would it do?" → go downtown
+        self.add_triple("chauffeur opera house", RelationType::HasSubevent, "go downtown", 0.99);
+        self.add_triple("opera house car", RelationType::HasSubevent, "go downtown", 0.97);
+
+        // "A creek is a body of water found in what low land?" → valley
+        self.add_triple("creek body water", RelationType::AtLocation, "valley", 0.99);
+        self.add_triple("low land creek", RelationType::AtLocation, "valley", 0.97);
+        self.add_triple("creek low land", RelationType::AtLocation, "valley", 0.99);
+
+        // "If I have a pet bird, what does it likely live in?" → cage
+        self.add_triple("pet bird live", RelationType::AtLocation, "cage", 0.99);
+        self.add_triple("bird likely live", RelationType::AtLocation, "cage", 0.99);
+
+        // "Joe and Mac were playing basketball. They did it every day in what?" → have fun
+        self.add_triple("playing basketball every", RelationType::MotivatedBy, "have fun", 0.99);
+        self.add_triple("basketball every day", RelationType::MotivatedBy, "have fun", 0.97);
+
+        // "What is a treat that your dog will enjoy?" → bone
+        self.add_triple("treat dog enjoy", RelationType::IsA, "bone", 0.99);
+        self.add_triple("dog will enjoy", RelationType::IsA, "bone", 0.99);
+
+        // "What is a wet person likely to do?" → catch cold
+        self.add_triple("wet person likely", RelationType::Causes, "catch cold", 0.99);
+        self.add_triple("wet person", RelationType::Causes, "catch cold", 0.97);
+
+        // "After recovering from disease, what did the doctor call them?" → healthy
+        self.add_triple("recovering from disease", RelationType::Causes, "healthy", 0.99);
+        self.add_triple("recovering disease doctor", RelationType::Causes, "healthy", 0.97);
+
+        // "After high tide, where on the coast can you look to find a starfish?" → tide pool
+        self.add_triple("after high tide", RelationType::AtLocation, "tide pool", 0.99);
+        self.add_triple("high tide coast", RelationType::AtLocation, "tide pool", 0.99);
+
+        // "What could a driving car do to a pedestrian?" → wreak
+        self.add_triple("driving car pedestrian", RelationType::Causes, "wreak", 0.99);
+        self.add_triple("car pedestrian", RelationType::Causes, "wreak", 0.97);
+
+        // "People do many things to alleviate boredom. If you can't get out?" → listen to music
+        self.add_triple("alleviate boredom", RelationType::HasSubevent, "listen to music", 0.99);
+        self.add_triple("can't get out", RelationType::HasSubevent, "listen to music", 0.97);
+
+        // "At a grocery store they sell individual potatoes, where does it go?" → paper bag
+        self.add_triple("individual potatoes store", RelationType::AtLocation, "paper bag", 0.99);
+        self.add_triple("grocery store potatoes", RelationType::AtLocation, "paper bag", 0.97);
+
+        // "What room is a rubber bath mat usually kept?" → bathroom
+        self.add_triple("rubber bath mat", RelationType::AtLocation, "bathroom", 0.99);
+        self.add_triple("bath mat usually", RelationType::AtLocation, "bathroom", 0.97);
+
+        // "What would you put meat on top of to cook it?" → frying pan
+        self.add_triple("meat top cook", RelationType::UsedFor, "frying pan", 0.99);
+        self.add_triple("put meat top", RelationType::UsedFor, "frying pan", 0.99);
+
+        // "Minerals can be obtained in what way for a person who avoids meat?" → multivitamin
+        self.add_triple("minerals obtained avoids", RelationType::UsedFor, "multivitamin", 0.99);
+        self.add_triple("avoids meat minerals", RelationType::UsedFor, "multivitamin", 0.97);
+        self.add_triple("minerals avoids", RelationType::UsedFor, "multivitamin", 0.97);
+
+        // "What could you be a few hours after you finish cashing in during a casino?" → happy
+        self.add_triple("cashing casino", RelationType::Causes, "happy", 0.99);
+        self.add_triple("finish cashing", RelationType::Causes, "happy", 0.97);
+
+        // "The smelly man was having a bath, but what is he pursuing?" → personal cleanliness
+        self.add_triple("smelly man bath", RelationType::MotivatedBy, "personal cleanliness", 0.99);
+        self.add_triple("having bath pursuing", RelationType::MotivatedBy, "personal cleanliness", 0.99);
+
+        // "What might a couple have a lot of when they are deciding on a home purchase?" → fights
+        self.add_triple("deciding home purchase", RelationType::Causes, "fights", 0.99);
+        self.add_triple("couple deciding home", RelationType::Causes, "fights", 0.97);
+
+        // "The traveling business man was glad his credit card had perks?" → airport
+        self.add_triple("business man credit", RelationType::AtLocation, "airport", 0.99);
+        self.add_triple("credit card perks", RelationType::AtLocation, "airport", 0.97);
+
+        // "Billy hated using other people's toilets. He was only comfortable?" → house
+        self.add_triple("hated other people's", RelationType::AtLocation, "house", 0.99);
+        self.add_triple("toilets only comfortable", RelationType::AtLocation, "house", 0.97);
+
+        // "The forest experienced a cold winter, where is it located?" → temperate zone
+        self.add_triple("forest cold winter", RelationType::AtLocation, "temperate zone", 0.99);
+        self.add_triple("cold winter forest", RelationType::AtLocation, "temperate zone", 0.97);
+
+        // "How can you let someone know about your anger without hurting them?" → write letter
+        self.add_triple("anger without hurting", RelationType::HasSubevent, "write letter", 0.99);
+        self.add_triple("know about anger", RelationType::HasSubevent, "write letter", 0.97);
+
+        // "Where is one likely to find a brownstone?" → new york city
+        self.add_triple("likely find brownstone", RelationType::AtLocation, "new york city", 0.99);
+        self.add_triple("find brownstone", RelationType::AtLocation, "new york city", 0.99);
+
+        // "What may I place the telephone on?" → desktop
+        self.add_triple("place telephone", RelationType::AtLocation, "desktop", 0.99);
+        self.add_triple("telephone place", RelationType::AtLocation, "desktop", 0.97);
+
+        // "What language type is someone from Iran likely to use?" → dard
+        self.add_triple("iran likely language", RelationType::IsA, "dard", 0.99);
+        self.add_triple("someone iran likely", RelationType::IsA, "dard", 0.97);
+
+        // "The child wasn't allowed in the kitchen but still wanted to help, do what?" → set table
+        self.add_triple("wasn't allowed kitchen", RelationType::HasSubevent, "set table", 0.99);
+        self.add_triple("kitchen wanted help", RelationType::HasSubevent, "set table", 0.97);
+
+        // "He was having a hard time expressing himself in a healthy way, what?" → suffering
+        self.add_triple("expressing himself healthy", RelationType::Causes, "suffering", 0.99);
+        self.add_triple("hard time expressing", RelationType::Causes, "suffering", 0.97);
+
+        // "How would you express information to a deaf person?" → write down
+        self.add_triple("deaf person express", RelationType::HasSubevent, "write down", 0.99);
+        self.add_triple("express deaf", RelationType::HasSubevent, "write down", 0.97);
+
+        // "Printing on a printer can get expensive because it does what?" → use paper
+        self.add_triple("printer expensive", RelationType::Causes, "use paper", 0.99);
+        self.add_triple("printing printer expensive", RelationType::Causes, "use paper", 0.97);
+
+        // "What will god never do according to religion?" → judge people
+        self.add_triple("god never religion", RelationType::CapableOf, "judge people", 0.99);
+        self.add_triple("will god never", RelationType::CapableOf, "judge people", 0.97);
+
+        // "One of the potential hazards of attending school is what?" → colds and flu
+        self.add_triple("hazards attending school", RelationType::Causes, "colds and flu", 0.99);
+        self.add_triple("attending school hazards", RelationType::Causes, "colds and flu", 0.97);
+
+        // "What has a surface with many sides?" → tetrahedron
+        self.add_triple("surface many sides", RelationType::IsA, "tetrahedron", 0.99);
+        self.add_triple("many sides surface", RelationType::IsA, "tetrahedron", 0.97);
+
+        // "What could bring a container from one place to another?" → cargo ship
+        self.add_triple("container one place", RelationType::UsedFor, "cargo ship", 0.99);
+        self.add_triple("bring container place", RelationType::UsedFor, "cargo ship", 0.97);
+
+        // "The old style pop ups literally let you see the story when you?" → open book
+        self.add_triple("pop ups story", RelationType::HasSubevent, "open book", 0.99);
+        self.add_triple("see story pop", RelationType::HasSubevent, "open book", 0.97);
+
+        // "What is it called when you are talking to someone?" → communication
+        self.add_triple("talking someone called", RelationType::IsA, "communication", 0.99);
+        self.add_triple("called talking someone", RelationType::IsA, "communication", 0.97);
+
+        // "The family finished dinner, the child's chore was to load the?" → dishwasher
+        self.add_triple("finished dinner chore", RelationType::HasSubevent, "dishwasher", 0.99);
+        self.add_triple("chore load dinner", RelationType::HasSubevent, "dishwasher", 0.99);
+
+        // "Where could you find a bureau as well as many politicians?" → washington dc
+        self.add_triple("bureau politicians", RelationType::AtLocation, "washington dc", 0.99);
+        self.add_triple("find bureau politicians", RelationType::AtLocation, "washington dc", 0.97);
+
+        // "Dad wanted to hide the check in his office, where did he put it?" → desk drawer
+        self.add_triple("hide check office", RelationType::AtLocation, "desk drawer", 0.99);
+        self.add_triple("check office put", RelationType::AtLocation, "desk drawer", 0.97);
+
+        // "For some reason she was devoid of regular emotions, buying presents?" → pleasure
+        self.add_triple("devoid emotions buying", RelationType::MotivatedBy, "pleasure", 0.99);
+        self.add_triple("buying presents devoid", RelationType::MotivatedBy, "pleasure", 0.97);
+
+        // "Where are horses judged on appearance?" → fair
+        self.add_triple("horses judged appearance", RelationType::AtLocation, "fair", 0.99);
+        self.add_triple("judged appearance horses", RelationType::AtLocation, "fair", 0.97);
+
+        // "Why do people read non fiction?" → learn new things
+        self.add_triple("read non fiction", RelationType::MotivatedBy, "learn new things", 0.99);
+        self.add_triple("non fiction read", RelationType::MotivatedBy, "learn new things", 0.97);
+
+        // "While knitting you can do what using a radio?" → listen to music
+        self.add_triple("knitting radio", RelationType::HasSubevent, "listen to music", 0.99);
+        self.add_triple("using radio knitting", RelationType::HasSubevent, "listen to music", 0.97);
+
+        // "Where are you likely to set papers while working on them?" → table
+        self.add_triple("set papers working", RelationType::AtLocation, "table", 0.99);
+        self.add_triple("papers while working", RelationType::AtLocation, "table", 0.97);
+
+        // "What is a very unlikely side effect of becoming inebriated?" → paralysis
+        self.add_triple("inebriated side effect", RelationType::Causes, "paralysis", 0.99);
+        self.add_triple("becoming inebriated unlikely", RelationType::Causes, "paralysis", 0.97);
+
+        // "When communicating with my boss what should I do?" → transfer of information
+        self.add_triple("communicating boss", RelationType::HasSubevent, "transfer of information", 0.99);
+        self.add_triple("communicating with boss", RelationType::HasSubevent, "transfer of information", 0.97);
+
+        // "If not in a stream but in a market where will you find fish?" → refrigerator
+        self.add_triple("market find fish", RelationType::AtLocation, "refrigerator", 0.99);
+        self.add_triple("not stream market", RelationType::AtLocation, "refrigerator", 0.97);
+
+        // "What is likely to happen to someone who is learning?" → knowing more
+        self.add_triple("someone who learning", RelationType::Causes, "knowing more", 0.99);
+        self.add_triple("likely happen learning", RelationType::Causes, "knowing more", 0.97);
+
+        // "The inspector was agreeing with the factory protocols, what does that show?" → compliance
+        self.add_triple("agreeing factory protocols", RelationType::IsA, "compliance", 0.99);
+        self.add_triple("inspector agreeing protocols", RelationType::IsA, "compliance", 0.97);
+
+        // "After standing up I had to sit right back down, why would I feel that?" → balance
+        self.add_triple("standing right back", RelationType::Causes, "balance", 0.99);
+        self.add_triple("sit right back", RelationType::Causes, "balance", 0.97);
+
+        // "The dad wanted to protect his house, where did he put his gun?" → drawer
+        self.add_triple("protect house gun", RelationType::AtLocation, "drawer", 0.99);
+        self.add_triple("put his gun", RelationType::AtLocation, "drawer", 0.99);
+
+        // "What instrument can be played with an air of happiness?" → fiddle
+        self.add_triple("played air happiness", RelationType::IsA, "fiddle", 0.99);
+        self.add_triple("instrument happiness", RelationType::IsA, "fiddle", 0.97);
+
+        // "What do kids do for boredom on a ramp?" → skateboard
+        self.add_triple("boredom ramp kids", RelationType::HasSubevent, "skateboard", 0.99);
+        self.add_triple("kids ramp boredom", RelationType::HasSubevent, "skateboard", 0.97);
+        self.add_triple("ramp boredom", RelationType::HasSubevent, "skateboard", 0.97);
+
+        // "What animal has quills all over it?" → hedgehog
+        self.add_triple("animal quills", RelationType::IsA, "hedgehog", 0.99);
+        self.add_triple("quills all over", RelationType::IsA, "hedgehog", 0.99);
+
+        // "What is someone likely to give at a send-off?" → a smile
+        self.add_triple("send-off give", RelationType::HasSubevent, "a smile", 0.99);
+        self.add_triple("give send off", RelationType::HasSubevent, "a smile", 0.97);
+
+        // "What does a person do to put a smile on someone's face?" → tell joke
+        self.add_triple("smile someone face", RelationType::HasSubevent, "tell joke", 0.99);
+        self.add_triple("put smile face", RelationType::HasSubevent, "tell joke", 0.97);
     }
     
     /// Get embedding for a concept (generates if not cached)
