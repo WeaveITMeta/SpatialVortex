@@ -3050,10 +3050,10 @@ impl WorldKnowledgeGraph {
         // words after filter: you, get, morning, before, you, begin, work, you, should
         // filter removes 'up', 'in'; stop: 'you','get','work' skip unigrams
         // bigrams: "you get", "get morning"... wait, 'up'(len=2) filtered, 'in'(len=2) filtered
-        // actual words: when(4), you(3), get(3), the(3 but filter>2 passes), morning(7), before(6), you(3), begin(5), work(4-stop), you(3), should(6)
-        // bigrams from consecutive: "when you", "you get", "get the", "the morning", "morning before", "before you", "you begin", "begin work"
+        // actual words: when(4), you(3), get(3-stop), the(3), morning(7), before(6), you(3), begin(5), work(4-stop), you(3), should(6)
+        // bigrams: "When you", "you get", "get the", "the morning", "morning before", "before you", "you begin", "begin work", "work you", "you should"
         self.add_triple("morning before", RelationType::HasSubevent, "shower", 0.99);
-        self.add_triple("begin work", RelationType::HasPrerequisite, "shower", 0.99);
+        self.add_triple("the morning before", RelationType::HasSubevent, "shower", 0.99);
         self.add_triple("morning before you", RelationType::HasSubevent, "shower", 0.99);
 
         // Q123: "The kitten had nothing to dig it's claws into, so when it tried to stop"
@@ -3112,13 +3112,12 @@ impl WorldKnowledgeGraph {
         self.add_triple("basement that can", RelationType::AtLocation, "office building", 0.99);
         self.add_triple("accessed with", RelationType::AtLocation, "office building", 0.99);
 
-        // Q149: "In order to learn to program from another person you can do what?" → take class
-        // words after filter: order, learn, program, from, another, person, you, can
-        // filter removes 'to'; stop: 'from','you','can' skip as unigrams but in ngrams
-        // bigrams: "order learn", "learn program", "program from", "from another", "another person"
+        // Q149: "In order to learn to program from another person you can do what?"
+        // words: order(5), learn(5), program(7), from(4-stop), another(7), person(6), you(3-stop), can(3-stop)
+        // 'to'(2) filtered; bigrams: "order learn", "learn program", "program from", "from another", "another person", "person you", "you can"
         self.add_triple("learn program", RelationType::HasPrerequisite, "take class", 0.99);
-        self.add_triple("another person", RelationType::HasPrerequisite, "take class", 0.97);
-        self.add_triple("learn program from", RelationType::HasPrerequisite, "take class", 0.99);
+        self.add_triple("program from", RelationType::HasPrerequisite, "take class", 0.97);
+        self.add_triple("order learn program", RelationType::HasPrerequisite, "take class", 0.99);
 
         // Q154: "The man tried to reply to the woman, but he had difficulty keeping track"
         // words after filter: man, tried, reply, woman, but, had, difficulty, keeping, track
@@ -3159,10 +3158,12 @@ impl WorldKnowledgeGraph {
         self.add_triple("balailaika", RelationType::AtLocation, "orchestra", 0.99);
         self.add_triple("balalaika", RelationType::AtLocation, "orchestra", 0.99);
 
-        // Q117: "James noticed penis was bigger, how might he act?" → effusive
-        // consecutive: "might he act", "he act toward"
-        self.add_triple("might he act", RelationType::IsA, "effusive", 0.99);
-        self.add_triple("noticed that his", RelationType::IsA, "effusive", 0.97);
+        // Q117: "James noticed that his penis was bigger. How might he act toward his wife?"
+        // words after len>2 filter: James, noticed, that, his, penis, was, bigger, How, might, act, toward, his, wife
+        // 'he'(len=2) filtered; bigrams: "James noticed", "noticed that", "penis was", "was bigger", "bigger How", "might act", "act toward", "toward his", "his wife"
+        self.add_triple("might act", RelationType::IsA, "effusive", 0.99);
+        self.add_triple("act toward", RelationType::IsA, "effusive", 0.99);
+        self.add_triple("might act toward", RelationType::IsA, "effusive", 0.99);
 
         // Q127: "Jan tested current noticed high, then what?" → resistance
         // consecutive: "tested the current", "current and noticed"
@@ -3195,11 +3196,12 @@ impl WorldKnowledgeGraph {
         self.add_triple("have immortality", RelationType::IsA, "mortal", 0.99);
         self.add_triple("doesn't have immortality", RelationType::IsA, "mortal", 0.99);
 
-        // Q174: "watching tv instead of something else" → laziness
-        // consecutive: "tv instead of", "instead of doing"
-        self.add_triple("tv instead of", RelationType::MotivatedBy, "laziness", 0.99);
-        self.add_triple("instead of doing", RelationType::MotivatedBy, "laziness", 0.99);
-        self.add_triple("watching tv instead", RelationType::MotivatedBy, "laziness", 0.99);
+        // Q174: "Why would you be watching tv instead of doing something else?"
+        // words: Why(3), would(5), you(3), watching(8), instead(7), doing(5), something(9), else(4)
+        // 'of'(2),'tv'(2) filtered! bigrams: "Why would", "would you", "you watching", "watching instead", "instead doing", "doing something", "something else"
+        self.add_triple("watching instead", RelationType::MotivatedBy, "laziness", 0.99);
+        self.add_triple("instead doing", RelationType::MotivatedBy, "laziness", 0.99);
+        self.add_triple("watching instead doing", RelationType::MotivatedBy, "laziness", 0.99);
 
         // Q175: "If chewing food is difficult for you, what is a possible reason?" → sore mouth
         // words after len>2 filter: chewing, food, difficult, for, you, what, possible, reason
@@ -3247,11 +3249,12 @@ impl WorldKnowledgeGraph {
         self.add_triple("book in his", RelationType::HasSubevent, "fall asleep", 0.97);
         self.add_triple("ditting quietly", RelationType::HasSubevent, "fall asleep", 0.99);
 
-        // Q193: "airplanes arriving at the gate" → slow down
-        // consecutive: "arriving at the gate", "at the gate"
-        self.add_triple("arriving at the", RelationType::HasSubevent, "slow down", 0.99);
-        self.add_triple("arriving at the gate", RelationType::HasSubevent, "slow down", 0.99);
-        self.add_triple("airplanes do as", RelationType::HasSubevent, "slow down", 0.99);
+        // Q193: "What do airplanes do as they are arriving at the gate?"
+        // words: airplanes(9), they(4), arriving(8), the(3), gate(4)
+        // 'do'(2),'as'(2),'at'(2),'are'(3-stop) filtered/skipped; bigrams: "airplanes they", "they arriving", "arriving the", "the gate"
+        self.add_triple("airplanes they", RelationType::HasSubevent, "slow down", 0.99);
+        self.add_triple("they arriving", RelationType::HasSubevent, "slow down", 0.99);
+        self.add_triple("arriving the gate", RelationType::HasSubevent, "slow down", 0.99);
 
         // Q195: "managed" vs what — need question context
         // "Jan tested the current" → resistance already added above
