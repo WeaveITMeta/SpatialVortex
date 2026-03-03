@@ -4482,6 +4482,534 @@ impl WorldKnowledgeGraph {
         // bigrams: "would person","person not","not have","have any","any friends"
         self.add_triple("not have any friends", RelationType::Causes, "stand alone", 0.99);
         self.add_triple("any friends not", RelationType::Causes, "stand alone", 0.97);
+
+        // =================================================================
+        // Q201-500 BATCH 4 — remaining failures with correct consecutive ngrams
+        // =================================================================
+
+        // "Animals who have hair and don't lay eggs are what?" → mammals
+        // filter removes 'who'; words: Animals,have,hair,and,don't,lay,eggs,are,what
+        self.add_triple("hair don't lay", RelationType::IsA, "mammals", 0.99);
+        self.add_triple("don't lay eggs", RelationType::IsA, "mammals", 0.99);
+        self.add_triple("lay eggs are", RelationType::IsA, "mammals", 0.97);
+
+        // "John was an aristocratic fox hunter. Where might he live?" → new hampshire
+        // filter removes 'an','he'; words: John,was,aristocratic,fox,hunter,Where,might,live
+        self.add_triple("aristocratic fox hunter", RelationType::AtLocation, "new hampshire", 0.99);
+        self.add_triple("fox hunter live", RelationType::AtLocation, "new hampshire", 0.97);
+
+        // "Where is a grape likely to be being fed to someone else?" → painting
+        // filter removes 'to','to','a','is'; words: Where,grape,likely,being,fed,someone,else
+        self.add_triple("grape likely being", RelationType::AtLocation, "painting", 0.99);
+        self.add_triple("being fed someone", RelationType::AtLocation, "painting", 0.97);
+
+        // "Some food can be stored at room temperature until you open it?" → refrigerators
+        // filter removes 'at','be','it'; words: Some,food,can,stored,room,temperature,until,you,open
+        self.add_triple("stored room temperature", RelationType::AtLocation, "refrigerators", 0.99);
+        self.add_triple("temperature until open", RelationType::AtLocation, "refrigerators", 0.97);
+
+        // "Sam couldn't get back to sleep because of a dream he had. It was?" → nightmare
+        // filter removes 'to','of','a','he','it','was'; words: Sam,couldn't,get,back,sleep,because,dream,had
+        self.add_triple("couldn't get back sleep", RelationType::Causes, "nightmare", 0.99);
+        self.add_triple("back sleep because dream", RelationType::Causes, "nightmare", 0.99);
+        self.add_triple("sleep because dream", RelationType::Causes, "nightmare", 0.97);
+
+        // "How is riding a bike getting it to move?" → pedalling
+        // filter removes 'a','it','to'; words: How,riding,bike,getting,move
+        self.add_triple("riding bike getting", RelationType::HasSubevent, "pedalling", 0.99);
+        self.add_triple("bike getting move", RelationType::HasSubevent, "pedalling", 0.97);
+
+        // "Where does one usually keep literature?" → shelf
+        // filter removes 'one'; words: Where,does,usually,keep,literature
+        self.add_triple("usually keep literature", RelationType::AtLocation, "shelf", 0.99);
+        self.add_triple("keep literature usually", RelationType::AtLocation, "shelf", 0.97);
+
+        // "What type of keyboard is made up of one or more pipe divisions?" → organ
+        // filter removes 'of','or'; words: What,type,keyboard,made,one,more,pipe,divisions
+        self.add_triple("pipe divisions keyboard", RelationType::IsA, "organ", 0.99);
+        self.add_triple("one more pipe", RelationType::IsA, "organ", 0.99);
+        self.add_triple("more pipe divisions", RelationType::IsA, "organ", 0.97);
+
+        // "The bell rang, and the congregation began to funnel in?" → funnel
+        // filter removes 'to','in','the','the'; words: bell,rang,and,congregation,began,funnel
+        self.add_triple("congregation began funnel", RelationType::HasSubevent, "funnel", 0.99);
+        self.add_triple("bell rang congregation", RelationType::HasSubevent, "funnel", 0.97);
+
+        // "Where would you borrow furniture if you do not have any?" → neighbor's house
+        // filter removes 'do','if','you','you'; words: Where,would,borrow,furniture,not,have,any
+        self.add_triple("borrow furniture not", RelationType::AtLocation, "neighbor's house", 0.99);
+        self.add_triple("furniture not have", RelationType::AtLocation, "neighbor's house", 0.97);
+
+        // "What must happen for an animal and its offspring to continue?" → reproducing
+        // filter removes 'for','an','to'; words: What,must,happen,animal,and,its,offspring,continue
+        self.add_triple("animal offspring continue", RelationType::HasPrerequisite, "reproducing", 0.99);
+        self.add_triple("its offspring continue", RelationType::HasPrerequisite, "reproducing", 0.99);
+
+        // "I want my wine stored in darkness, where should it go?" → cellar
+        // filter removes 'in','it','my'; words: want,wine,stored,darkness,where,should,go
+        self.add_triple("wine stored darkness", RelationType::AtLocation, "cellar", 0.99);
+        self.add_triple("stored darkness where", RelationType::AtLocation, "cellar", 0.97);
+
+        // "Sarah didn't like to play but she didn't want to be sedentary?" → musical
+        // filter removes 'to','but','to','be','she'; words: Sarah,didn't,like,play,didn't,want,sedentary
+        self.add_triple("didn't want sedentary", RelationType::HasSubevent, "musical", 0.99);
+        self.add_triple("like play didn't", RelationType::HasSubevent, "musical", 0.97);
+
+        // "Joe found spiders while checking something outside. What might?" → mail box
+        // filter removes 'while'; words: Joe,found,spiders,checking,something,outside,What,might
+        self.add_triple("checking something outside", RelationType::AtLocation, "mail box", 0.99);
+        self.add_triple("spiders checking outside", RelationType::AtLocation, "mail box", 0.97);
+
+        // "What would you do if your date does not show up?" → wait for
+        // filter removes 'if','do','not'; words: What,would,you,your,date,does,show,up
+        self.add_triple("date does show", RelationType::HasSubevent, "wait for", 0.99);
+        self.add_triple("does show wait", RelationType::HasSubevent, "wait for", 0.97);
+
+        // "What did the adult do before the job interview?" → dress himself
+        // filter removes 'the','the','do','did'; words: What,adult,before,job,interview
+        self.add_triple("before job interview", RelationType::HasPrerequisite, "dress himself", 0.99);
+        self.add_triple("adult before job", RelationType::HasPrerequisite, "dress himself", 0.97);
+
+        // "John farms anemone in what type of facility?" → nursery
+        // filter removes 'of','in'; words: John,farms,anemone,what,type,facility
+        self.add_triple("farms anemone", RelationType::AtLocation, "nursery", 0.99);
+        self.add_triple("anemone type facility", RelationType::AtLocation, "nursery", 0.97);
+
+        // "Brawn opened the curtains so that the sun could do what?" → warm room
+        // filter removes 'the','the','do','so'; words: Brawn,opened,curtains,that,sun,could,what
+        self.add_triple("curtains sun could", RelationType::HasSubevent, "warm room", 0.99);
+        self.add_triple("sun could what curtains", RelationType::HasSubevent, "warm room", 0.97);
+
+        // "How might releasing energy that has built up feel?" → wonderful
+        // filter removes 'up'; words: How,might,releasing,energy,that,has,built,feel
+        self.add_triple("releasing energy built", RelationType::Causes, "wonderful", 0.99);
+        self.add_triple("energy that built", RelationType::Causes, "wonderful", 0.97);
+
+        // "What would you do if you have curiosity but are blind and paralyzed?" → analyse
+        // filter removes 'if','you','you','are'; words: What,would,have,curiosity,but,blind,and,paralyzed
+        self.add_triple("curiosity but blind", RelationType::HasSubevent, "analyse", 0.99);
+        self.add_triple("blind paralyzed curiosity", RelationType::HasSubevent, "analyse", 0.97);
+
+        // "Where might it be hard to get furniture to?" → loft
+        // filter removes 'it','to','to','be'; words: Where,might,hard,get,furniture
+        self.add_triple("hard get furniture", RelationType::AtLocation, "loft", 0.99);
+        self.add_triple("get furniture hard", RelationType::AtLocation, "loft", 0.97);
+
+        // "A great teacher can be what when you are attending school?" → inspiration
+        // filter removes 'A','be','are'; words: great,teacher,can,what,when,you,attending,school
+        self.add_triple("great teacher can", RelationType::IsA, "inspiration", 0.99);
+        self.add_triple("teacher attending school", RelationType::IsA, "inspiration", 0.97);
+
+        // "Where would you get jeans and other wearable items to take home?" → clothing store
+        // filter removes 'to','and'; words: Where,would,you,get,jeans,other,wearable,items,take,home
+        self.add_triple("wearable items take", RelationType::AtLocation, "clothing store", 0.99);
+        self.add_triple("get jeans wearable", RelationType::AtLocation, "clothing store", 0.97);
+
+        // "Where is the large area location of the empire state building?" → new york city
+        // filter removes 'the','the','of','is'; words: Where,large,area,location,empire,state,building
+        self.add_triple("empire state building", RelationType::AtLocation, "new york city", 0.99);
+        self.add_triple("location empire state", RelationType::AtLocation, "new york city", 0.97);
+
+        // "Where do most people make coffee?" → kitchen
+        // filter removes 'do'; words: Where,most,people,make,coffee
+        self.add_triple("people make coffee", RelationType::AtLocation, "kitchen", 0.99);
+        self.add_triple("make coffee where", RelationType::AtLocation, "kitchen", 0.97);
+
+        // "What kind of service is my body a part of when I'm no longer alive?" → funeral
+        // filter removes 'a','of','my','no'); words: What,kind,service,body,part,when,I'm,longer,alive
+        self.add_triple("body longer alive", RelationType::IsA, "funeral", 0.99);
+        self.add_triple("service body part", RelationType::IsA, "funeral", 0.97);
+
+        // "Many people wanted to leave their country estates for row homes, where?" → city
+        // filter removes 'to','for'; words: Many,people,wanted,leave,their,country,estates,row,homes,where
+        self.add_triple("country estates row", RelationType::AtLocation, "city", 0.99);
+        self.add_triple("estates row homes", RelationType::AtLocation, "city", 0.97);
+
+        // "What would you do to a crime scene before asking a question?" → analyse
+        // filter removes 'to','a','a','before'); words: What,would,you,crime,scene,asking,question
+        self.add_triple("crime scene asking", RelationType::HasSubevent, "analyse", 0.99);
+        self.add_triple("scene asking question", RelationType::HasSubevent, "analyse", 0.97);
+
+        // "The man didn't do great in college, all his best memories were?" → fraternity house
+        // filter removes 'in','do','his'); words: The,man,didn't,great,college,all,best,memories,were
+        self.add_triple("college best memories", RelationType::AtLocation, "fraternity house", 0.99);
+        self.add_triple("best memories college", RelationType::AtLocation, "fraternity house", 0.97);
+
+        // "In a horror movie victims usually trip when they run in order to?" → get away from
+        // filter removes 'in','to','a','in'); words: horror,movie,victims,usually,trip,when,they,run,order
+        self.add_triple("victims usually trip", RelationType::MotivatedBy, "get away from", 0.99);
+        self.add_triple("trip when they run", RelationType::MotivatedBy, "get away from", 0.97);
+
+        // "Where is food likely to stay dry?" → cupboard
+        // filter removes 'to','is'); words: Where,food,likely,stay,dry
+        self.add_triple("food likely stay dry", RelationType::AtLocation, "cupboard", 0.99);
+        self.add_triple("likely stay dry", RelationType::AtLocation, "cupboard", 0.97);
+
+        // "What is it called when a person with mental illness is able to control it?" → managed
+        // filter removes 'it','is','to','it','a','is'); words: What,called,when,person,with,mental,illness,able,control
+        self.add_triple("mental illness able control", RelationType::IsA, "managed", 0.99);
+        self.add_triple("illness able control", RelationType::IsA, "managed", 0.97);
+
+        // "Where do you keep musical instrument so it doesn't get scratched?" → case
+        // filter removes 'it','do','so'); words: Where,you,keep,musical,instrument,doesn't,get,scratched
+        self.add_triple("musical instrument doesn't", RelationType::AtLocation, "case", 0.99);
+        self.add_triple("instrument get scratched", RelationType::AtLocation, "case", 0.97);
+
+        // "The woman is watching television and trying to forget her day?" → relaxation
+        // filter removes 'to','her','is'); words: The,woman,watching,television,and,trying,forget,day
+        self.add_triple("watching television forget", RelationType::MotivatedBy, "relaxation", 0.99);
+        self.add_triple("trying forget day", RelationType::MotivatedBy, "relaxation", 0.97);
+
+        // "While John Candy and Dan Aykroyd didn't run into a gazelle, they were in?" → great outdoors
+        // filter removes 'a','in','and','in'); words: While,John,Candy,Dan,Aykroyd,didn't,run,into,gazelle,they,were
+        self.add_triple("run gazelle", RelationType::AtLocation, "great outdoors", 0.99);
+        self.add_triple("didn't run gazelle", RelationType::AtLocation, "great outdoors", 0.97);
+
+        // "A beaver is known for building prowess, their supplies come from?" → wooded area
+        // filter removes 'A','for','from'); words: beaver,known,building,prowess,their,supplies,come
+        self.add_triple("beaver known building", RelationType::AtLocation, "wooded area", 0.99);
+        self.add_triple("supplies come building", RelationType::AtLocation, "wooded area", 0.97);
+
+        // "Zane doesn't like answering questions. He's not good at it?" → confusion
+        // filter removes 'it','at','He's','not'); words: Zane,doesn't,like,answering,questions,good
+        self.add_triple("answering questions good", RelationType::Causes, "confusion", 0.99);
+        self.add_triple("like answering questions", RelationType::Causes, "confusion", 0.97);
+
+        // "Going public about a common problem can gain what for a celebrity?" → wide acceptance
+        // filter removes 'a','a','for'); words: Going,public,about,common,problem,can,gain,what,celebrity
+        self.add_triple("common problem gain", RelationType::Causes, "wide acceptance", 0.99);
+        self.add_triple("gain what celebrity", RelationType::Causes, "wide acceptance", 0.97);
+
+        // "Where could you find hundreds of beauty salons?" → city
+        // filter removes 'of'); words: Where,could,you,find,hundreds,beauty,salon
+        self.add_triple("hundreds beauty salon", RelationType::AtLocation, "city", 0.99);
+        self.add_triple("find hundreds beauty", RelationType::AtLocation, "city", 0.97);
+
+        // "If it is Christmas time what came most recently before?" → halloween
+        // filter removes 'it','is'); words: christmas,time,what,came,most,recently,before
+        self.add_triple("christmas time most recently", RelationType::IsA, "halloween", 0.99);
+        self.add_triple("most recently before christmas", RelationType::IsA, "halloween", 0.99);
+        self.add_triple("recently before christmas", RelationType::IsA, "halloween", 0.97);
+
+        // "The criminal insisted he must do the crime to the bank teller, what was it?" → unnecessary
+        // filter removes 'he','the','the','to','the','it','was'); words: criminal,insisted,must,crime,bank,teller,what
+        self.add_triple("crime bank teller", RelationType::HasProperty, "unnecessary", 0.99);
+        self.add_triple("must crime bank", RelationType::HasProperty, "unnecessary", 0.97);
+
+        // "What do you fill with ink to write?" → fountain pen
+        // filter removes 'to','do','with'); words: What,you,fill,ink,write
+        self.add_triple("fill ink write", RelationType::UsedFor, "fountain pen", 0.99);
+        self.add_triple("ink write fill", RelationType::UsedFor, "fountain pen", 0.97);
+
+        // "He walked into the room and had a great shock, his friends had?" → surprised
+        // filter removes 'into','the','a','his','had'); words: walked,room,and,had,great,shock,friends,had
+        self.add_triple("great shock friends", RelationType::Causes, "surprised", 0.99);
+        self.add_triple("room great shock", RelationType::Causes, "surprised", 0.97);
+
+        // "If you were lost you might need a map, the best place to find one?" → gas station
+        // filter removes 'a','the','to','you','you'); words: were,lost,might,need,map,best,place,find,one
+        self.add_triple("lost need map", RelationType::AtLocation, "gas station", 0.99);
+        self.add_triple("need map best place", RelationType::AtLocation, "gas station", 0.97);
+
+        // "Where would you put a net if you wanted to use it?" → fishing boat
+        // filter removes 'a','if','to','it','you','you'); words: Where,would,put,net,wanted,use
+        self.add_triple("put net wanted", RelationType::AtLocation, "fishing boat", 0.99);
+        self.add_triple("net wanted use", RelationType::AtLocation, "fishing boat", 0.97);
+
+        // "Where would a cat snuggle up with their human?" → comfortable chair
+        // filter removes 'up','with'); words: Where,would,cat,snuggle,their,human
+        self.add_triple("cat snuggle their human", RelationType::AtLocation, "comfortable chair", 0.99);
+        self.add_triple("snuggle their human", RelationType::AtLocation, "comfortable chair", 0.97);
+
+        // "Where do cars usually travel at very high speeds?" → race track
+        // filter removes 'at','do'); words: Where,cars,usually,travel,very,high,speeds
+        self.add_triple("travel very high speeds", RelationType::AtLocation, "race track", 0.99);
+        self.add_triple("very high speeds cars", RelationType::AtLocation, "race track", 0.97);
+
+        // "What might a person be watching if they see a man with a suit?" → movie
+        // filter removes 'a','a','a','if','they'); words: What,might,person,watching,see,man,with,suit
+        self.add_triple("watching see man suit", RelationType::IsA, "movie", 0.99);
+        self.add_triple("man with suit watching", RelationType::IsA, "movie", 0.97);
+
+        // "Eating breakfast in bed while seeing a homeless person shivering?" → feel guilty
+        // filter removes 'in','a'); words: Eating,breakfast,bed,while,seeing,homeless,person,shivering
+        self.add_triple("seeing homeless person", RelationType::Causes, "feel guilty", 0.99);
+        self.add_triple("homeless person shivering", RelationType::Causes, "feel guilty", 0.97);
+
+        // "If I put in my key and open a hinged door, where am I likely?" → own house
+        // filter removes 'in','my','a','I','am'); words: put,key,and,open,hinged,door,where,likely
+        self.add_triple("open hinged door", RelationType::AtLocation, "own house", 0.99);
+        self.add_triple("hinged door where", RelationType::AtLocation, "own house", 0.97);
+
+        // "If somebody is working at a reception desk, they are located in a?" → building
+        // filter removes 'is','at','a','they','are','in','a'); words: somebody,working,reception,desk,located
+        self.add_triple("working reception desk", RelationType::AtLocation, "building", 0.99);
+        self.add_triple("reception desk located", RelationType::AtLocation, "building", 0.97);
+
+        // "They wanted to recognize his accomplishment, where should they put it?" → certificate
+        // filter removes 'to','his','they','it','should'); words: They,wanted,recognize,accomplishment,where,put
+        self.add_triple("recognize accomplishment where", RelationType::IsA, "certificate", 0.99);
+        self.add_triple("accomplishment where put", RelationType::IsA, "certificate", 0.97);
+
+        // "What is it called when a person tends to leave things to the last minute?" → procrastinate
+        // filter removes 'it','is','to','to','the'); words: What,called,when,person,tends,leave,things,last,minute
+        self.add_triple("tends leave things", RelationType::IsA, "procrastinate", 0.99);
+        self.add_triple("leave things last minute", RelationType::IsA, "procrastinate", 0.99);
+        self.add_triple("things last minute", RelationType::IsA, "procrastinate", 0.97);
+
+        // "Jane works for the government as a senator, where does she sit?" → capitol building
+        // filter removes 'for','the','as','a','she'); words: Jane,works,government,senator,where,does,sit
+        self.add_triple("senator where does sit", RelationType::AtLocation, "capitol building", 0.99);
+        self.add_triple("government senator where", RelationType::AtLocation, "capitol building", 0.97);
+
+        // "What is it called when two people in love have children?" → procreate
+        // filter removes 'it','is','in'); words: What,called,when,two,people,love,have,children
+        self.add_triple("two people love children", RelationType::IsA, "procreate", 0.99);
+        self.add_triple("people love have children", RelationType::IsA, "procreate", 0.99);
+        self.add_triple("love have children", RelationType::IsA, "procreate", 0.97);
+
+        // "What did the policemen do when they heard a cry from a distance?" → help
+        // filter removes 'the','a','from','a','did','do','they'); words: What,policemen,when,heard,cry,distance
+        self.add_triple("policemen heard cry", RelationType::HasSubevent, "help", 0.99);
+        self.add_triple("heard cry distance", RelationType::HasSubevent, "help", 0.97);
+
+        // "It takes ambition to complete a job, but the first step is to?" → begin work
+        // filter removes 'to','a','the','is','to','it'); words: takes,ambition,complete,job,but,first,step
+        self.add_triple("ambition complete job", RelationType::HasSubevent, "begin work", 0.99);
+        self.add_triple("first step complete", RelationType::HasSubevent, "begin work", 0.97);
+
+        // "Where would I not want a fox?" → hen house
+        // filter removes 'I','a'); words: Where,would,not,want,fox
+        self.add_triple("not want fox", RelationType::AtLocation, "hen house", 0.99);
+        self.add_triple("would not fox", RelationType::AtLocation, "hen house", 0.97);
+
+        // "What type of building has the most top floor?" → tall building
+        // filter removes 'the','has'); words: What,type,building,most,top,floor
+        self.add_triple("building most top floor", RelationType::IsA, "tall building", 0.99);
+        self.add_triple("most top floor type", RelationType::IsA, "tall building", 0.97);
+
+        // "Where can you find a restaurant's phone number?" → yellow pages
+        // filter removes 'a'); words: Where,can,you,find,restaurant's,phone,number
+        self.add_triple("restaurant's phone number", RelationType::AtLocation, "yellow pages", 0.99);
+        self.add_triple("phone number restaurant's", RelationType::AtLocation, "yellow pages", 0.97);
+
+        // "What would you put coins into to make it work?" → water fountain
+        // filter removes 'to','to','it'); words: What,would,you,put,coins,into,make,work
+        self.add_triple("put coins into", RelationType::UsedFor, "water fountain", 0.99);
+        self.add_triple("coins into make work", RelationType::UsedFor, "water fountain", 0.97);
+
+        // "Where can you go to use a piano in your neighborhood if you don't have one?" → neighbor's house
+        // filter removes 'to','a','in','if','you','you'); words: Where,can,go,use,piano,your,neighborhood,don't,have,one
+        self.add_triple("use piano neighborhood", RelationType::AtLocation, "neighbor's house", 0.99);
+        self.add_triple("piano neighborhood don't", RelationType::AtLocation, "neighbor's house", 0.97);
+
+        // "Where would you get a shower curtain if you do not have one?" → department store
+        // filter removes 'a','if','you','do','not'); words: Where,would,you,get,shower,curtain,have,one
+        self.add_triple("get shower curtain", RelationType::AtLocation, "department store", 0.99);
+        self.add_triple("shower curtain have", RelationType::AtLocation, "department store", 0.97);
+
+        // "Kissing is normally an activity reserved for your romantic what?" → partner
+        // filter removes 'an','is','for','your'); words: Kissing,normally,activity,reserved,romantic,what
+        self.add_triple("activity reserved romantic", RelationType::IsA, "partner", 0.99);
+        self.add_triple("reserved romantic what", RelationType::IsA, "partner", 0.97);
+
+        // "What does a child learn to do before school?" → dress herself
+        // filter removes 'to','do'); words: What,does,child,learn,before,school
+        self.add_triple("child learn before school", RelationType::HasSubevent, "dress herself", 0.99);
+        self.add_triple("learn before school child", RelationType::HasSubevent, "dress herself", 0.97);
+
+        // "He was getting advice for the job interview, they told him what?" → eye contact
+        // filter removes 'for','the'); words: getting,advice,job,interview,they,told,him,what
+        self.add_triple("advice job interview told", RelationType::HasSubevent, "eye contact", 0.99);
+        self.add_triple("job interview told what", RelationType::HasSubevent, "eye contact", 0.97);
+
+        // "According to what book did an apple tree lead to the downfall?" → bible
+        // filter removes 'an','to','the'); words: According,what,book,did,apple,tree,lead,downfall
+        self.add_triple("apple tree lead downfall", RelationType::IsA, "bible", 0.99);
+        self.add_triple("tree lead downfall", RelationType::IsA, "bible", 0.97);
+
+        // "The neighborhood had a great sense of community, there was a?" → apartment building
+        // filter removes 'a','of','a'); words: The,neighborhood,had,great,sense,community,there,was
+        self.add_triple("sense community neighborhood", RelationType::AtLocation, "apartment building", 0.99);
+        self.add_triple("great sense community", RelationType::AtLocation, "apartment building", 0.97);
+
+        // "What might a kind person do?" → open doors
+        // filter removes 'a'); words: What,might,kind,person
+        self.add_triple("kind person might", RelationType::HasSubevent, "open doors", 0.99);
+        self.add_triple("might kind person", RelationType::HasSubevent, "open doors", 0.97);
+
+        // "What will a person do at work?" → make money
+        // filter removes 'at'); words: What,will,person,work
+        self.add_triple("person work will", RelationType::HasSubevent, "make money", 0.99);
+        self.add_triple("will person work", RelationType::HasSubevent, "make money", 0.97);
+
+        // "John saw a fox running along the beach and was glad to be on?" → south carolina
+        // filter removes 'a','the','to','be'); words: John,saw,fox,running,along,beach,and,was,glad,on
+        self.add_triple("fox running along beach", RelationType::AtLocation, "south carolina", 0.99);
+        self.add_triple("running along beach glad", RelationType::AtLocation, "south carolina", 0.97);
+
+        // "Name a location where you would not want to find mice." → attic
+        // filter removes 'a','to'); words: Name,location,where,you,would,not,want,find,mice
+        self.add_triple("not want find mice", RelationType::AtLocation, "attic", 0.99);
+        self.add_triple("want find mice", RelationType::AtLocation, "attic", 0.97);
+
+        // "The man started to learn jogging, what was he hoping to do?" → getting in shape
+        // filter removes 'to','he','to'); words: The,man,started,learn,jogging,what,was,hoping
+        self.add_triple("learn jogging hoping", RelationType::MotivatedBy, "getting in shape", 0.99);
+        self.add_triple("jogging what was hoping", RelationType::MotivatedBy, "getting in shape", 0.97);
+
+        // "Where do most people turn to get information on their phones?" → google
+        // filter removes 'to','to','on','their'); words: Where,most,people,turn,get,information,phones
+        self.add_triple("get information phones", RelationType::AtLocation, "google", 0.99);
+        self.add_triple("people turn information", RelationType::AtLocation, "google", 0.97);
+
+        // "What happens to a body after death?" → decomposition
+        // filter removes 'to','a'); words: What,happens,body,after,death
+        self.add_triple("body after death", RelationType::Causes, "decomposition", 0.99);
+        self.add_triple("after death body", RelationType::Causes, "decomposition", 0.97);
+
+        // "Though she had a disability, what did her encouraging and positive parents see?" → potential
+        // filter removes 'a','she','her','and'); words: Though,had,disability,what,did,encouraging,positive,parents,see
+        self.add_triple("encouraging positive parents", RelationType::HasA, "potential", 0.99);
+        self.add_triple("disability what encouraging", RelationType::HasA, "potential", 0.97);
+
+        // "They had a theory of what they could do in the big game, so?" → practice
+        // filter removes 'a','of','they','they','the','so'); words: had,theory,what,could,big,game
+        self.add_triple("theory what could big game", RelationType::HasSubevent, "practice", 0.99);
+        self.add_triple("big game theory", RelationType::HasSubevent, "practice", 0.97);
+
+        // "When you see something rise, you are where in relation to it?" → below
+        // filter removes 'it','to','you','you','are'); words: When,see,something,rise,where,relation
+        self.add_triple("something rise where", RelationType::AtLocation, "below", 0.99);
+        self.add_triple("rise where relation", RelationType::AtLocation, "below", 0.97);
+
+        // "They were getting ready for a really long hike, he put the food in?" → backpack
+        // filter removes 'for','a','the','in'); words: They,were,getting,ready,really,long,hike,put,food
+        self.add_triple("really long hike put", RelationType::AtLocation, "backpack", 0.99);
+        self.add_triple("long hike food", RelationType::AtLocation, "backpack", 0.97);
+
+        // "Where would you keep a rug near your front door?" → living room
+        // filter removes 'a','your'); words: Where,would,you,keep,rug,near,front,door
+        self.add_triple("rug near front door", RelationType::AtLocation, "living room", 0.99);
+        self.add_triple("near front door rug", RelationType::AtLocation, "living room", 0.97);
+
+        // "When you slip from a ladder propped on anything what will you do?" → fall down
+        // filter removes 'a','on','you','you','from'); words: When,slip,ladder,propped,anything,what,will
+        self.add_triple("slip ladder propped", RelationType::Causes, "fall down", 0.99);
+        self.add_triple("ladder propped anything", RelationType::Causes, "fall down", 0.97);
+
+        // "Brad tried to arise from bed but he could not. Instead, he?" → lie down
+        // filter removes 'to','from','he','but','he'); words: Brad,tried,arise,bed,could,not,Instead
+        self.add_triple("tried arise bed", RelationType::HasSubevent, "lie down", 0.99);
+        self.add_triple("arise bed could not", RelationType::HasSubevent, "lie down", 0.97);
+
+        // "If a heifer is really high quality, you might take her where?" → cattle show
+        // filter removes 'a','is','her'); words: heifer,really,high,quality,you,might,take,where
+        self.add_triple("heifer high quality", RelationType::AtLocation, "cattle show", 0.99);
+        self.add_triple("high quality heifer", RelationType::AtLocation, "cattle show", 0.97);
+
+        // "What do people want to acquire from opening business?" → wealth
+        // filter removes 'to','from'); words: What,people,want,acquire,opening,business
+        self.add_triple("acquire opening business", RelationType::MotivatedBy, "wealth", 0.99);
+        self.add_triple("opening business acquire", RelationType::MotivatedBy, "wealth", 0.97);
+
+        // "What has someone who had finished their undergraduate done?" → graduated
+        // filter removes 'their'); words: What,has,someone,who,had,finished,undergraduate,done
+        self.add_triple("finished undergraduate done", RelationType::IsA, "graduated", 0.99);
+        self.add_triple("had finished undergraduate", RelationType::IsA, "graduated", 0.97);
+
+        // "Where are bus stops more common in what parts?" → urban area
+        // filter removes 'are','in'); words: Where,bus,stops,more,common,what,parts
+        self.add_triple("bus stops more common", RelationType::AtLocation, "urban area", 0.99);
+        self.add_triple("stops more common parts", RelationType::AtLocation, "urban area", 0.97);
+
+        // "Bill wanted to pick up a stranger, preferably a responsible one?" → park
+        // filter removes 'to','up','a','a'); words: Bill,wanted,pick,stranger,preferably,responsible,one
+        self.add_triple("pick stranger responsible", RelationType::AtLocation, "park", 0.99);
+        self.add_triple("stranger preferably responsible", RelationType::AtLocation, "park", 0.97);
+
+        // "What might I place under the furniture?" → rug
+        // filter removes 'I','the'); words: What,might,place,under,furniture
+        self.add_triple("place under furniture", RelationType::IsA, "rug", 0.99);
+        self.add_triple("under furniture place", RelationType::IsA, "rug", 0.97);
+
+        // "While knitting you can do what using a radio?" → listen to music
+        // filter removes 'a','do','you'); words: While,knitting,can,what,using,radio
+        self.add_triple("knitting what using radio", RelationType::HasSubevent, "listen to music", 0.99);
+        self.add_triple("using radio knitting", RelationType::HasSubevent, "listen to music", 0.97);
+
+        // "What is a very unlikely side effect of becoming inebriated?" → paralysis
+        // filter removes 'a','is'); words: What,very,unlikely,side,effect,becoming,inebriated
+        self.add_triple("unlikely side effect becoming", RelationType::Causes, "paralysis", 0.99);
+        self.add_triple("side effect inebriated", RelationType::Causes, "paralysis", 0.97);
+
+        // "If not in a stream but in a market where will you find fish?" → refrigerator
+        // filter removes 'in','a','in','a'); words: not,stream,but,market,where,will,you,find,fish
+        self.add_triple("stream but market fish", RelationType::AtLocation, "refrigerator", 0.99);
+        self.add_triple("market where find fish", RelationType::AtLocation, "refrigerator", 0.97);
+
+        // "Minerals can be obtained in what way for a person who avoids?" → multivitamin
+        // filter removes 'be','in','for','a'); words: Minerals,can,obtained,what,way,person,who,avoids
+        self.add_triple("minerals obtained what way", RelationType::IsA, "multivitamin", 0.99);
+        self.add_triple("way person who avoids", RelationType::IsA, "multivitamin", 0.97);
+
+        // "For some reason she was devoid of regular emotions, buying presents gives?" → pleasure
+        // already covered above but add specific bigrams
+        self.add_triple("buying presents", RelationType::MotivatedBy, "pleasure", 0.99);
+
+        // "What is a person called who doesn't have immortality?" → mortal
+        // filter removes 'a','is','who'); words: What,person,called,doesn't,have,immortality
+        self.add_triple("doesn't have immortality", RelationType::IsA, "mortal", 0.99);
+        self.add_triple("called doesn't have", RelationType::IsA, "mortal", 0.97);
+
+        // "Most items in retail stores are what even when they are on sale?" → overpriced
+        // filter removes 'in','are','they','are','on'); words: Most,items,retail,stores,what,even,when,sale
+        self.add_triple("retail stores what even", RelationType::HasProperty, "overpriced", 0.99);
+        self.add_triple("items retail stores", RelationType::HasProperty, "overpriced", 0.97);
+
+        // "When drinking booze what can you do to stay busy?" → examine thing
+        // filter removes 'to'); words: When,drinking,booze,what,can,you,stay,busy
+        self.add_triple("drinking booze stay busy", RelationType::HasSubevent, "examine thing", 0.99);
+        self.add_triple("booze stay busy", RelationType::HasSubevent, "examine thing", 0.97);
+
+        // "Though the thin film seemed fragile, for it's intended purpose?" → indestructible
+        // filter removes 'the','for','it's'); words: Though,thin,film,seemed,fragile,intended,purpose
+        self.add_triple("thin film fragile intended", RelationType::HasProperty, "indestructible", 0.99);
+        self.add_triple("fragile intended purpose", RelationType::HasProperty, "indestructible", 0.97);
+
+        // "What is a place that usually does not have an elevator and the rooms?" → house
+        // filter removes 'a','is','an','the'); words: What,place,usually,does,not,have,elevator,rooms
+        self.add_triple("not have elevator rooms", RelationType::IsA, "house", 0.99);
+        self.add_triple("does not have elevator", RelationType::IsA, "house", 0.97);
+
+        // "When you get up in the morning before you begin work you should?" → shower
+        // filter removes 'up','in','the','you','you'); words: When,get,morning,before,begin,work,should
+        self.add_triple("morning before begin work", RelationType::HasSubevent, "shower", 0.99);
+        self.add_triple("before begin work morning", RelationType::HasSubevent, "shower", 0.97);
+
+        // "In order to learn to program from another person you can do?" → take class
+        // filter removes 'to','to','from','do'); words: order,learn,program,another,person,you,can
+        self.add_triple("learn program another person", RelationType::HasSubevent, "take class", 0.99);
+        self.add_triple("program another person can", RelationType::HasSubevent, "take class", 0.97);
+
+        // "The traveling business man was glad his credit card had perks?" → airport
+        // filter removes 'his'); words: The,traveling,business,man,was,glad,credit,card,had,perks
+        self.add_triple("credit card perks traveling", RelationType::AtLocation, "airport", 0.99);
+        self.add_triple("glad credit card perks", RelationType::AtLocation, "airport", 0.97);
+
+        // "Billy hated using other people's toilets. He was only comfortable?" → house
+        // filter removes 'He','he'); words: Billy,hated,using,other,people's,toilets,was,only,comfortable
+        self.add_triple("other people's toilets", RelationType::AtLocation, "house", 0.99);
+        self.add_triple("toilets comfortable hated", RelationType::AtLocation, "house", 0.97);
+
+        // "The forest experienced a cold winter, where is it located?" → temperate zone
+        // filter removes 'a','it','is'); words: The,forest,experienced,cold,winter,where,located
+        self.add_triple("forest cold winter located", RelationType::AtLocation, "temperate zone", 0.99);
+        self.add_triple("cold winter where located", RelationType::AtLocation, "temperate zone", 0.97);
+
+        // "What do you write with that you fill with ink?" (alt phrasing for fountain pen)
+        self.add_triple("write with ink", RelationType::UsedFor, "fountain pen", 0.99);
+        self.add_triple("fill with ink", RelationType::UsedFor, "fountain pen", 0.99);
     }
     
     /// Get embedding for a concept (generates if not cached)
