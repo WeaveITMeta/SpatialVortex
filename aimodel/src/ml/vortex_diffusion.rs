@@ -2195,6 +2195,90 @@ impl VortexDiffusionEngine {
         &self.stats
     }
 
+    /// Pathway-guided unmasking: Use exhaustive pathway search to find optimal token unmasking order.
+    /// 
+    /// Instead of random or confidence-only unmasking, this evaluates all n! permutations
+    /// (up to n=9 for tractability) to find the best ordering via E8 lattice selection.
+    /// 
+    /// # Arguments
+    /// * `masked_indices` - Indices of masked tokens in the sequence
+    /// * `context_embedding` - Target embedding we're denoising toward
+    /// 
+    /// # Returns
+    /// Optimal unmasking order as a permutation of indices
+    #[cfg(feature = "diffusion-expert")]
+    pub fn pathway_guided_unmasking(
+        &self,
+        masked_indices: &[usize],
+        context_embedding: &[f32],
+    ) -> Vec<usize> {
+        use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig};
+        
+        let n = masked_indices.len().min(9); // Cap at 9 for tractability (9! = 362,880)
+        if n == 0 {
+            return Vec::new();
+        }
+        
+        // Create pathway optimizer with fast config (3 stacks for ~100ms)
+        let mut optimizer = ExhaustivePathwayOptimizer::new(PathwayConfig {
+            n_nodes: n,
+            dimension: self.config.embed_dim,
+            num_stacks: 3,  // Fast: 3 × 362K = 1M evals in ~100ms
+            top_k_per_stack: 20,
+            parallel: true,
+            ..Default::default()
+        });
+        
+        // Get embeddings for each masked token position
+        let mut token_embeddings = Vec::with_capacity(n);
+        for &idx in masked_indices.iter().take(n) {
+            let embed = self.transformer.get_embedding(MASK_TOKEN_ID, idx);
+            token_embeddings.push(embed);
+        }
+        
+        // Set embeddings and target
+        optimizer.set_embeddings(&token_embeddings);
+        optimizer.set_target(context_embedding);
+        
+        // Run exhaustive search to find best unmasking order
+        let top_paths = optimizer.fast_search(1);
+        
+        // Return best permutation, or sequential fallback
+        if let Some(best) = top_paths.first() {
+            // Map permutation indices back to actual sequence indices
+            best.perm.iter().map(|&i| masked_indices[i]).collect()
+        } else {
+            // Fallback: sequential order
+            masked_indices.iter().copied().take(n).collect()
+        }
+    }
+    
+    /// Get context embedding for pathway-guided unmasking.
+    /// Averages embeddings of all locked (non-masked) tokens.
+    #[cfg(feature = "diffusion-expert")]
+    pub fn get_context_embedding(&self, states: &[TokenState]) -> Vec<f32> {
+        let mut sum = vec![0.0f32; self.config.embed_dim];
+        let mut count = 0;
+        
+        for (i, state) in states.iter().enumerate() {
+            if state.is_final() && state.token_id != MASK_TOKEN_ID {
+                let embed = self.transformer.get_embedding(state.token_id, i);
+                for (j, &val) in embed.iter().enumerate() {
+                    sum[j] += val;
+                }
+                count += 1;
+            }
+        }
+        
+        if count > 0 {
+            for val in &mut sum {
+                *val /= count as f32;
+            }
+        }
+        
+        sum
+    }
+
     /// Infill: given a sequence with some tokens filled and some as MASK,
     /// generate the masked positions while keeping filled positions fixed.
     ///

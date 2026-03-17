@@ -34,6 +34,8 @@ web = ["actix-web", "actix-cors", "actix-files"]
 web-learning = ["dep:reqwest", "dep:urlencoding", "dep:scraper", "dep:html2md", "dep:dashmap", "dep:governor", "dep:flume"]
 # Classical ML augmentation (linfa scikit-learn-like toolkit)
 linfa-ml = ["dep:linfa", "dep:linfa-clustering", "dep:linfa-reduction", "dep:linfa-linear", "dep:ndarray"]
+# Diffusion LM expert with pathway-guided unmasking
+diffusion-expert = []
 
 [dependencies]
 # Core

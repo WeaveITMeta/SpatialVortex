@@ -65,6 +65,7 @@ pub mod secure_aggregation;
 pub mod learning_to_rank;
 pub mod pillar_integration;
 pub mod vortex_diffusion;
+pub mod vortex_planner;
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm_alignment::{
@@ -154,6 +155,7 @@ pub use reasoning_engine::{
     ComprehensiveReasoner,
 };
 pub use recursive_chains::{SNOATNode, SNOATChain, ChainPathwayReasoner};
+pub use vortex_planner::{VortexSymbolicPlanner, PlanStep, PlanTrace, SacredGateResult};
 pub use conceptual_agglomeration::{
     ConceptNode, ConceptGraph, ConceptualReasoner,
     ConceptRef, ConceptRelation, ConceptRelationType,

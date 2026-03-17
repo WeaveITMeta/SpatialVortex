@@ -132,6 +132,12 @@ pub struct TransitiveFluxReasoner {
     locations: HashMap<String, String>, // entity -> current_location
     /// Flux matrix engine for context-aware entity linking
     flux_engine: FluxMatrixEngine,
+    /// 2D spatial coordinates assigned from relation facts (x=horizontal, y=vertical)
+    /// Used for cross-relation positional inference (e.g. left_of + below → diagonal)
+    spatial_coords: HashMap<String, (f32, f32)>,
+    /// Size rankings: entity → relative size score (higher = bigger)
+    /// Used for task 18 cross-relation size chain inference
+    size_rank: HashMap<String, f32>,
 }
 
 impl TransitiveFluxReasoner {
@@ -149,6 +155,8 @@ impl TransitiveFluxReasoner {
             entity_counts: HashMap::new(),
             locations: HashMap::new(),
             flux_engine: FluxMatrixEngine::new(),
+            spatial_coords: HashMap::new(),
+            size_rank: HashMap::new(),
         }
     }
     
@@ -167,6 +175,8 @@ impl TransitiveFluxReasoner {
         self.locations.clear();
         self.calibration_factor = 1.0;
         self.flux_engine.reset();
+        self.spatial_coords.clear();
+        self.size_rank.clear();
     }
     
     /// Extract relations from context text
@@ -219,6 +229,10 @@ impl TransitiveFluxReasoner {
         
         // Compute transitive closure
         self.compute_transitive_closure();
+        // Build 2D coordinate map for spatial cross-relation inference (task 17)
+        self.build_spatial_coords();
+        // Build size rank for size cross-relation inference (task 18)
+        self.build_size_rank();
     }
     
     /// Enhanced entity linking using flux matrix sacred positions for disambiguation
@@ -472,6 +486,147 @@ impl TransitiveFluxReasoner {
         self.relations.extend(new_relations);
     }
     
+    /// Assign relative size ranks to entities from bigger_than/smaller_than facts.
+    /// bigger_than → source.rank > target.rank  (+1)
+    /// smaller_than → source.rank < target.rank  (-1)
+    /// fits_inside  → source.rank < target.rank  (same as smaller_than)
+    /// Propagates iteratively until stable so multi-hop chains resolve correctly.
+    fn build_size_rank(&mut self) {
+        self.size_rank.clear();
+
+        // Find the "biggest" entity: one that appears as source of bigger_than but never as target.
+        // This is the natural root of the size chain. Seed it at a high rank so all others
+        // derive correctly below it.
+        let size_rels: Vec<_> = self.relations.iter()
+            .filter(|r| matches!(r.relation.as_str(), "bigger_than" | "smaller_than" | "fits_inside"))
+            .collect();
+        if size_rels.is_empty() { return; }
+
+        // Collect all entities that are targets of bigger_than (i.e., smaller things)
+        let smaller_entities: std::collections::HashSet<String> = size_rels.iter()
+            .filter(|r| r.relation == "bigger_than")
+            .map(|r| r.target.clone())
+            .collect();
+
+        // Find root candidates: sources of bigger_than that are never listed as smaller
+        let root = size_rels.iter()
+            .filter(|r| r.relation == "bigger_than")
+            .map(|r| r.source.clone())
+            .find(|src| !smaller_entities.contains(src))
+            .unwrap_or_else(|| size_rels[0].source.clone());
+
+        self.size_rank.insert(root, (size_rels.len() as f32).max(5.0));
+
+        for _ in 0..self.max_chain_depth {
+            let mut changed = false;
+            for rel in &self.relations.clone() {
+                let delta: f32 = match rel.relation.as_str() {
+                    "bigger_than"  =>  1.0,
+                    "smaller_than" => -1.0,
+                    "fits_inside"  => -1.0,
+                    _ => continue,
+                };
+                let src_rank = self.size_rank.get(&rel.source).copied();
+                let tgt_rank = self.size_rank.get(&rel.target).copied();
+
+                match (src_rank, tgt_rank) {
+                    (Some(sr), None) => {
+                        self.size_rank.insert(rel.target.clone(), sr - delta);
+                        changed = true;
+                    }
+                    (None, Some(tr)) => {
+                        self.size_rank.insert(rel.source.clone(), tr + delta);
+                        changed = true;
+                    }
+                    _ => {}
+                }
+            }
+            if !changed { break; }
+        }
+    }
+
+    /// Query whether a size relation holds using rank comparison.
+    /// Returns (holds: bool, confidence: f32) or None if either entity has no rank.
+    pub fn query_size_rank(&self, source: &str, relation: &str, target: &str) -> Option<(bool, f32)> {
+        let src = self.size_rank.get(&source.to_lowercase())?;
+        let tgt = self.size_rank.get(&target.to_lowercase())?;
+        let epsilon = 0.1f32;
+        let holds = match relation {
+            "bigger_than"  => src > &(tgt + epsilon),
+            "smaller_than" => src + epsilon < *tgt,
+            "fits_inside"  => src + epsilon < *tgt, // smaller things fit inside bigger ones
+            _ => return None,
+        };
+        Some((holds, 0.95))
+    }
+
+    /// Assign 2D (x, y) coordinates to each entity from spatial relation facts.
+    /// left_of  → source.x < target.x  (dx = -1)
+    /// right_of → source.x > target.x  (dx = +1)
+    /// above    → source.y > target.y  (dy = +1)
+    /// below    → source.y < target.y  (dy = -1)
+    /// Propagates iteratively until stable so multi-hop chains resolve correctly.
+    fn build_spatial_coords(&mut self) {
+        self.spatial_coords.clear();
+
+        // Seed: assign (0,0) to the first entity encountered
+        let seed_entity: Option<String> = self.relations.first().map(|r| r.source.clone());
+        if let Some(seed) = seed_entity {
+            self.spatial_coords.insert(seed, (0.0, 0.0));
+        }
+
+        // Propagate up to max_chain_depth passes
+        for _ in 0..self.max_chain_depth {
+            let mut changed = false;
+            for rel in &self.relations.clone() {
+                let (dx, dy): (f32, f32) = match rel.relation.as_str() {
+                    "left_of"  => (-1.0,  0.0),
+                    "right_of" => ( 1.0,  0.0),
+                    "above"    => ( 0.0,  1.0),
+                    "below"    => ( 0.0, -1.0),
+                    _          => continue,
+                };
+                let src_coord = self.spatial_coords.get(&rel.source).copied();
+                let tgt_coord = self.spatial_coords.get(&rel.target).copied();
+
+                match (src_coord, tgt_coord) {
+                    (Some(sc), None) => {
+                        // Derive target from source
+                        let new_coord = (sc.0 - dx, sc.1 - dy);
+                        self.spatial_coords.insert(rel.target.clone(), new_coord);
+                        changed = true;
+                    }
+                    (None, Some(tc)) => {
+                        // Derive source from target
+                        let new_coord = (tc.0 + dx, tc.1 + dy);
+                        self.spatial_coords.insert(rel.source.clone(), new_coord);
+                        changed = true;
+                    }
+                    _ => {}
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+    }
+
+    /// Query whether a spatial relation holds using 2D coordinates.
+    /// Returns (holds: bool, confidence: f32) or None if either entity has no coords.
+    pub fn query_spatial_coords(&self, source: &str, relation: &str, target: &str) -> Option<(bool, f32)> {
+        let src = self.spatial_coords.get(&source.to_lowercase())?;
+        let tgt = self.spatial_coords.get(&target.to_lowercase())?;
+        let epsilon = 0.1f32;
+        let holds = match relation {
+            "left_of"  => src.0 + epsilon < tgt.0,
+            "right_of" => src.0 > tgt.0 + epsilon,
+            "above"    => src.1 > tgt.1 + epsilon,
+            "below"    => src.1 + epsilon < tgt.1,
+            _          => return None,
+        };
+        Some((holds, 0.95))
+    }
+
     /// Get inverse relation type
     fn get_inverse_relation(&self, relation: &str) -> Option<&'static str> {
         match relation {
@@ -562,24 +717,25 @@ impl TransitiveFluxReasoner {
             ("bigger than", "bigger_than"),
             ("larger than", "bigger_than"),
             ("smaller than", "smaller_than"),
-            ("fit in", "fits_inside"),
+            ("fits inside", "fits_inside"),
             ("fits in", "fits_inside"),
+            ("fit inside", "fits_inside"),
+            ("fit in", "fits_inside"),
         ];
         
         for (pattern, rel_type) in spatial_patterns.iter().chain(size_patterns.iter()) {
             if question_lower.contains(pattern) {
                 relation = rel_type.to_string();
                 
-                // Extract source (after "is the" or "is")
-                if let Some(is_pos) = question_lower.find("is the ") {
-                    let after_is = &question_lower[is_pos + 7..];
-                    if let Some(pat_pos) = after_is.find(pattern) {
-                        source = after_is[..pat_pos].trim().to_string();
-                    }
-                } else if let Some(is_pos) = question_lower.find("is ") {
-                    let after_is = &question_lower[is_pos + 3..];
-                    if let Some(pat_pos) = after_is.find(pattern) {
-                        source = after_is[..pat_pos].trim().to_string();
+                // Extract source (after "is the" / "is" / "does the" / "does")
+                let subject_markers = ["does the ", "does ", "is the ", "is "];
+                'outer: for marker in &subject_markers {
+                    if let Some(pos) = question_lower.find(marker) {
+                        let after = &question_lower[pos + marker.len()..];
+                        if let Some(pat_pos) = after.find(pattern) {
+                            source = after[..pat_pos].trim().to_string();
+                            break 'outer;
+                        }
                     }
                 }
                 
@@ -705,7 +861,31 @@ impl TransitiveFluxReasoner {
         for sentence in context_lower.split(|c| c == '.' || c == '\n') {
             let sentence = sentence.trim();
             if sentence.is_empty() { continue; }
-            
+
+            // Handle explicit negations first: "X is not in Y" / "X is no longer in Y"
+            // These override any previously stored location for entity X.
+            let negation_patterns = [
+                (" is not in the ", " is not at the ", " is no longer in the ", " is no longer at the ",
+                 " is not in ", " is not at ", " is no longer in ", " is no longer at "),
+            ];
+            let _ = negation_patterns; // suppress unused warning — inline below
+            for neg_pat in &[" is not in the ", " is not in ", " is no longer in the ", " is no longer in "] {
+                if sentence.contains(neg_pat) {
+                    if let Some(neg_pos) = sentence.find(neg_pat) {
+                        let entity = sentence[..neg_pos].trim().split_whitespace().last().unwrap_or("").to_string();
+                        let location = sentence[neg_pos + neg_pat.len()..]
+                            .trim().trim_end_matches('.').trim().to_string();
+                        if !entity.is_empty() && !location.is_empty() {
+                            // Mark entity as explicitly NOT at this location with sentinel "!<location>"
+                            let current = self.locations.get(&entity).cloned();
+                            if current.as_deref() == Some(&location) || current.is_none() {
+                                self.locations.insert(entity.clone(), format!("!{}", location));
+                            }
+                        }
+                    }
+                }
+            }
+
             // Parse movement patterns
             for (pattern, rel_type) in &movement_patterns {
                 if let Some((entity, location)) = self.parse_relation_pattern(sentence, pattern) {
@@ -899,7 +1079,69 @@ impl TransitiveFluxReasoner {
     pub fn get_location(&self, entity: &str) -> Option<&String> {
         self.locations.get(&entity.to_lowercase())
     }
-    
+
+    /// Returns true when the locations map is empty (no movement events parsed)
+    /// Used by VortexSymbolicPlanner gate 3 to check whether location-based
+    /// yes/no reasoning (tasks 3,6,9) can fire
+    pub fn locations_populated(&self) -> bool {
+        self.locations.is_empty()
+    }
+
+    /// Returns true when the relations list is empty
+    /// Used by VortexSymbolicPlanner position 1 to detect no relational structure
+    pub fn relations_is_empty(&self) -> bool {
+        self.relations.is_empty()
+    }
+
+    /// Returns true when entity_counts is non-empty — at least one pickup/drop event
+    /// was parsed from context. Used by VortexSymbolicPlanner to guard counting answers:
+    /// if no events were seen, committing count=0 is unreliable (context may be truncated).
+    pub fn has_entity_events(&self) -> bool {
+        !self.entity_counts.is_empty()
+    }
+
+    /// Alias for get_location that returns an owned String — used by VortexSymbolicPlanner
+    pub fn get_entity_location(&self, entity: &str) -> Option<String> {
+        self.locations.get(&entity.to_lowercase()).cloned()
+    }
+
+    /// Search the adjacency graph for a neighbor of `target_node` connected by `relation`.
+    ///
+    /// Scan direction: find a source node S such that adjacency[S] contains an edge
+    /// (target_node, relation, _).  This answers "who is `relation` of `target_node`?".
+    ///
+    /// Used by VortexSymbolicPlanner position 5 for directional queries like
+    /// "What is north of the garden?" (relation="north_of", target="garden") and
+    /// "What is the bathroom east of?" (uses inverse relation lookup).
+    pub fn find_neighbor_by_relation(&self, target_node: &str, relation: &str) -> Option<String> {
+        let target_lower = target_node.to_lowercase();
+        let relation_lower = relation.to_lowercase();
+
+        // First pass: direct lookup — adjacency[source] has edge (target, relation, _)
+        // This covers "what is [relation] of target?" = find source
+        for (source, edges) in &self.adjacency {
+            for (dest, rel, _weight) in edges {
+                if dest.to_lowercase() == target_lower
+                    && rel.to_lowercase().replace(' ', "_") == relation_lower
+                {
+                    return Some(source.clone());
+                }
+            }
+        }
+
+        // Second pass: adjacency[target] has edge (dest, relation, _) — forward lookup
+        // This covers "what does target [relation]?" = find dest
+        if let Some(edges) = self.adjacency.get(&target_lower) {
+            for (dest, rel, _weight) in edges {
+                if rel.to_lowercase().replace(' ', "_") == relation_lower {
+                    return Some(dest.clone());
+                }
+            }
+        }
+
+        None
+    }
+
     /// Answer path-finding questions (bAbI Task 19)
     pub fn answer_path_question(&self, question: &str) -> Option<(String, f32)> {
         let question_lower = question.to_lowercase();
@@ -989,15 +1231,41 @@ impl TransitiveFluxReasoner {
         // Track items per entity
         let mut entity_items: HashMap<String, HashSet<String>> = HashMap::new();
         
-        for sentence in context_lower.split(|c| c == '.' || c == '\n') {
+        for sentence in context_lower.split(|c| c == '\n') {
+            // Strip trailing period and whitespace, then strip leading "N " line number
+            let sentence = sentence.trim().trim_end_matches('.');
+            let sentence = sentence.trim_start_matches(|c: char| c.is_ascii_digit() || c == ' ');
             let sentence = sentence.trim();
             if sentence.is_empty() { continue; }
-            
-            // Find entity (usually first word or after "the")
+
+            // Handle "X gave Y to Z" as both a drop for X and a gain for Z
+            let give_patterns = ["gave the ", "gave ", "handed the ", "handed "];
+            for gp in &give_patterns {
+                if sentence.contains(gp) {
+                    if let Some(gp_pos) = sentence.find(gp) {
+                        let giver = sentence[..gp_pos].trim().split_whitespace().last().unwrap_or("").to_string();
+                        let after_gp = &sentence[gp_pos + gp.len()..];
+                        if let Some(to_pos) = after_gp.find(" to ") {
+                            let obj = after_gp[..to_pos].trim().to_string();
+                            let receiver = after_gp[to_pos + 4..]
+                                .trim().trim_end_matches('.').split_whitespace().next().unwrap_or("").to_string();
+                            if !obj.is_empty() && !receiver.is_empty() {
+                                if !giver.is_empty() {
+                                    if let Some(items) = entity_items.get_mut(&giver) { items.remove(&obj); }
+                                }
+                                entity_items.entry(receiver).or_insert_with(HashSet::new).insert(obj);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // Find entity (usually first word, after stripping "the")
             let words: Vec<&str> = sentence.split_whitespace().collect();
             if words.is_empty() { continue; }
             
-            let entity = words[0].trim_start_matches("the ").to_string();
+            let entity = words[0].to_string();
             
             // Check for acquisition
             for pattern in &acquire_patterns {
@@ -1013,7 +1281,7 @@ impl TransitiveFluxReasoner {
                             .trim_end_matches(|c: char| !c.is_alphanumeric())
                             .to_string();
                         
-                        if !item.is_empty() {
+                        if !item.is_empty() && item != "there" && item.len() > 1 {
                             entity_items.entry(entity.clone())
                                 .or_insert_with(HashSet::new)
                                 .insert(item);

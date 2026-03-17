@@ -51,6 +51,9 @@ pub struct InferenceTrace {
     pub final_probs: Vec<f32>,
     /// Wall-clock time for this question (ms)
     pub elapsed_ms: u64,
+    /// Diffusion expert contribution (if enabled)
+    #[cfg(feature = "diffusion-expert")]
+    pub diffusion_contribution: Option<DiffusionContribution>,
 }
 
 impl InferenceTrace {
@@ -71,6 +74,8 @@ impl InferenceTrace {
             raw_logits: vec![0.0; num_choices],
             final_probs: vec![0.0; num_choices],
             elapsed_ms: 0,
+            #[cfg(feature = "diffusion-expert")]
+            diffusion_contribution: None,
         }
     }
 
@@ -182,10 +187,30 @@ impl fmt::Display for InferenceTrace {
 // 2. ExpertContribution — One expert's score for one choice
 // =============================================================================
 
+/// Per-expert score contribution
 #[derive(Debug, Clone)]
 pub struct ExpertContribution {
     pub expert_name: String,
     pub score: f32,
+}
+
+/// Diffusion expert contribution metrics
+#[derive(Debug, Clone)]
+pub struct DiffusionContribution {
+    /// Time spent generating (ms)
+    pub generation_time_ms: f64,
+    /// Time spent on pathway search (ms)
+    pub pathway_search_time_ms: f64,
+    /// N-gram plausibility score
+    pub ngram_score: f32,
+    /// Choice overlap bonus
+    pub overlap_bonus: f32,
+    /// Total diffusion score contribution
+    pub total_score: f32,
+    /// Number of tokens generated
+    pub tokens_generated: usize,
+    /// Average confidence from diffusion stats
+    pub avg_confidence: f32,
 }
 
 // =============================================================================
