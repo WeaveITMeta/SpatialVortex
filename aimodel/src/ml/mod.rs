@@ -68,6 +68,9 @@ pub mod vortex_diffusion;
 pub mod vortex_planner;
 pub mod parallel_fusion;
 pub mod grid_encoder;
+pub mod arc_trajectory;
+pub mod causal_model;
+pub mod symbol_resolver;
 
 pub use parallel_fusion::{
     SpectralConsensus,
@@ -178,6 +181,19 @@ pub use vortex_planner::{VortexSymbolicPlanner, PlanStep, PlanTrace, SacredGateR
 pub use grid_encoder::{
     GridEncoder, GridEncoderConfig, EncodedGrid, TransformEncoding,
     ArcGrid, CellEmbedding, FluxPositionMap, SacredGateResult as GridSacredGateResult,
+};
+pub use arc_trajectory::{
+    TrajectoryBuffer, TrajectoryStep, ArcGridState, GridHash,
+    FluxEmbedding, FlowDir, VortexPosition, ActionId, ActionEdge,
+    StateGraph, CompletedEpisode,
+};
+pub use causal_model::{
+    CausalModel, CausalEdge, CausalEffect, Intervention,
+    SymbolicDerivative, DerivativeSignature,
+};
+pub use symbol_resolver::{
+    SymbolResolver, EquivalenceCache, EquivalenceClass,
+    UnificationCandidate,
 };
 pub use conceptual_agglomeration::{
     ConceptNode, ConceptGraph, ConceptualReasoner,

@@ -1,0 +1,51 @@
+[package]
+name = "eustress-forge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Eustress Forge - Game server orchestration built on forge-orchestration"
+authors = ["EustressEngine Contributors"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Core orchestration platform
+# Using tls-ring for pure Rust crypto (no cmake/MSVC required on Windows)
+forge-orchestration = { version = "0.4.2", default-features = false, features = ["nomad", "quic", "tls-ring"] }
+
+# Core async runtime
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging
+tracing = "0.1"
+
+# UUID for instance IDs
+uuid = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Async trait for custom routers
+async-trait = "0.1"
+
+# Concurrent data structures
+parking_lot = "0.12"
+
+# Hostname detection
+hostname = "0.4"
+
+[features]
+default = ["full"]
+full = ["metrics", "quic"]
+metrics = []
+quic = []
+
+[dev-dependencies]
+tokio-test = "0.4"

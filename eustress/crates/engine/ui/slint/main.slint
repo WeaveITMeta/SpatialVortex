@@ -1,0 +1,2027 @@
+// ============================================================================
+// Eustress Engine Studio - Main UI Layout
+// Slint 1.12 declarative UI replacing egui immediate-mode
+// ============================================================================
+
+import { VerticalBox, HorizontalBox, TabWidget, Button, ComboBox, LineEdit, ScrollView, StandardListView, CheckBox, Slider, GridBox, GroupBox, SpinBox, TextEdit } from "std-widgets.slint";
+import { Ribbon } from "ribbon.slint";
+import { ExplorerPanel, TreeNode } from "explorer.slint";
+import { PropertiesPanel, PropertyData } from "properties.slint";
+import { OutputConsole, LogData } from "output.slint";
+import { CommandBar } from "command_bar.slint";
+import { Toolbox } from "toolbox.slint";
+import { AssetManager, AssetNode } from "asset_manager.slint";
+import { Collaboration } from "collaboration.slint";
+import { SoulPanel } from "soul_panel.slint";
+import { ScriptEditor, ScriptTab, CenterTab, HighlightLine } from "script_editor.slint";
+import { WebBrowser } from "web_browser.slint";
+import { Notifications } from "notifications.slint";
+import { ViewSelector } from "view_selector.slint";
+import { AIGeneration } from "ai_generation.slint";
+import { PublishDialog } from "publish.slint";
+import { LoginDialog } from "login.slint";
+import { HistoryPanel } from "history_panel.slint";
+import { ContextMenu, MenuItem } from "context_menu.slint";
+import { Theme } from "theme.slint";
+// Dock layout system
+import { LayoutPresetSelector, AdvancedTabBar, PerformanceOverlay, DockZoneIndicator, ThemeEditor, LayoutPreset, DockTab, DockZone } from "dock_layout.slint";
+// New components for complete egui parity
+import { TerrainEditor } from "terrain_editor.slint";
+import { SettingsDialog } from "settings.slint";
+import { NetworkPanel } from "network_panel.slint";
+import { FindDialog } from "find_dialog.slint";
+import { ServiceProperties } from "service_properties.slint";
+// Modal dialogs
+import { SoulSettingsDialog } from "soul_settings.slint";
+import { SimulationSettingsDialog, WatchpointData, SimOutputBinding } from "simulation_settings.slint";
+import { ForgeConnectDialog } from "forge_connect.slint";
+import { StressTestDialog } from "stress_test.slint";
+import { DataSourcesDialog } from "data_sources.slint";
+import { ExitConfirmationDialog } from "exit_confirmation.slint";
+import { SyncDomainDialog } from "sync_domain.slint";
+import { WorkshopPanel, ChatMessage, PipelineStepData } from "workshop_panel.slint";
+
+// ============================================================================
+// Main Studio Window Component
+// ============================================================================
+
+export component StudioWindow inherits Window {
+    // Window properties
+    // NOTE: Do NOT set width/height here — the size comes from the BevyWindowAdapter
+    // via WindowEvent::Resized. Hardcoding dimensions prevents resize from working.
+    preferred-width: 1600px;
+    preferred-height: 900px;
+    title: "Eustress Engine";
+    background: transparent;  // Transparent so 3D scene shows through viewport; panels have own opaque backgrounds
+    default-font-family: "Segoe UI";
+    default-font-size: 13px;
+
+    // ========================================================================
+    // Global State Properties
+    // ========================================================================
+    
+    // Theme
+    in-out property <bool> dark-theme: true;
+    
+    // Panel visibility
+    in-out property <bool> show-explorer: true;
+    in-out property <bool> show-properties: true;
+    in-out property <bool> show-output: true;
+    in-out property <bool> show-toolbox: true;
+    in-out property <bool> show-assets: false;
+    in-out property <bool> show-collaboration: false;
+    in-out property <bool> show-soul-panel: false;
+    in-out property <bool> show-script-editor: false;
+    in-out property <bool> show-history: false;
+    in-out property <bool> show-ai-generation: false;
+    in-out property <bool> show-workshop-panel: false;
+    
+    // HUD visibility (toggle all Eustress Engine UI, keep Bevy UI)
+    in-out property <bool> show-hud: true;
+    
+    // Tab context menu state
+    in-out property <bool> show-tab-context-menu: false;
+    in-out property <int> tab-context-menu-index: -1;
+    in-out property <length> tab-context-menu-x: 0px;
+    in-out property <length> tab-context-menu-y: 0px;
+    
+    // Command bar
+    in-out property <bool> show-command-bar: false;
+    in-out property <string> command-text: "";
+    
+    // Dialogs
+    in-out property <bool> show-publish-dialog: false;
+    in-out property <string> publish-experience-name: "";
+    in-out property <string> publish-description: "";
+    in-out property <string> publish-genre: "All";
+    in-out property <bool> publish-is-public: true;
+    in-out property <bool> publish-open-source: false;
+    in-out property <bool> publish-studio-editable: false;
+    in-out property <bool> publish-as-new: false;
+    in-out property <bool> publish-is-update: false;
+    in-out property <string> publish-target: "Cloudflare bucket";
+    in-out property <bool> show-login-dialog: false;
+    in-out property <bool> show-keybindings-dialog: false;
+    in-out property <bool> show-soul-settings-dialog: false;
+    in-out property <bool> show-exit-confirmation: false;
+    in-out property <bool> show-settings-dialog: false;
+    in-out property <bool> show-find-dialog: false;
+    
+    // New panels for egui parity
+    in-out property <bool> show-terrain-editor: false;
+    in-out property <bool> show-network-panel: false;
+    in-out property <bool> show-mindspace-panel: false;
+    in-out property <bool> show-global-sources-window: false;
+    in-out property <bool> show-domains-window: false;
+    in-out property <bool> show-global-variables-window: false;
+    
+    // Additional modal dialogs
+    in-out property <bool> show-forge-connect-dialog: false;
+    in-out property <bool> show-stress-test-dialog: false;
+    in-out property <bool> show-sync-domain-dialog: false;
+    in-out property <bool> show-simulation-settings-dialog: false;
+
+    // Simulation settings state (mirrors SimulationSettingsDialog properties)
+    in-out property <string> sim-time-scale-preset: "Realtime (1\u{00d7})";
+    in-out property <string> sim-custom-time-scale: "1.0";
+    in-out property <string> sim-tick-rate: "60";
+    in-out property <string> sim-max-ticks-per-frame: "10";
+    in-out property <bool> sim-auto-start: false;
+    in-out property <bool> sim-recording-enabled: true;
+    in-out property <string> sim-output-dir: "recordings";
+    in-out property <bool> sim-auto-export: true;
+    in-out property <[WatchpointData]> sim-watchpoints: [];
+    in-out property <[SimOutputBinding]> sim-output-bindings: [];
+    
+    // Workshop Panel state (System 0: Ideation conversational interface)
+    in-out property <[ChatMessage]> workshop-messages: [];
+    in-out property <string> workshop-input-text: "";
+    in-out property <[PipelineStepData]> workshop-pipeline-steps: [];
+    in-out property <string> workshop-pipeline-state: "idle";
+    in-out property <string> workshop-product-name: "";
+    in-out property <int> workshop-total-artifacts: 0;
+    in-out property <string> workshop-estimated-cost: "$0.00";
+    in-out property <bool> workshop-api-key-valid: false;
+
+    // Scene name for exit confirmation
+    in-out property <string> scene-name: "Untitled";
+    
+    // Terrain state
+    in-out property <bool> has-terrain: false;
+    in-out property <bool> terrain-edit-mode: false;
+    in-out property <string> terrain-brush: "raise";
+    in-out property <float> terrain-brush-size: 10.0;
+    in-out property <float> terrain-brush-strength: 0.5;
+    in-out property <float> terrain-brush-falloff: 0.5;
+    
+    // Terrain config properties (from _terrain.toml, synced from TerrainConfig)
+    in-out property <string> terrain-size: "512";
+    in-out property <string> terrain-chunk-size: "64";
+    in-out property <string> terrain-resolution: "256";
+    in-out property <string> terrain-height-scale: "1.0";
+    in-out property <string> terrain-lod-levels: "5";
+    in-out property <string> terrain-chunk-count: "0";
+    in-out property <string> terrain-material: "Default";
+    
+    // Network state
+    in-out property <bool> server-running: false;
+    in-out property <bool> forge-connected: false;
+
+    // Account and sync state
+    in-out property <string> account-name: "Guest";
+    in-out property <string> account-status: "Logged out";
+    in-out property <string> sync-status: "Local-first";
+    
+    // Service selection (for service properties)
+    in-out property <string> selected-service: ""; // "workspace", "lighting", "players", etc.
+    
+    // Context menu
+    in-out property <bool> show-context-menu: false;
+    in-out property <length> context-menu-x: 0px;
+    in-out property <length> context-menu-y: 0px;
+    in-out property <string> context-menu-node-type: ""; // "entity" or "file"
+    in-out property <[MenuItem]> context-menu-items: [];
+    
+    // Current tool
+    in-out property <string> current-tool: "select";
+    
+    // Transform mode
+    in-out property <string> transform-mode: "world";
+    
+    // Grid/Snap state (synced from Bevy EditorSettings)
+    in-out property <bool> snap-enabled: true;
+    in-out property <float> snap-size: 1.96;
+    in-out property <bool> grid-visible: true;
+    in-out property <float> grid-size: 9.81;
+    
+    // View mode
+    in-out property <string> view-mode: "perspective";
+    
+    // Play mode state
+    in-out property <string> play-state: "stopped"; // stopped, playing, paused
+    
+    // Selection info (for properties panel)
+    in-out property <int> selected-count: 0;
+    in-out property <string> selected-class: "";
+    in-out property <image> selected-icon;    // Class icon for Properties panel header
+    
+    // Unsaved changes tracking
+    in-out property <bool> has-unsaved-changes: false;
+    
+    // Output console log data (pushed from Bevy each frame)
+    in-out property <[LogData]> output-logs: [];
+    
+    // Unified explorer tree data: ECS entities + filesystem (pushed from Bevy)
+    in-out property <[TreeNode]> tree-nodes: [];
+    
+    // Properties panel data (pushed from Bevy for selected entity)
+    in-out property <[PropertyData]> entity-properties: [];
+    // Help icon settings (from File > Settings)
+    in-out property <bool> show-help-icons: true;
+    in-out property <bool> help-opens-in-tab: false;
+    
+    // Input focus tracking — when true, Rust sync systems should NOT push property updates
+    // to avoid overwriting user input while they're typing. Set by callbacks from input fields.
+    in-out property <bool> any-input-has-focus: false;
+    
+    // Panel widths (resizable)
+    in-out property <length> left-panel-width: 280px;
+    in-out property <length> right-panel-width: 300px;
+    in-out property <length> output-height: 150px;
+    
+    // ========================================================================
+    // Dock Layout System Properties
+    // ========================================================================
+    
+    // Layout presets
+    in-out property <int> current-layout-preset: 0;
+    in-out property <bool> show-layout-dropdown: false;
+    
+    // Theme settings
+    in-out property <bool> show-theme-editor: false;
+    in-out property <bool> high-contrast-mode: false;
+    in-out property <float> ui-scale: 1.0;
+    
+    // Performance overlay
+    in-out property <bool> show-performance-overlay: true;
+    in-out property <float> current-fps: 60.0;
+    in-out property <float> current-frame-time: 16.67;
+    in-out property <int> current-entity-count: 0;
+    
+    // Floating panels
+    in-out property <bool> has-floating-panels: false;
+    
+    // Drag-drop docking state
+    in-out property <bool> is-dragging-panel: false;
+    in-out property <DockZone> active-dock-zone: DockZone.center;
+    
+    // Viewport dimensions (reported to Bevy for camera viewport clipping)
+    // Bound to viewport-sizer which always exists inside center-content's VerticalLayout.
+    // Uses absolute-position for correct window-absolute coordinates.
+    out property <float> viewport-width: viewport-sizer.width / 1px;
+    out property <float> viewport-height: viewport-sizer.height / 1px;
+    out property <float> viewport-x: viewport-sizer.absolute-position.x / 1px;
+    out property <float> viewport-y: viewport-sizer.absolute-position.y / 1px;
+    
+    // Viewport image (set by Bevy with rendered 3D scene)
+    in-out property <image> viewport-image;
+    
+    // Center viewport tab bar (VS Code-style tabbed viewer)
+    // Tab types: "scene" = 3D viewport, "script" = Soul Script, "web" = browser
+    in-out property <[CenterTab]> center-tabs: [];
+    in-out property <int> center-active-tab: 0;
+    in-out property <string> script-editor-content: "";
+    in property <string> script-line-numbers: "1";  // Pre-computed "1\n2\n3...N" pushed by Rust
+    // Pulsed true by Rust on tab switch/load to reset the editor scroll to line 1
+    in-out property <bool> script-scroll-to-top: false;
+    // Syntax-highlighted lines pushed from Rust (one per source line).
+    // Empty when no file is open or language is unsupported.
+    in property <[HighlightLine]> script-highlight-lines: [];
+    
+    // Active tab type helper (set by Rust sync system)
+    in-out property <string> active-tab-type: "scene"; // "scene", "script", "web"
+    
+    // Web browser state for active web tab
+    in-out property <string> web-url-bar: "";
+    in-out property <image> web-content-image;  // Offscreen-rendered web page
+    in-out property <bool> web-secure: false;
+    in-out property <bool> web-has-url: false;
+    in-out property <bool> web-loading: false;
+    in-out property <bool> web-can-go-back: false;
+    in-out property <bool> web-can-go-forward: false;
+    
+    // Tab drag-and-drop reorder state
+    in-out property <int> tab-drag-source: -1;   // Index of tab being dragged (-1 = none)
+    in-out property <int> tab-drag-target: -1;    // Drop target index (-1 = none)
+    in-out property <bool> tab-dragging: false;
+    // Mouse-x relative to the tab strip start (updated by overlay TouchArea each frame)
+    in-out property <length> tab-drag-x: 0px;
+    // Width of the pinned Space1 tab (used as offset when computing drop index)
+    in-out property <length> tab-strip-space1-width: 80px;
+    in-out property <string> scene-tab-name: "Space";
+    
+    // Left panel tab
+    in-out property <int> left-tab-index: 0;
+    
+    // Right panel tab
+    in-out property <int> right-tab-index: 0;
+
+    // Asset Manager
+    in property <[AssetNode]> asset-nodes: [];
+    in property <string> asset-category: "All";
+    in property <int> universe-asset-count: 0;
+    in property <int> space-asset-count: 0;
+    callback asset-select(int);
+    callback asset-expand(int);
+    callback asset-import(string);
+    callback asset-search(string);
+    callback asset-category-changed(string);
+
+    // ========================================================================
+    // Callbacks (bound to Bevy systems)
+    // ========================================================================
+    
+    // File operations
+    callback new-universe();
+    callback new-scene();
+    callback open-scene();
+    callback save-scene();
+    callback save-scene-as();
+    callback open-publish-dialog();
+    callback publish(string, string, string, bool, bool, bool, bool);
+    callback publish-as();
+    callback exit-app();
+    
+    // Edit operations
+    callback undo();
+    callback redo();
+    callback copy();
+    callback cut();
+    callback paste();
+    callback delete-selected();
+    callback select-all();
+    callback duplicate();
+    callback group();
+    callback ungroup();
+    
+    // Tool selection
+    callback select-tool(string);
+    
+    // Transform
+    callback set-transform-mode(string);
+    callback toggle-snap();
+    callback set-snap-increment(float);
+    
+    // View
+    callback set-view-mode(string);
+    callback focus-selected();
+    callback toggle-wireframe();
+    callback toggle-grid();
+    
+    // Play mode
+    callback play-solo();
+    callback play-with-character();
+    callback pause();
+    callback stop();
+    
+    // Explorer (unified: entities + files)
+    callback select-node(int, string);
+    callback expand-node(int, string);
+    callback collapse-node(int, string);
+    callback open-node(int, string);
+    callback rename-node(int, string, string);
+    callback add-service();  // (+) button — add a new service to the Space
+    callback expand-all();   // Expand all explorer tree nodes
+    callback collapse-all(); // Collapse all explorer tree nodes
+    
+    // Properties
+    callback property-changed(string, string);
+    // Section header chevron toggle — Rust drives collapsed state
+    callback section-toggle(string);
+    // Help icon — open /learn documentation URL
+    callback open-learn-url(string);
+    
+    // Command bar
+    callback execute-command(string);
+    
+    // Toolbox part insertion
+    callback insert-part(string);
+    
+    // Context menu
+    callback context-action(string);
+    
+    // Soul/Scripts
+    callback build-script(int);
+    callback open-script(int);
+    
+    // Center tab management
+    callback close-center-tab(int);
+    callback select-center-tab(int);
+    callback script-content-changed(string);
+    callback reorder-center-tab(int, int); // (from-index, to-index)
+    callback toggle-mode(int);             // Toggle summary/code for SoulScript tab at index
+    
+    // Tab context menu actions
+    callback close-other-tabs(int);         // Close all tabs except index
+    callback close-tabs-to-right(int);      // Close all tabs to the right of index
+    callback close-all-tabs();              // Close all closable tabs
+    callback copy-tab-path(int);            // Copy tab file path to clipboard
+    callback reveal-tab-in-explorer(int);   // Reveal tab's file in explorer panel
+    
+    // Web browser navigation
+    callback open-web-tab(string);          // Open URL in new tab
+    callback web-navigate(string);          // Navigate active web tab to URL
+    callback web-go-back();
+    callback web-go-forward();
+    callback web-refresh();
+    
+    // Auth
+    callback login();
+    callback logout();
+    
+    // Terrain
+    callback generate-terrain(string); // "small", "medium", "large"
+    callback toggle-terrain-edit-mode();
+    callback set-terrain-brush(string);
+    callback import-heightmap();
+    callback export-heightmap();
+    
+    // Network
+    callback start-server();
+    callback stop-server();
+    callback connect-forge();
+    callback disconnect-forge();
+    callback allocate-forge-server();
+    callback spawn-synthetic-clients(int);
+    callback disconnect-all-clients();
+    
+    // Simulation settings
+    callback apply-simulation-settings();
+    callback save-simulation-settings();
+    callback add-sim-watchpoint();
+    callback remove-sim-watchpoint(int);
+    callback add-sim-output-binding();
+    callback remove-sim-output-binding(int);
+
+    // Data menu
+    callback open-global-sources();
+    callback open-domains();
+    callback open-global-variables();
+    callback open-sync-domain();
+    callback add-data-source(string);
+    
+    // MindSpace / Plugins
+    callback toggle-mindspace();
+    callback mindspace-add-label();
+    callback mindspace-connect();
+    callback plugin-action(string);
+    callback open-url(string);
+    callback menu-action(string);
+    
+    // Workshop Panel (System 0: Ideation)
+    callback workshop-send-message(string);
+    callback workshop-approve-mcp(int);
+    callback workshop-skip-mcp(int);
+    callback workshop-edit-mcp(int);
+    callback workshop-open-artifact(string);
+    callback workshop-start-pipeline();
+    callback workshop-pause-pipeline();
+    callback workshop-resume-pipeline();
+    callback workshop-cancel-pipeline();
+    callback workshop-optimize-and-build();
+
+    // Settings / Panels
+    callback open-settings();
+    callback open-find();
+    // Help icon setting changes (fired immediately from Settings dialog)
+    callback help-icons-changed(bool);
+    callback help-opens-in-tab-changed(bool);
+    
+    // Dock Layout System Callbacks
+    callback apply-layout-preset(int);
+    callback save-layout-to-file();
+    callback load-layout-from-file();
+    callback reset-layout-to-default();
+    callback toggle-theme-editor();
+    callback apply-theme-settings(bool, bool, float); // dark-mode, high-contrast, ui-scale
+    callback detach-panel-to-window(string);
+    callback dock-panel(string, DockZone);
+    
+    // Native Window Integration Callbacks
+    // These are called when viewport bounds change so Bevy can reposition its window
+    callback viewport-bounds-changed(float, float, float, float); // x, y, width, height
+    callback close-requested();
+    callback force-exit(); // Skip unsaved check (after exit confirmation dialog)
+
+    // ========================================================================
+    // Main Layout
+    // ========================================================================
+    
+    VerticalLayout {
+        spacing: 0px;
+
+        // ====================================================================
+        // Top Ribbon
+        // ====================================================================
+        Ribbon {
+            current-tool: root.current-tool;
+            transform-mode: root.transform-mode;
+            play-state: root.play-state;
+            has-unsaved-changes: root.has-unsaved-changes;
+            
+            // Bind View menu panel visibility (two-way)
+            show-explorer <=> root.show-explorer;
+            show-properties <=> root.show-properties;
+            show-output <=> root.show-output;
+            show-assets <=> root.show-assets;
+            show-collaboration <=> root.show-collaboration;
+            show-command-bar <=> root.show-command-bar;
+            account-name: root.account-name;
+            account-status: root.account-status;
+            sync-status: root.sync-status;
+            
+            // File
+            on-new-universe => { root.new-universe(); }
+            on-new-scene => { root.new-scene(); }
+            on-open-scene => { root.open-scene(); }
+            on-save-scene => { root.save-scene(); }
+            on-save-scene-as => { root.save-scene-as(); }
+            on-publish => { root.open-publish-dialog(); }
+            on-publish-as => { root.publish-as(); }
+            on-exit => { root.exit-app(); }
+            
+            // Edit
+            on-undo => { root.undo(); }
+            on-redo => { root.redo(); }
+            on-copy => { root.copy(); }
+            on-cut => { root.cut(); }
+            on-paste => { root.paste(); }
+            on-delete => { root.delete-selected(); }
+            on-duplicate => { root.duplicate(); }
+            on-select-all => { root.select-all(); }
+            on-group => { root.group(); }
+            on-ungroup => { root.ungroup(); }
+            
+            // Tools
+            on-select-tool(tool) => { root.select-tool(tool); }
+            on-set-transform-mode(mode) => { root.set-transform-mode(mode); }
+            
+            // View
+            on-focus-selection => { root.focus-selected(); }
+            
+            // Play
+            on-play-solo => { root.play-solo(); }
+            on-play-with-character => { root.play-with-character(); }
+            on-pause => { root.pause(); }
+            on-stop => { root.stop(); }
+            on-show-simulation-settings => { root.show-simulation-settings-dialog = true; }
+            
+            // Network
+            on-start-server => { root.start-server(); }
+            on-stop-server => { root.stop-server(); }
+            on-show-forge-connect => { root.show-forge-connect-dialog = true; }
+            on-show-network-panel => { root.show-network-panel = true; }
+            on-show-stress-test => { root.show-stress-test-dialog = true; }
+            
+            // Data
+            on-show-global-sources => { root.open-global-sources(); }
+            on-show-domains => { root.open-domains(); }
+            on-show-global-variables => { root.open-global-variables(); }
+            on-show-sync-domain => { root.open-sync-domain(); }
+            on-add-data-source(source-type) => { root.add-data-source(source-type); }
+            
+            // Terrain
+            on-spawn-terrain(size) => { root.generate-terrain(size); }
+            on-toggle-terrain-edit => { root.toggle-terrain-edit-mode(); }
+            on-set-terrain-brush(brush) => { root.set-terrain-brush(brush); }
+            on-import-heightmap => { root.import-heightmap(); }
+            on-export-heightmap => { root.export-heightmap(); }
+            
+            // Plugins / MindSpace
+            on-plugin-action(action) => { root.plugin-action(action); }
+            
+            // Other
+            on-toggle-command-bar => { root.show-command-bar = !root.show-command-bar; }
+            on-show-keybindings => { root.show-keybindings-dialog = true; }
+            on-show-soul-settings => { root.show-soul-settings-dialog = true; }
+            on-open-url(url) => { root.open-url(url); }
+            on-menu-action(action) => { root.menu-action(action); }
+        }
+
+        // ====================================================================
+        // Main Content Area (Left Panel | Viewport | Right Panel)
+        // ====================================================================
+        HorizontalLayout {
+            spacing: 0px;
+            
+            // ================================================================
+            // Left Panel (Explorer, Toolbox, Assets, etc.)
+            // ================================================================
+            if root.show-explorer || root.show-toolbox || root.show-assets || root.show-terrain-editor: Rectangle {
+                width: root.left-panel-width;
+                background: Theme.panel-background;
+                border-width: 0px;
+                // Right edge separator
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    height: 100%;
+                    background: Theme.border-color;
+                }
+                
+                VerticalLayout {
+                    spacing: 0px;
+                    
+                    // Tab bar
+                    Rectangle {
+                        height: 30px;
+                        background: Theme.header-background;
+                        
+                        HorizontalLayout {
+                            padding-left: 2px;
+                            padding-right: 2px;
+                            padding-top: 2px;
+                            spacing: 1px;
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.left-tab-index == 0 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.left-tab-index = 0; }
+                                }
+                                
+                                Text {
+                                    text: "Explorer";
+                                    color: root.left-tab-index == 0 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.left-tab-index == 1 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.left-tab-index = 1; }
+                                }
+                                
+                                Text {
+                                    text: "Toolbox";
+                                    color: root.left-tab-index == 1 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.left-tab-index == 2 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.left-tab-index = 2; }
+                                }
+                                
+                                Text {
+                                    text: "Assets";
+                                    color: root.left-tab-index == 2 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.left-tab-index == 3 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.left-tab-index = 3; }
+                                }
+                                
+                                Text {
+                                    text: "Terrain";
+                                    color: root.left-tab-index == 3 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Tab content (must stretch to fill remaining space so inner ScrollView works)
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.panel-background;
+                        
+                        if root.left-tab-index == 0: ExplorerPanel {
+                            tree-nodes: root.tree-nodes;
+                            on-select-node(id, node-type) => { root.select-node(id, node-type); }
+                            on-expand-node(id, node-type) => { root.expand-node(id, node-type); }
+                            on-collapse-node(id, node-type) => { root.collapse-node(id, node-type); }
+                            on-open-node(id, node-type) => { root.open-node(id, node-type); }
+                            on-add-service() => { root.add-service(); }
+                            on-expand-all() => { root.expand-all(); }
+                            on-collapse-all() => { root.collapse-all(); }
+                            on-context-menu(x, y, node-id, node-type) => {
+                                root.context-menu-x = x;
+                                root.context-menu-y = y;
+                                root.context-menu-node-type = node-type;
+                                
+                                // Populate menu items based on node type
+                                if node-type == "file" {
+                                    root.context-menu-items = [
+                                        { id: "open", label: "Open", shortcut: "Enter", icon: @image-url("../../assets/icons/ui/new-file.svg"), enabled: true, separator-after: false },
+                                        { id: "open-with", label: "Open With...", shortcut: "", icon: @image-url("../../assets/icons/ui/settings.svg"), enabled: true, separator-after: true },
+                                        { id: "cut", label: "Cut", shortcut: "Ctrl+X", icon: @image-url("../../assets/icons/ui/cut.svg"), enabled: true, separator-after: false },
+                                        { id: "copy", label: "Copy", shortcut: "Ctrl+C", icon: @image-url("../../assets/icons/ui/copy.svg"), enabled: true, separator-after: false },
+                                        { id: "paste", label: "Paste", shortcut: "Ctrl+V", icon: @image-url("../../assets/icons/ui/paste.svg"), enabled: true, separator-after: false },
+                                        { id: "delete", label: "Delete", shortcut: "Del", icon: @image-url("../../assets/icons/ui/delete.svg"), enabled: true, separator-after: true },
+                                        { id: "rename", label: "Rename", shortcut: "F2", icon: @image-url("../../assets/icons/ui/rename.svg"), enabled: true, separator-after: false },
+                                        { id: "duplicate", label: "Duplicate", shortcut: "Ctrl+D", icon: @image-url("../../assets/icons/ui/duplicate.svg"), enabled: true, separator-after: true },
+                                        { id: "show-in-explorer", label: "Show in File Explorer", shortcut: "", icon: @image-url("../../assets/icons/folder.svg"), enabled: true, separator-after: false },
+                                        { id: "copy-path", label: "Copy Path", shortcut: "", icon: @image-url("../../assets/icons/ui/link.svg"), enabled: true, separator-after: false },
+                                        { id: "copy-relative-path", label: "Copy Relative Path", shortcut: "", icon: @image-url("../../assets/icons/ui/link.svg"), enabled: true, separator-after: true },
+                                        { id: "properties", label: "Properties", shortcut: "Alt+Enter", icon: @image-url("../../assets/icons/ui/settings.svg"), enabled: true, separator-after: false },
+                                    ];
+                                } else {
+                                    // Entity menu - use default items from ContextMenu component
+                                    root.context-menu-items = [];
+                                }
+                                
+                                root.show-context-menu = true;
+                            }
+                        }
+                        
+                        if root.left-tab-index == 1: Toolbox {
+                            current-tool: root.current-tool;
+                            on-select-tool(tool) => { root.select-tool(tool); }
+                            on-insert-part(part-type) => { root.insert-part(part-type); }
+                        }
+                        
+                        if root.left-tab-index == 2: AssetManager {
+                            asset-nodes: root.asset-nodes;
+                            current-category: root.asset-category;
+                            universe-asset-count: root.universe-asset-count;
+                            space-asset-count: root.space-asset-count;
+                            on-select-asset(id) => { root.asset-select(id); }
+                            on-expand-asset(id) => { root.asset-expand(id); }
+                            on-import-asset(kind) => { root.asset-import(kind); }
+                            on-search-changed(text) => { root.asset-search(text); }
+                            on-category-changed(cat) => { root.asset-category-changed(cat); }
+                        }
+                        
+                        if root.left-tab-index == 3: TerrainEditor {
+                            has-terrain: root.has-terrain;
+                            edit-mode: root.terrain-edit-mode;
+                            current-brush: root.terrain-brush;
+                            terrain-size: root.terrain-size;
+                            terrain-chunk-size: root.terrain-chunk-size;
+                            terrain-resolution: root.terrain-resolution;
+                            terrain-height-scale: root.terrain-height-scale;
+                            terrain-lod-levels: root.terrain-lod-levels;
+                            terrain-chunk-count: root.terrain-chunk-count;
+                            terrain-material: root.terrain-material;
+                            on-toggle-edit-mode() => { root.toggle-terrain-edit-mode(); }
+                            on-generate-terrain(size) => { root.generate-terrain(size); }
+                            on-import-heightmap() => { root.import-heightmap(); }
+                            on-export-heightmap() => { root.export-heightmap(); }
+                        }
+                    }
+                }
+                
+                // Resize handle — 8px interactive strip on the right edge with hover highlight
+                left-resize := Rectangle {
+                    x: parent.width - 4px;
+                    width: 8px;
+                    height: 100%;
+                    background: left-resize-ta.has-hover || left-resize-ta.pressed ? Theme.border-focus : transparent;
+                    opacity: left-resize-ta.pressed ? 1.0 : 0.5;
+                    
+                    left-resize-ta := TouchArea {
+                        mouse-cursor: ew-resize;
+                        moved => {
+                            root.left-panel-width = max(180px, min(600px, root.left-panel-width + (self.mouse-x - self.pressed-x)));
+                        }
+                    }
+                }
+            }
+
+            // ================================================================
+            // Central Area: Tab Bar + Viewport / Script Editor
+            // ================================================================
+            center-content := Rectangle {
+                horizontal-stretch: 1;
+                background: transparent;
+                
+                VerticalLayout {
+                    spacing: 0px;
+                
+                // ---- VS Code-style Tab Bar ----
+                tab-bar := Rectangle {
+                    height: 35px;
+                    background: Theme.background-secondary;
+                    
+                    // Bottom border
+                    Rectangle {
+                        y: parent.height - 1px;
+                        height: 1px;
+                        background: Theme.border-color;
+                    }
+                    
+                    // === Home button (left-aligned) ===
+                    Rectangle {
+                        x: 0px;
+                        y: 0px;
+                        width: 36px;
+                        height: 35px;
+                        background: home-btn-touch.has-hover ? #ffffff0c : transparent;
+                        
+                        home-btn-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.open-web-tab("https://eustress.dev"); }
+                        }
+                        
+                        Image {
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/globe.svg");
+                            image-fit: contain;
+                            colorize: Theme.accent-blue;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        // Right separator
+                        Rectangle {
+                            x: parent.width - 1px;
+                            width: 1px;
+                            height: parent.height;
+                            background: Theme.border-color;
+                        }
+                    }
+                    
+                    // === UI Toggle button (right-aligned) ===
+                    Rectangle {
+                        x: parent.width - 36px;
+                        y: 0px;
+                        width: 36px;
+                        height: 35px;
+                        background: hud-toggle-touch.has-hover ? #ffffff0c : transparent;
+                        
+                        hud-toggle-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-hud = !root.show-hud; }
+                        }
+                        
+                        Image {
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/layout-default.svg");
+                            image-fit: contain;
+                            colorize: root.show-hud ? Theme.text-secondary : #ef5350;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        // Left separator
+                        Rectangle {
+                            x: 0px;
+                            width: 1px;
+                            height: parent.height;
+                            background: Theme.border-color;
+                        }
+                    }
+                    
+                    // === Tab strip (between Home and UI toggle) ===
+                    // Wrapped in Rectangle so the drag-overlay TouchArea can be positioned
+                    // absolutely on top of the entire strip — this is the only way in Slint
+                    // to receive moved() events that cross multiple tab boundaries.
+                    tab-strip := Rectangle {
+                        x: 36px;
+                        y: 0px;
+                        width: parent.width - 72px;
+                        height: 35px;
+
+                    HorizontalLayout {
+                        width: parent.width;
+                        height: parent.height;
+                        spacing: 0px;
+                        alignment: start;
+                        
+                        // Pinned Space1 tab (always first, never closable)
+                        Rectangle {
+                            width: space1-label.preferred-width + 24px;
+                            height: 35px;
+                            background: root.center-active-tab == 0 ? Theme.panel-background : 
+                                        space1-touch.has-hover ? #ffffff08 : Theme.background-secondary;
+                            
+                            // Active tab indicator (blue top border — VS Code style)
+                            if root.center-active-tab == 0: Rectangle {
+                                y: 0px;
+                                height: 2px;
+                                background: Theme.accent-blue;
+                            }
+                            
+                            // Right separator
+                            Rectangle {
+                                x: parent.width - 1px;
+                                width: 1px;
+                                height: parent.height;
+                                background: Theme.border-color;
+                            }
+                            
+                            space1-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.center-active-tab = 0;
+                                    root.select-center-tab(0);
+                                }
+                                // Right-click context menu
+                                pointer-event(event) => {
+                                    if event.kind == PointerEventKind.up && event.button == PointerEventButton.right {
+                                        root.tab-context-menu-index = -1;
+                                        root.tab-context-menu-x = self.absolute-position.x + self.mouse-x - tab-strip.absolute-position.x;
+                                        root.tab-context-menu-y = 35px;
+                                        tab-ctx-menu.show();
+                                    }
+                                }
+                            }
+                            
+                            space1-label := Text {
+                                text: root.scene-tab-name;
+                                color: root.center-active-tab == 0 ? Theme.text-primary : Theme.text-secondary;
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        // Dynamic tabs (script + web) with drag-and-drop reorder
+                        for tab[index] in root.center-tabs: Rectangle {
+                            width: tab.tab-type == "web" ? 200px : 180px;
+                            height: 35px;
+                            background: root.center-active-tab == index + 1
+                                ? Theme.panel-background
+                                : (tab-hover.has-hover ? #ffffff08 : Theme.background-secondary);
+                            
+                            // Active tab indicator (blue top border — VS Code style)
+                            if root.center-active-tab == index + 1: Rectangle {
+                                y: 0px;
+                                height: 2px;
+                                background: Theme.accent-blue;
+                            }
+                            
+                            // Drop indicator line (left edge) when dragging over
+                            if root.tab-dragging && root.tab-drag-target == index && root.tab-drag-source != index: Rectangle {
+                                x: -1px;
+                                width: 2px;
+                                height: parent.height;
+                                background: Theme.accent-blue;
+                            }
+                            
+                            // Right separator
+                            Rectangle {
+                                x: parent.width - 1px;
+                                width: 1px;
+                                height: parent.height;
+                                background: Theme.border-color;
+                            }
+                            
+                            tab-hover := TouchArea {
+                                mouse-cursor: root.tab-dragging ? move : pointer;
+                                // Click to select (only when not dragging)
+                                clicked => {
+                                    if !root.tab-dragging {
+                                        root.center-active-tab = index + 1;
+                                        root.select-center-tab(index + 1);
+                                    }
+                                }
+                                // Right-click context menu only — drag is handled by overlay
+                                pointer-event(event) => {
+                                    if event.kind == PointerEventKind.up && event.button == PointerEventButton.right {
+                                        root.tab-context-menu-index = index;
+                                        root.tab-context-menu-x = self.absolute-position.x + self.mouse-x - tab-strip.absolute-position.x;
+                                        root.tab-context-menu-y = 35px;
+                                        tab-ctx-menu.show();
+                                    }
+                                }
+                            }
+                            
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 4px;
+                                spacing: 6px;
+                                // No alignment: center here — it fights horizontal-stretch on the
+                                // tab name text. Each child uses vertical-alignment: center instead.
+
+                                // Tab icon (type-dependent) — vertically centered via VerticalLayout
+                                if tab.tab-type == "web" && tab.favicon.width > 0: VerticalLayout {
+                                    alignment: center;
+                                    width: 14px;
+                                    Image {
+                                        width: 14px;
+                                        height: 14px;
+                                        source: tab.favicon;
+                                        image-fit: contain;
+                                    }
+                                }
+                                if tab.tab-type == "web" && tab.favicon.width == 0: VerticalLayout {
+                                    alignment: center;
+                                    width: 14px;
+                                    Image {
+                                        width: 14px;
+                                        height: 14px;
+                                        source: @image-url("../../assets/icons/ui/globe.svg");
+                                        image-fit: contain;
+                                        colorize: Theme.text-secondary;
+                                    }
+                                }
+                                if tab.tab-type == "script": VerticalLayout {
+                                    alignment: center;
+                                    width: 14px;
+                                    Image {
+                                        width: 14px;
+                                        height: 14px;
+                                        source: @image-url("../../assets/icons/script.svg");
+                                        image-fit: contain;
+                                    }
+                                }
+                                if tab.tab-type == "code": VerticalLayout {
+                                    alignment: center;
+                                    width: 14px;
+                                    Image {
+                                        width: 14px;
+                                        height: 14px;
+                                        source: @image-url("../../assets/icons/ui/new-file.svg");
+                                        image-fit: contain;
+                                        colorize: Theme.text-secondary;
+                                    }
+                                }
+
+                                // Tab name — stretches to fill space, pushing close button right
+                                Text {
+                                    horizontal-stretch: 1;
+                                    text: tab.name;
+                                    color: root.center-active-tab == index + 1 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+
+                                // Loading spinner
+                                if tab.loading: Text {
+                                    text: "◌";
+                                    color: Theme.accent-blue;
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                }
+
+                                // Dirty indicator (unsaved dot)
+                                if tab.dirty && !tab.loading: VerticalLayout {
+                                    alignment: center;
+                                    width: 8px;
+                                    Rectangle {
+                                        width: 8px;
+                                        height: 8px;
+                                        border-radius: 4px;
+                                        background: #e8e8e8;
+                                    }
+                                }
+
+                                // Close button (X) — rightmost, vertically centered via VerticalLayout
+                                VerticalLayout {
+                                    alignment: center;
+                                    width: 22px;
+                                    Rectangle {
+                                        width: 22px;
+                                        height: 22px;
+                                        background: close-area.has-hover ? #ffffff18 : transparent;
+                                        border-radius: 4px;
+
+                                        close-area := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.close-center-tab(index); }
+                                        }
+
+                                        Image {
+                                            width: 12px;
+                                            height: 12px;
+                                            source: @image-url("../../assets/icons/ui/close.svg");
+                                            image-fit: contain;
+                                            colorize: close-area.has-hover ? Theme.text-primary : Theme.text-secondary;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Drop indicator at end (when dragging past last tab)
+                        if root.tab-dragging && root.tab-drag-target >= root.center-tabs.length: Rectangle {
+                            width: 2px;
+                            height: 35px;
+                            background: Theme.accent-blue;
+                        }
+                        
+                        // Fill remaining space
+                        Rectangle { horizontal-stretch: 1; }
+                    } // end HorizontalLayout
+
+                    // ── Drag overlay ─────────────────────────────────────────
+                    // A single full-width TouchArea on top of all dynamic tabs.
+                    // It is the ONLY place that tracks moved() during a drag so
+                    // the event is never lost when the pointer crosses tab edges.
+                    // Space1 tab (~80px) is skipped; dynamic tabs are 180/200px wide.
+                    if root.tab-drag-source >= 0: TouchArea {
+                        x: root.tab-strip-space1-width; // start after pinned Space1
+                        y: 0px;
+                        width: parent.width - root.tab-strip-space1-width;
+                        height: parent.height;
+                        mouse-cursor: move;
+
+                        moved => {
+                            // Begin drag after 5px threshold
+                            if !root.tab-dragging && abs(self.mouse-x - self.pressed-x) > 5px {
+                                root.tab-dragging = true;
+                            }
+                            if root.tab-dragging {
+                                // Compute which tab slot the pointer is over from mouse-x
+                                // Each dynamic tab is ~190px wide on average (mix of 180/200)
+                                // We iterate via a step approximation — good enough for reorder UX
+                                let raw-idx = floor((self.mouse-x) / 190px);
+                                let clamped = max(0, min(raw-idx, root.center-tabs.length));
+                                root.tab-drag-target = clamped;
+                                root.tab-drag-x = self.mouse-x;
+                            }
+                        }
+
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                                if root.tab-dragging && root.tab-drag-source != root.tab-drag-target && root.tab-drag-target >= 0 {
+                                    root.reorder-center-tab(root.tab-drag-source, root.tab-drag-target);
+                                }
+                                root.tab-dragging = false;
+                                root.tab-drag-source = -1;
+                                root.tab-drag-target = -1;
+                            }
+                        }
+                    }
+
+                    // Per-tab mouse-down: record which tab starts the drag
+                    // This has to live outside the for-loop overlay to fire before it.
+                    // We use a second transparent overlay that only records press-down.
+                    TouchArea {
+                        x: root.tab-strip-space1-width;
+                        y: 0px;
+                        width: parent.width - root.tab-strip-space1-width;
+                        height: parent.height;
+                        // Only sets drag-source on press; all other events fall through
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                                // Identify which tab was pressed from mouse-x
+                                let raw-idx = floor((self.mouse-x) / 190px);
+                                let clamped = max(0, min(raw-idx, root.center-tabs.length - 1));
+                                root.tab-drag-source = clamped;
+                            }
+                        }
+                    }
+
+                    } // end tab-strip Rectangle
+                    
+                    // Tab context menu (PopupWindow positioned relative to tab-bar)
+                    tab-ctx-menu := PopupWindow {
+                        x: root.tab-context-menu-x;
+                        y: root.tab-context-menu-y;
+                        width: 220px;
+                        
+                        Rectangle {
+                            background: #1e1e1e;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #3a3a3a;
+                            drop-shadow-blur: 8px;
+                            drop-shadow-color: #00000060;
+                            width: 220px;
+                            
+                            VerticalLayout {
+                                padding: 4px;
+                                spacing: 0px;
+                                
+                                // Close
+                                if root.tab-context-menu-index >= 0: Rectangle {
+                                    height: 28px;
+                                    background: ctx-close-touch.has-hover ? #ffffff10 : transparent;
+                                    border-radius: 3px;
+                                    ctx-close-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.close-center-tab(root.tab-context-menu-index); }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px;
+                                        Text { text: "Close"; color: Theme.text-primary; font-size: 12px; vertical-alignment: center; }
+                                        Rectangle { horizontal-stretch: 1; }
+                                        Text { text: "Ctrl+W"; color: Theme.text-secondary; font-size: 11px; vertical-alignment: center; }
+                                    }
+                                }
+                                
+                                // Close Others
+                                Rectangle {
+                                    height: 28px;
+                                    background: ctx-others-touch.has-hover ? #ffffff10 : transparent;
+                                    border-radius: 3px;
+                                    ctx-others-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.close-other-tabs(root.tab-context-menu-index); }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px;
+                                        Text { text: "Close Others"; color: Theme.text-primary; font-size: 12px; vertical-alignment: center; }
+                                    }
+                                }
+                                
+                                // Close All
+                                Rectangle {
+                                    height: 28px;
+                                    background: ctx-all-touch.has-hover ? #ffffff10 : transparent;
+                                    border-radius: 3px;
+                                    ctx-all-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.close-all-tabs(); }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px;
+                                        Text { text: "Close All"; color: Theme.text-primary; font-size: 12px; vertical-alignment: center; }
+                                    }
+                                }
+                                
+                                // Close to the Right
+                                if root.tab-context-menu-index >= 0: Rectangle {
+                                    height: 28px;
+                                    background: ctx-right-touch.has-hover ? #ffffff10 : transparent;
+                                    border-radius: 3px;
+                                    ctx-right-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.close-tabs-to-right(root.tab-context-menu-index); }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px;
+                                        Text { text: "Close to the Right"; color: Theme.text-primary; font-size: 12px; vertical-alignment: center; }
+                                    }
+                                }
+                                
+                                // Separator
+                                Rectangle { height: 1px; background: Theme.border-color; }
+                                
+                                // Copy Path
+                                if root.tab-context-menu-index >= 0: Rectangle {
+                                    height: 28px;
+                                    background: ctx-copy-touch.has-hover ? #ffffff10 : transparent;
+                                    border-radius: 3px;
+                                    ctx-copy-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.copy-tab-path(root.tab-context-menu-index); }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px;
+                                        Text { text: "Copy Path"; color: Theme.text-primary; font-size: 12px; vertical-alignment: center; }
+                                    }
+                                }
+                                
+                                // Reveal in Explorer
+                                if root.tab-context-menu-index >= 0: Rectangle {
+                                    height: 28px;
+                                    background: ctx-reveal-touch.has-hover ? #ffffff10 : transparent;
+                                    border-radius: 3px;
+                                    ctx-reveal-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.reveal-tab-in-explorer(root.tab-context-menu-index); }
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px;
+                                        Text { text: "Reveal in Explorer"; color: Theme.text-primary; font-size: 12px; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // ---- Content Area: 3D Viewport / Script Editor / Web Browser ----
+                // Persistent viewport sizer — always exists, reports absolute position to Bevy
+                // via property bindings on root.viewport-width/height/x/y
+                viewport-sizer := Rectangle {
+                    vertical-stretch: 1;
+                    background: transparent;
+                
+                // Keyboard shortcut handler (Ctrl+W to close active tab, Ctrl+T for new web tab)
+                tab-keys := FocusScope {
+                    
+                    key-pressed(event) => {
+                        // Ctrl+W: close active tab (not Space1)
+                        if event.modifiers.control && event.text == "w" {
+                            if root.center-active-tab > 0 {
+                                root.close-center-tab(root.center-active-tab - 1);
+                                if root.center-active-tab >= root.center-tabs.length + 1 {
+                                    root.center-active-tab = root.center-tabs.length;
+                                }
+                            }
+                            return accept;
+                        }
+                        // Ctrl+T: open new web tab
+                        if event.modifiers.control && event.text == "t" {
+                            root.open-web-tab("about:blank");
+                            return accept;
+                        }
+                        // Ctrl+L: focus URL bar (when on web tab)
+                        if event.modifiers.control && event.text == "l" {
+                            if root.active-tab-type == "web" {
+                                // URL bar focus handled by Rust
+                                return accept;
+                            }
+                        }
+                        return reject;
+                    }
+                    
+                    // 3D Viewport (shown when Space1 / scene tab is active)
+                    // The Bevy 3D camera renders directly to the window; this area is transparent
+                    // so the 3D scene shows through. The Slint overlay composites UI on top.
+                    if root.active-tab-type == "scene": viewport-area := Rectangle {
+                        background: transparent;
+                        
+                        // Layout Preset Selector (top-left)
+                        LayoutPresetSelector {
+                            x: 8px;
+                            y: 8px;
+                            current-preset-index: root.current-layout-preset;
+                            
+                            preset-selected(preset) => {
+                                root.show-explorer = preset.show-explorer;
+                                root.show-properties = preset.show-properties;
+                                root.show-output = preset.show-output;
+                                root.show-toolbox = preset.show-toolbox;
+                                root.show-assets = preset.show-assets;
+                                root.show-history = preset.show-history;
+                                root.show-soul-panel = preset.show-soul-panel;
+                                root.left-panel-width = preset.left-panel-width * 1px;
+                                root.right-panel-width = preset.right-panel-width * 1px;
+                                root.output-height = preset.output-height * 1px;
+                                root.left-tab-index = preset.left-tab-index;
+                                root.right-tab-index = preset.right-tab-index;
+                                root.apply-layout-preset(root.current-layout-preset);
+                            }
+                            save-current-layout => { root.save-layout-to-file(); }
+                            load-layout-from-file => { root.load-layout-from-file(); }
+                            reset-to-factory => { root.reset-layout-to-default(); }
+                        }
+                        
+                        // Performance Overlay (top-right)
+                        if root.show-performance-overlay: PerformanceOverlay {
+                            x: parent.width - self.width - 8px;
+                            y: 8px;
+                            fps: root.current-fps;
+                            frame-time-ms: root.current-frame-time;
+                            entity-count: root.current-entity-count;
+                        }
+                        
+                        // Snap status (bottom-center)
+                        Rectangle {
+                            x: (parent.width - self.width) / 2;
+                            y: parent.height - self.height - 8px;
+                            width: snap-label.preferred-width + 24px;
+                            height: 24px;
+                            background: Theme.overlay-background;
+                            border-radius: 12px;
+                            
+                            snap-label := Text {
+                                text: root.snap-enabled ? "Snap: " + root.snap-size + " m" : "Snap: Off";
+                                color: root.snap-enabled ? Theme.text-primary : Theme.text-secondary;
+                                font-size: 11px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            
+                            TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.toggle-snap(); }
+                            }
+                        }
+                        
+                        // Play mode indicator
+                        if root.play-state != "stopped": Rectangle {
+                            x: (parent.width - self.width) / 2;
+                            y: 8px;
+                            width: 140px;
+                            height: 32px;
+                            background: root.play-state == "playing" ? #2d7d46 : #7d6d2d;
+                            border-radius: 4px;
+                            
+                            HorizontalBox {
+                                padding: 8px;
+                                alignment: center;
+                                Text {
+                                    text: root.play-state == "playing" ? "▶ Playing" : "⏸ Paused";
+                                    color: white;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Script/Code Editor (shown when a script or code tab is active)
+                    if root.active-tab-type == "script" || root.active-tab-type == "code": ScriptEditor {
+                        show-tab-bar: false;
+                        tabs: root.center-tabs;
+                        active-tab: root.center-active-tab - 1;
+                        current-content: root.script-editor-content;
+                        line-numbers-text: root.script-line-numbers;
+                        scroll-to-top-trigger <=> root.script-scroll-to-top;
+                        highlight-lines: root.script-highlight-lines;
+                        has-highlights: root.script-highlight-lines.length > 0;
+
+                        on-tab-selected(idx) => {
+                            root.center-active-tab = idx + 1;
+                            root.select-center-tab(idx + 1);
+                        }
+                        on-tab-closed(idx) => {
+                            root.close-center-tab(idx);
+                        }
+                        on-content-changed(text) => {
+                            root.script-content-changed(text);
+                        }
+                        on-toggle-mode(idx) => {
+                            root.toggle-mode(idx + 1);
+                        }
+                        on-save => { }
+                        on-build => {
+                            if root.center-active-tab > 0 && root.center-active-tab <= root.center-tabs.length {
+                                root.build-script(root.center-tabs[root.center-active-tab - 1].entity-id);
+                            }
+                        }
+                    }
+                    
+                    // Web Browser (shown when a web tab is active)
+                    if root.active-tab-type == "web": WebBrowser {
+                        url: root.web-url-bar;
+                        loading: root.web-loading;
+                        can-go-back: root.web-can-go-back;
+                        can-go-forward: root.web-can-go-forward;
+                        secure: root.web-secure;
+                        has-url: root.web-has-url;
+                        page-image: root.web-content-image;
+                        url-bar-text <=> root.web-url-bar;
+                        
+                        navigate(url) => { root.web-navigate(url); }
+                        go-back => { root.web-go-back(); }
+                        go-forward => { root.web-go-forward(); }
+                        refresh => { root.web-refresh(); }
+                    }
+                    
+                    
+                    // Image Viewer (shown for "image" tab type)
+                    if root.active-tab-type == "image": Rectangle {
+                        background: #181825;
+                        
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                width: 48px;
+                                height: 48px;
+                                source: @image-url("../../assets/icons/ui/image.svg");
+                                image-fit: contain;
+                                horizontal-alignment: center;
+                            }
+                            Text {
+                                text: "Image Viewer";
+                                color: Theme.text-secondary;
+                                font-size: 14px;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                    
+                    // Video Player (shown for "video" tab type)
+                    if root.active-tab-type == "video": Rectangle {
+                        background: #11111b;
+                        
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Video Player";
+                                color: Theme.text-secondary;
+                                font-size: 14px;
+                                horizontal-alignment: center;
+                            }
+                            Text {
+                                text: "WebView-based playback";
+                                color: #45475a;
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                    
+                    // Document Viewer (shown for "document" tab type)
+                    if root.active-tab-type == "document": Rectangle {
+                        background: Theme.panel-background;
+                        
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Document Viewer";
+                                color: Theme.text-secondary;
+                                font-size: 14px;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                    
+                    // Parameters Editor (shown for "parameters" tab type)
+                    if root.active-tab-type == "parameters": Rectangle {
+                        background: Theme.panel-background;
+                        
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Parameters Editor";
+                                color: Theme.text-secondary;
+                                font-size: 14px;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+                } // close viewport-sizer
+                }
+            }
+
+            // ================================================================
+            // Right Panel (Properties, History, Soul, Workshop)
+            // ================================================================
+            if root.show-properties || root.show-history || root.show-soul-panel || root.show-script-editor || root.show-workshop-panel: Rectangle {
+                width: root.right-panel-width;
+                background: Theme.panel-background;
+                border-width: 0px;
+                // Left edge separator
+                Rectangle {
+                    x: 0px;
+                    width: 1px;
+                    height: 100%;
+                    background: Theme.border-color;
+                }
+                
+                // Resize handle — 8px interactive strip on the left edge with hover highlight
+                right-resize := Rectangle {
+                    x: -4px;
+                    width: 8px;
+                    height: 100%;
+                    background: right-resize-ta.has-hover || right-resize-ta.pressed ? Theme.border-focus : transparent;
+                    opacity: right-resize-ta.pressed ? 1.0 : 0.5;
+                    
+                    right-resize-ta := TouchArea {
+                        mouse-cursor: ew-resize;
+                        moved => {
+                            root.right-panel-width = max(200px, min(700px, root.right-panel-width - (self.mouse-x - self.pressed-x)));
+                        }
+                    }
+                }
+                
+                VerticalLayout {
+                    spacing: 0px;
+                    
+                    // Tab bar
+                    Rectangle {
+                        height: 30px;
+                        background: Theme.header-background;
+                        
+                        HorizontalLayout {
+                            padding-left: 2px;
+                            padding-right: 2px;
+                            padding-top: 2px;
+                            spacing: 1px;
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.right-tab-index == 0 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.right-tab-index = 0; }
+                                }
+                                
+                                Text {
+                                    text: "Properties";
+                                    color: root.right-tab-index == 0 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.right-tab-index == 1 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.right-tab-index = 1; }
+                                }
+                                
+                                Text {
+                                    text: "History";
+                                    color: root.right-tab-index == 1 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.right-tab-index == 2 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.right-tab-index = 2; }
+                                }
+                                
+                                Text {
+                                    text: "Soul";
+                                    color: root.right-tab-index == 2 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: root.right-tab-index == 3 ? Theme.panel-background : Theme.tab-inactive;
+                                border-top-left-radius: 4px;
+                                border-top-right-radius: 4px;
+                                
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.right-tab-index = 3; }
+                                }
+                                
+                                Text {
+                                    text: "Workshop";
+                                    color: root.right-tab-index == 3 ? Theme.text-primary : Theme.text-secondary;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Tab content (must stretch to fill remaining space so inner ScrollView works)
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.panel-background;
+                        
+                        if root.right-tab-index == 0: PropertiesPanel {
+                            selected-count: root.selected-count;
+                            selected-class: root.selected-class;
+                            selected-icon: root.selected-icon;
+                            properties: root.entity-properties;
+                            show-help-icons: root.show-help-icons;
+                            help-opens-in-tab: root.help-opens-in-tab;
+                            on-property-changed(name, value) => { root.property-changed(name, value); }
+                            on-section-toggle(category) => { root.section-toggle(category); }
+                            on-open-learn-url(url) => { root.open-learn-url(url); }
+                            on-input-focus-changed(focused) => { root.any-input-has-focus = focused; }
+                        }
+                        
+                        if root.right-tab-index == 1: HistoryPanel {
+                            on-undo => { root.undo(); }
+                            on-redo => { root.redo(); }
+                        }
+                        
+                        if root.right-tab-index == 2: SoulPanel {
+                            on-build-script(id) => { root.build-script(id); }
+                            on-open-script(id) => { root.open-script(id); }
+                        }
+                        
+                        if root.right-tab-index == 3: WorkshopPanel {
+                            messages: root.workshop-messages;
+                            input-text <=> root.workshop-input-text;
+                            pipeline-steps: root.workshop-pipeline-steps;
+                            pipeline-state: root.workshop-pipeline-state;
+                            product-name: root.workshop-product-name;
+                            total-artifacts: root.workshop-total-artifacts;
+                            estimated-cost: root.workshop-estimated-cost;
+                            api-key-valid: root.workshop-api-key-valid;
+                            
+                            on-send-message(text) => { root.workshop-send-message(text); }
+                            on-approve-mcp(id) => { root.workshop-approve-mcp(id); }
+                            on-skip-mcp(id) => { root.workshop-skip-mcp(id); }
+                            on-edit-mcp(id) => { root.workshop-edit-mcp(id); }
+                            on-open-artifact(path) => { root.workshop-open-artifact(path); }
+                            on-start-pipeline() => { root.workshop-start-pipeline(); }
+                            on-pause-pipeline() => { root.workshop-pause-pipeline(); }
+                            on-resume-pipeline() => { root.workshop-resume-pipeline(); }
+                            on-cancel-pipeline() => { root.workshop-cancel-pipeline(); }
+                            on-configure-api() => { root.open-settings(); }
+                            on-optimize-and-build() => { root.workshop-optimize-and-build(); }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ====================================================================
+        // Bottom Area (Output Console + Command Bar)
+        // ====================================================================
+        if root.show-output: Rectangle {
+            height: root.output-height;
+            background: Theme.panel-background;
+            border-width: 0px;
+            // Top edge separator only
+            Rectangle {
+                y: 0px;
+                width: 100%;
+                height: 1px;
+                background: Theme.border-color;
+            }
+            
+            // Resize handle
+            Rectangle {
+                y: 0px;
+                width: 100%;
+                height: 4px;
+                background: transparent;
+                
+                TouchArea {
+                    mouse-cursor: ns-resize;
+                    moved => {
+                        root.output-height = max(100px, min(400px, root.output-height - (self.mouse-y - self.pressed-y)));
+                    }
+                }
+            }
+            
+            // Output content (has its own integrated toolbar)
+            OutputConsole {
+                vertical-stretch: 1;
+                logs: root.output-logs;
+                on-clear => { root.output-logs = []; }
+                on-close => { root.show-output = false; }
+            }
+        }
+        
+    }
+
+    // ========================================================================
+    // Overlays and Dialogs
+    // ========================================================================
+    
+    // Command bar (floating, bottom-center, VS Code style — Ctrl+Shift+P)
+    if root.show-command-bar: Rectangle {
+        x: (parent.width - 500px) / 2;
+        y: parent.height - 340px;
+        width: 500px;
+        
+        CommandBar {
+            width: 100%;
+            command-text <=> root.command-text;
+            on-execute(cmd) => { root.execute-command(cmd); }
+            on-close => { root.show-command-bar = false; }
+        }
+    }
+    
+    // Notifications (toast messages)
+    Notifications {
+        x: parent.width - 320px;
+        y: 80px;
+    }
+    
+    // Context menu backdrop (click anywhere outside to dismiss)
+    // Must be clip:false so the menu can overflow Explorer/Properties panel boundaries
+    if root.show-context-menu: Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        background: transparent;
+        clip: false;
+        
+        TouchArea {
+            x: 0px;
+            y: 0px;
+            width: root.width;
+            height: root.height;
+            clicked => { root.show-context-menu = false; }
+        }
+        
+        ContextMenu {
+            x: min(root.context-menu-x, root.width - 224px);
+            y: min(root.context-menu-y, root.height - 270px);
+            items: root.context-menu-items;
+            on-action(action) => {
+                root.context-action(action);
+                root.show-context-menu = false;
+            }
+            on-close => { root.show-context-menu = false; }
+        }
+    }
+    
+    // Publish dialog
+    if root.show-publish-dialog: PublishDialog {
+        experience-name <=> root.publish-experience-name;
+        description <=> root.publish-description;
+        genre <=> root.publish-genre;
+        is-public <=> root.publish-is-public;
+        open-source <=> root.publish-open-source;
+        studio-editable <=> root.publish-studio-editable;
+        publish-target: root.publish-target;
+        sync-status: root.sync-status;
+        is-update: root.publish-is-update;
+        is-as-new: root.publish-as-new;
+        on-publish(experience_name, description, genre, is_public, open_source, studio_editable, as_new) => {
+            root.show-publish-dialog = false;
+            root.publish(experience_name, description, genre, is_public, open_source, studio_editable, as_new);
+        }
+        on-close => { root.show-publish-dialog = false; }
+    }
+    
+    // Login dialog
+    if root.show-login-dialog: LoginDialog {
+        on-login => { root.login(); }
+        on-close => { root.show-login-dialog = false; }
+    }
+    
+    // Exit confirmation
+    if root.show-exit-confirmation: ExitConfirmationDialog {
+        scene-name: root.scene-name;
+        on-save-and-exit => {
+            root.save-scene();
+            root.show-exit-confirmation = false;
+            root.force-exit();
+        }
+        on-exit-without-saving => {
+            root.show-exit-confirmation = false;
+            root.force-exit();
+        }
+        on-cancel => { root.show-exit-confirmation = false; }
+    }
+    
+    // Settings dialog
+    if root.show-settings-dialog: SettingsDialog {
+        show-help-icons <=> root.show-help-icons;
+        help-opens-in-tab <=> root.help-opens-in-tab;
+        on-help-icons-changed(val) => { root.help-icons-changed(val); }
+        on-help-opens-in-tab-changed(val) => { root.help-opens-in-tab-changed(val); }
+        on-save => { root.show-settings-dialog = false; }
+        on-close => { root.show-settings-dialog = false; }
+    }
+    
+    // Theme Editor panel (floating overlay — draggable)
+    if root.show-theme-editor: theme-panel := Rectangle {
+        property <length> drag-x: parent.width - 280px;
+        property <length> drag-y: parent.height - 320px;
+        
+        x: self.drag-x;
+        y: self.drag-y;
+        width: 260px;
+        height: 300px;
+        background: Theme.panel-background;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: Theme.border-color;
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #00000060;
+        
+        VerticalBox {
+            padding: 0px;
+            
+            // Draggable header with close button
+            Rectangle {
+                height: 32px;
+                background: Theme.header-background;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                
+                theme-drag := TouchArea {
+                    mouse-cursor: move;
+                    moved => {
+                        if self.pressed {
+                            theme-panel.drag-x += self.mouse-x - self.pressed-x;
+                            theme-panel.drag-y += self.mouse-y - self.pressed-y;
+                        }
+                    }
+                }
+                
+                HorizontalBox {
+                    padding: 8px;
+                    
+                    Image {
+                        width: 16px;
+                        height: 16px;
+                        source: @image-url("../../assets/icons/ui/palette.svg");
+                        image-fit: contain;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: " Theme Settings";
+                        color: Theme.text-primary;
+                        font-weight: 600;
+                        horizontal-stretch: 1;
+                    }
+                    
+                    TouchArea {
+                        width: 20px;
+                        clicked => { root.show-theme-editor = false; }
+                        
+                        Image {
+                            width: 12px;
+                            height: 12px;
+                            source: @image-url("../../assets/icons/ui/close.svg");
+                            image-fit: contain;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+            
+            ThemeEditor {
+                dark-mode: root.dark-theme;
+                high-contrast: root.high-contrast-mode;
+                ui-scale: root.ui-scale;
+                
+                theme-changed => {
+                    root.dark-theme = self.dark-mode;
+                    root.high-contrast-mode = self.high-contrast;
+                    root.ui-scale = self.ui-scale;
+                }
+                
+                apply-theme => {
+                    root.apply-theme-settings(root.dark-theme, root.high-contrast-mode, root.ui-scale);
+                    root.show-theme-editor = false;
+                }
+            }
+        }
+    }
+    
+    // Find dialog
+    if root.show-find-dialog: FindDialog {
+        on-close => { root.show-find-dialog = false; }
+    }
+    
+    // Soul settings dialog
+    if root.show-soul-settings-dialog: SoulSettingsDialog {
+        on-save => { root.show-soul-settings-dialog = false; }
+        on-close => { root.show-soul-settings-dialog = false; }
+    }
+    
+    // Forge connect dialog
+    if root.show-forge-connect-dialog: ForgeConnectDialog {
+        on-connect => { root.connect-forge(); }
+        on-close => { root.show-forge-connect-dialog = false; }
+    }
+    
+    // Stress test dialog
+    if root.show-stress-test-dialog: StressTestDialog {
+        on-start => { /* start stress test */ }
+        on-stop => { /* stop stress test */ }
+        on-close => { root.show-stress-test-dialog = false; }
+    }
+    
+    // Data sources dialog
+    if root.show-global-sources-window: DataSourcesDialog {
+        on-close => { root.show-global-sources-window = false; }
+    }
+    
+    // Sync domain dialog
+    if root.show-sync-domain-dialog: SyncDomainDialog {
+        on-sync => { root.show-sync-domain-dialog = false; }
+        on-close => { root.show-sync-domain-dialog = false; }
+    }
+
+    // Simulation settings dialog
+    if root.show-simulation-settings-dialog: SimulationSettingsDialog {
+        time-scale-preset <=> root.sim-time-scale-preset;
+        custom-time-scale <=> root.sim-custom-time-scale;
+        tick-rate <=> root.sim-tick-rate;
+        max-ticks-per-frame <=> root.sim-max-ticks-per-frame;
+        auto-start <=> root.sim-auto-start;
+        recording-enabled <=> root.sim-recording-enabled;
+        output-dir <=> root.sim-output-dir;
+        auto-export <=> root.sim-auto-export;
+        watchpoints <=> root.sim-watchpoints;
+        output-bindings <=> root.sim-output-bindings;
+
+        on-close => { root.show-simulation-settings-dialog = false; }
+        on-save => { root.save-simulation-settings(); }
+        on-add-watchpoint => { root.add-sim-watchpoint(); }
+        on-remove-watchpoint(i) => { root.remove-sim-watchpoint(i); }
+        on-add-output-binding => { root.add-sim-output-binding(); }
+        on-remove-output-binding(i) => { root.remove-sim-output-binding(i); }
+    }
+}

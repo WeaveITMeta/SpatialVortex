@@ -1,0 +1,524 @@
+// ============================================================================
+// Eustress Engine Studio - Output Console
+// Log viewer with filtering and search
+// ============================================================================
+
+import { LineEdit, ScrollView, CheckBox } from "std-widgets.slint";
+import { Theme, LogEntry } from "theme.slint";
+
+// Log entry data
+export struct LogData {
+    id: int,
+    level: string,
+    timestamp: string,
+    message: string,
+    source: string,
+}
+
+export component OutputConsole inherits Rectangle {
+    // Properties
+    in property <[LogData]> logs: [];
+    in-out property <bool> show-info: true;
+    in-out property <bool> show-warnings: true;
+    in-out property <bool> show-errors: true;
+    in-out property <bool> show-debug: false;
+    in-out property <string> filter-text: "";
+    in-out property <bool> auto-scroll: true;
+    
+    // Callbacks
+    callback on-clear();
+    callback on-filter-changed(string);
+    callback on-toggle-level(string);
+    callback on-copy-log(int);
+    callback on-close();
+    
+    background: Theme.panel-background;
+    
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+        
+        // Single integrated toolbar
+        // Layout: [icon Output] | [info][warn][err][dbg] [Clear] | [Filter...] | --- | [checkbox Auto-scroll] [X]
+        Rectangle {
+            height: 30px;
+            background: Theme.header-background;
+            
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 4px;
+                spacing: 0px;
+                alignment: stretch;
+                
+                // "Output" label with SVG icon
+                Rectangle {
+                    width: 70px;
+                    
+                    Image {
+                        x: 0px;
+                        y: 7px;
+                        width: 16px;
+                        height: 16px;
+                        source: @image-url("../../assets/icons/ui/output.svg");
+                        image-fit: contain;
+                    }
+                    
+                    Text {
+                        x: 20px;
+                        text: "Output";
+                        color: Theme.text-primary;
+                        font-size: 12px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                    }
+                }
+                
+                // Separator
+                Rectangle {
+                    width: 9px;
+                    Rectangle {
+                        x: 4px;
+                        y: 6px;
+                        width: 1px;
+                        height: 18px;
+                        background: Theme.border-color;
+                    }
+                }
+                
+                // Info filter
+                Rectangle {
+                    width: 28px;
+                    
+                    Rectangle {
+                        x: 1px;
+                        y: 4px;
+                        width: 26px;
+                        height: 22px;
+                        background: info-touch.has-hover ? Theme.button-hover : 
+                                    (root.show-info ? #333333 : transparent);
+                        border-radius: 3px;
+                        
+                        info-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-info = !root.show-info; root.on-toggle-level("info"); }
+                            moved => { info-tooltip.show(); }
+                        }
+                        
+                        Image {
+                            x: 5px;
+                            y: 3px;
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/info.svg");
+                            image-fit: contain;
+                        }
+                        
+                        info-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: info-tip-text.preferred-width + 12px;
+                                info-tip-text := Text {
+                                    text: "Toggle Info Messages";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Warning filter
+                Rectangle {
+                    width: 28px;
+                    
+                    Rectangle {
+                        x: 1px;
+                        y: 4px;
+                        width: 26px;
+                        height: 22px;
+                        background: warn-touch.has-hover ? Theme.button-hover :
+                                    (root.show-warnings ? #333333 : transparent);
+                        border-radius: 3px;
+                        
+                        warn-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-warnings = !root.show-warnings; root.on-toggle-level("warning"); }
+                            moved => { warn-tooltip.show(); }
+                        }
+                        
+                        Image {
+                            x: 5px;
+                            y: 3px;
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/warning.svg");
+                            image-fit: contain;
+                        }
+                        
+                        warn-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: warn-tip-text.preferred-width + 12px;
+                                warn-tip-text := Text {
+                                    text: "Toggle Warnings";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Error filter
+                Rectangle {
+                    width: 28px;
+                    
+                    Rectangle {
+                        x: 1px;
+                        y: 4px;
+                        width: 26px;
+                        height: 22px;
+                        background: err-touch.has-hover ? Theme.button-hover :
+                                    (root.show-errors ? #333333 : transparent);
+                        border-radius: 3px;
+                        
+                        err-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-errors = !root.show-errors; root.on-toggle-level("error"); }
+                            moved => { err-tooltip.show(); }
+                        }
+                        
+                        Image {
+                            x: 5px;
+                            y: 3px;
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/error.svg");
+                            image-fit: contain;
+                        }
+                        
+                        err-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: err-tip-text.preferred-width + 12px;
+                                err-tip-text := Text {
+                                    text: "Toggle Errors";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Debug filter
+                Rectangle {
+                    width: 28px;
+                    
+                    Rectangle {
+                        x: 1px;
+                        y: 4px;
+                        width: 26px;
+                        height: 22px;
+                        background: dbg-touch.has-hover ? Theme.button-hover :
+                                    (root.show-debug ? #333333 : transparent);
+                        border-radius: 3px;
+                        
+                        dbg-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-debug = !root.show-debug; root.on-toggle-level("debug"); }
+                            moved => { dbg-tooltip.show(); }
+                        }
+                        
+                        Image {
+                            x: 5px;
+                            y: 3px;
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/debug.svg");
+                            image-fit: contain;
+                        }
+                        
+                        dbg-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: dbg-tip-text.preferred-width + 12px;
+                                dbg-tip-text := Text {
+                                    text: "Toggle Debug";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Clear button (next to filters)
+                Rectangle {
+                    width: 54px;
+                    
+                    Rectangle {
+                        x: 4px;
+                        y: 4px;
+                        width: 46px;
+                        height: 22px;
+                        background: clear-touch.has-hover ? Theme.button-hover : Theme.button-background;
+                        border-radius: 3px;
+                        border-width: 1px;
+                        border-color: Theme.border-color;
+                        
+                        clear-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.on-clear(); }
+                            moved => { clear-tooltip.show(); }
+                        }
+                        
+                        Text {
+                            text: "Clear";
+                            color: Theme.text-primary;
+                            font-size: 11px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        clear-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: clear-tip-text.preferred-width + 12px;
+                                clear-tip-text := Text {
+                                    text: "Clear All Output";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Separator
+                Rectangle {
+                    width: 9px;
+                    Rectangle {
+                        x: 4px;
+                        y: 6px;
+                        width: 1px;
+                        height: 18px;
+                        background: Theme.border-color;
+                    }
+                }
+                
+                // Filter input
+                Rectangle {
+                    horizontal-stretch: 1;
+                    max-width: 180px;
+                    min-width: 80px;
+                    
+                    Rectangle {
+                        y: 3px;
+                        height: 24px;
+                        
+                        LineEdit {
+                            width: 100%;
+                            height: 100%;
+                            placeholder-text: "Filter...";
+                            text <=> root.filter-text;
+                            edited(text) => { root.on-filter-changed(text); }
+                        }
+                    }
+                }
+                
+                // Spacer
+                Rectangle { horizontal-stretch: 2; }
+                
+                // Auto-scroll toggle
+                Rectangle {
+                    width: 90px;
+                    
+                    Rectangle {
+                        x: 0px;
+                        y: 4px;
+                        width: 90px;
+                        height: 22px;
+                        background: autoscroll-touch.has-hover ? Theme.explorer-item-hover : transparent;
+                        border-radius: 3px;
+                        
+                        autoscroll-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.auto-scroll = !root.auto-scroll; }
+                            moved => { autoscroll-tooltip.show(); }
+                        }
+                        
+                        // Checkbox square
+                        Rectangle {
+                            x: 6px;
+                            y: 4px;
+                            width: 14px;
+                            height: 14px;
+                            border-width: 1px;
+                            border-color: root.auto-scroll ? Theme.accent-blue : Theme.text-secondary;
+                            border-radius: 3px;
+                            background: root.auto-scroll ? Theme.accent-blue : transparent;
+                            
+                            if root.auto-scroll: Rectangle {
+                                x: 3px;
+                                y: 3px;
+                                width: 8px;
+                                height: 8px;
+                                background: white;
+                                border-radius: 1px;
+                            }
+                        }
+                        
+                        // Label
+                        Text {
+                            x: 24px;
+                            text: "Auto-scroll";
+                            color: Theme.text-secondary;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                        
+                        autoscroll-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: autoscroll-tip-text.preferred-width + 12px;
+                                autoscroll-tip-text := Text {
+                                    text: "Toggle Auto-scroll";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Close (X) button — hides the output panel
+                Rectangle {
+                    width: 28px;
+                    
+                    Rectangle {
+                        x: 2px;
+                        y: 4px;
+                        width: 22px;
+                        height: 22px;
+                        background: close-touch.has-hover ? #c42b1c : transparent;
+                        border-radius: 3px;
+                        
+                        close-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.on-close(); }
+                            moved => { close-tooltip.show(); }
+                        }
+                        
+                        Image {
+                            x: 3px;
+                            y: 3px;
+                            width: 16px;
+                            height: 16px;
+                            source: @image-url("../../assets/icons/ui/close.svg");
+                            image-fit: contain;
+                        }
+                        
+                        close-tooltip := PopupWindow {
+                            x: 0px;
+                            y: parent.height + 4px;
+                            Rectangle {
+                                background: #2d2d2d;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: #404040;
+                                height: 24px;
+                                width: close-tip-text.preferred-width + 12px;
+                                close-tip-text := Text {
+                                    text: "Close Output Panel";
+                                    color: #d4d4d4;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Log list
+        ScrollView {
+            vertical-stretch: 1;
+            
+            VerticalLayout {
+                padding: 0px;
+                spacing: 0px;
+                alignment: start;
+                
+                for log in root.logs: LogEntry {
+                    level: log.level;
+                    timestamp: log.timestamp;
+                    message: log.message;
+                }
+                
+                // Empty state
+                if root.logs.length == 0: Rectangle {
+                    height: 40px;
+                    
+                    Text {
+                        text: "No log entries";
+                        color: Theme.text-secondary;
+                        font-size: 12px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
