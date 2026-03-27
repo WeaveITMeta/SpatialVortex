@@ -20,6 +20,11 @@ pub struct UnifiedModelConfig {
     pub jepa_config: crate::ml::jepa::JEPAConfig,
     /// Embedding dimension
     pub embed_dim: usize,
+    /// Output detail scale [0.0, 1.0] controlling response verbosity.
+    ///   0.0 = minimal/terse: answer only, no reasoning trace
+    ///   0.5 = balanced: answer with key reasoning highlights
+    ///   1.0 = full: complete reasoning chain with all sources and confidence
+    pub output_detail_scale: f32,
 }
 
 impl Default for UnifiedModelConfig {
@@ -29,6 +34,7 @@ impl Default for UnifiedModelConfig {
             calm_config: crate::ml::continuous_learning::ContinuousLearningConfig::default(),
             jepa_config: crate::ml::jepa::JEPAConfig::default(),
             embed_dim: 256,
+            output_detail_scale: 0.5,
         }
     }
 }
@@ -66,10 +72,12 @@ pub struct GenerativeResponse {
     pub answer: String,
     /// Confidence in the answer
     pub confidence: f32,
-    /// Reasoning trace
+    /// Reasoning trace (detail controlled by output_detail_scale)
     pub reasoning: String,
-    /// Sources used
+    /// Sources used (populated when detail_scale > 0.3)
     pub sources: Vec<String>,
+    /// Detail level used to generate this response [0.0, 1.0]
+    pub detail_scale: f32,
 }
 
 /// Unified Generative AI Model Architecture
@@ -82,6 +90,8 @@ pub struct UnifiedGenerativeModel {
     jepa_predictor: QuantumJEPAOptimizer,
     /// Transitive reasoning engine
     transitive_engine: TransitiveFluxReasoner,
+    /// Output detail scale [0.0, 1.0] controlling response verbosity
+    output_detail_scale: f32,
 }
 
 impl UnifiedGenerativeModel {
@@ -91,7 +101,14 @@ impl UnifiedGenerativeModel {
             calm_engine: ContinuousTrainer::new(config.calm_config),
             jepa_predictor: QuantumJEPAOptimizer::new(config.jepa_config),
             transitive_engine: TransitiveFluxReasoner::new(config.embed_dim),
+            output_detail_scale: config.output_detail_scale.clamp(0.0, 1.0),
         }
+    }
+    
+    /// Set the output detail scale dynamically at runtime.
+    /// 0.0 = minimal/terse, 0.5 = balanced, 1.0 = full reasoning chain.
+    pub fn set_detail_scale(&mut self, scale: f32) {
+        self.output_detail_scale = scale.clamp(0.0, 1.0);
     }
     
     /// Fully generative inference without benchmark-specific logic
@@ -185,19 +202,50 @@ impl UnifiedGenerativeModel {
         examples
     }
     
-    /// Synthesize final response from all reasoning components
+    /// Synthesize final response from all reasoning components.
+    /// Detail is controlled by `output_detail_scale`:
+    ///   [0.0, 0.3) = answer only, no reasoning trace, no sources
+    ///   [0.3, 0.5) = answer with source list
+    ///   [0.5, 0.8) = answer with key reasoning highlights
+    ///   [0.8, 1.0] = full reasoning chain with all confidence scores
     fn synthesize_response(&self, query: &str, flux_reasoning: crate::ml::stacked_flux::ReasoningResult, predicted_target: Vec<f32>) -> GenerativeResponse {
-        // Simple synthesis - in practice, this would be more sophisticated
-        let answer = format!("Based on the query '{}', the system reasoning suggests: {}", query, flux_reasoning.answer);
+        let scale = self.output_detail_scale;
         let confidence = flux_reasoning.confidence;
-        let reasoning = format!("JEPA prediction confidence: {:.2}, Flux reasoning confidence: {:.2}", 
-                               self.compute_embedding_confidence(&predicted_target), flux_reasoning.confidence);
+        let jepa_confidence = self.compute_embedding_confidence(&predicted_target);
+        
+        // Answer always included regardless of detail scale
+        let answer = if scale < 0.3 {
+            // Terse: just the core answer
+            flux_reasoning.answer.clone()
+        } else {
+            format!("Based on the query '{}', the system reasoning suggests: {}", query, flux_reasoning.answer)
+        };
+        
+        // Reasoning trace controlled by detail scale
+        let reasoning = if scale < 0.3 {
+            String::new()
+        } else if scale < 0.5 {
+            format!("Confidence: {:.0}%", confidence * 100.0)
+        } else if scale < 0.8 {
+            format!("JEPA: {:.2}, Flux: {:.2}", jepa_confidence, confidence)
+        } else {
+            format!("JEPA prediction confidence: {:.4}, Flux reasoning confidence: {:.4}, Combined: {:.4}",
+                    jepa_confidence, confidence, (jepa_confidence + confidence) / 2.0)
+        };
+        
+        // Sources included when detail scale >= 0.3
+        let sources = if scale >= 0.3 {
+            vec!["flux_reasoning".to_string(), "jepa_prediction".to_string()]
+        } else {
+            Vec::new()
+        };
         
         GenerativeResponse {
             answer,
             confidence,
             reasoning,
-            sources: vec!["flux_reasoning".to_string(), "jepa_prediction".to_string()],
+            sources,
+            detail_scale: scale,
         }
     }
     

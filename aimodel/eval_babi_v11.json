@@ -1,0 +1,130 @@
+{
+  "timestamp": "2026-03-18T22:43:14.776422+00:00",
+  "model_config": {
+    "name": "spatialvortex-7b-dev",
+    "training_epochs": 0,
+    "gpu_enabled": false,
+    "features": [
+      "sacred_geometry",
+      "vortex_cycles",
+      "elp_attributes",
+      "moe_routing"
+    ]
+  },
+  "task_results": [
+    {
+      "task": "babi1",
+      "accuracy": 98.94736842105263,
+      "num_correct": 94,
+      "total": 95,
+      "avg_confidence": 0.6961258,
+      "time_secs": 3.8358236,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi2",
+      "accuracy": 90.52631578947368,
+      "num_correct": 86,
+      "total": 95,
+      "avg_confidence": 0.5017178,
+      "time_secs": 5.5193669,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi3",
+      "accuracy": 74.73684210526315,
+      "num_correct": 71,
+      "total": 95,
+      "avg_confidence": 0.754333,
+      "time_secs": 2.0080002,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi4",
+      "accuracy": 68.42105263157895,
+      "num_correct": 65,
+      "total": 95,
+      "avg_confidence": 0.7511477,
+      "time_secs": 1.4490976,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi10",
+      "accuracy": 84.21052631578947,
+      "num_correct": 80,
+      "total": 95,
+      "avg_confidence": 0.8143353,
+      "time_secs": 0.7689002,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi11",
+      "accuracy": 100.0,
+      "num_correct": 95,
+      "total": 95,
+      "avg_confidence": 0.77556306,
+      "time_secs": 5.0240676,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi12",
+      "accuracy": 98.94736842105263,
+      "num_correct": 94,
+      "total": 95,
+      "avg_confidence": 0.72265875,
+      "time_secs": 5.9570745,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi15",
+      "accuracy": 100.0,
+      "num_correct": 95,
+      "total": 95,
+      "avg_confidence": 0.9977109,
+      "time_secs": 1.2219527000000001,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi16",
+      "accuracy": 100.0,
+      "num_correct": 95,
+      "total": 95,
+      "avg_confidence": 0.9977174,
+      "time_secs": 1.2442804,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi17",
+      "accuracy": 100.0,
+      "num_correct": 95,
+      "total": 95,
+      "avg_confidence": 0.9499995,
+      "time_secs": 0.0355845,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi18",
+      "accuracy": 96.84210526315789,
+      "num_correct": 92,
+      "total": 95,
+      "avg_confidence": 0.92105305,
+      "time_secs": 0.0425427,
+      "wrong_samples": []
+    },
+    {
+      "task": "babi20",
+      "accuracy": 100.0,
+      "num_correct": 95,
+      "total": 95,
+      "avg_confidence": 0.8536556,
+      "time_secs": 2.124679,
+      "wrong_samples": []
+    }
+  ],
+  "overall": {
+    "total_correct": 1057,
+    "total_questions": 1140,
+    "overall_accuracy": 92.71929824561404,
+    "total_time_secs": 32.9704803
+  }
+}

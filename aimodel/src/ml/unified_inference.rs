@@ -363,8 +363,8 @@ impl ReasoningLayer {
             
             // Pattern: "X fits inside Y" => X is smaller than Y
             if let Some(pos) = sentence.find(" fits inside ") {
-                let subject = sentence[..pos].trim();
-                let object = sentence[pos + 13..].trim();
+                let subject = sentence[..pos].trim().trim_start_matches("the ");
+                let object = sentence[pos + 13..].trim().trim_start_matches("the ");
                 if !subject.is_empty() && !object.is_empty() {
                     latent.size_relations.insert(
                         (subject.to_string(), object.to_string()), 
@@ -379,8 +379,8 @@ impl ReasoningLayer {
             
             // Pattern: "X is bigger than Y"
             if let Some(pos) = sentence.find(" is bigger than ") {
-                let subject = sentence[..pos].trim();
-                let object = sentence[pos + 16..].trim();
+                let subject = sentence[..pos].trim().trim_start_matches("the ");
+                let object = sentence[pos + 16..].trim().trim_start_matches("the ");
                 if !subject.is_empty() && !object.is_empty() {
                     latent.size_relations.insert(
                         (subject.to_string(), object.to_string()), 
@@ -610,11 +610,23 @@ impl ReasoningLayer {
                 if bigger && bigger_conf > 0.3 {
                     return Some(("no".to_string(), bigger_conf));
                 }
-                // If we have any size info about these entities, default to "no"
-                let has_subject_info = latent.size_relations.keys().any(|(a, _)| a == &subject);
-                let has_object_info = latent.size_relations.keys().any(|(a, _)| a == &object);
-                if has_subject_info || has_object_info {
-                    return Some(("no".to_string(), 0.6));
+                // Check size_relations: if object > subject (object is bigger), then subject fits
+                let obj_bigger_key = (object.clone(), subject.clone());
+                if let Some(rel) = latent.size_relations.get(&obj_bigger_key) {
+                    if rel == "bigger" {
+                        return Some(("yes".to_string(), 0.90));
+                    } else if rel == "smaller" {
+                        return Some(("no".to_string(), 0.90));
+                    }
+                }
+                // Check size_relations: if subject > object (subject is bigger), then subject can't fit
+                let subj_bigger_key = (subject.clone(), object.clone());
+                if let Some(rel) = latent.size_relations.get(&subj_bigger_key) {
+                    if rel == "bigger" {
+                        return Some(("no".to_string(), 0.90));
+                    } else if rel == "smaller" {
+                        return Some(("yes".to_string(), 0.90));
+                    }
                 }
             }
         }

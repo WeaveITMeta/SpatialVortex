@@ -508,14 +508,43 @@ impl TransitiveFluxReasoner {
             .map(|r| r.target.clone())
             .collect();
 
-        // Find root candidates: sources of bigger_than that are never listed as smaller
-        let root = size_rels.iter()
+        // Find ALL root candidates: sources of bigger_than that are never listed as smaller.
+        // Seeding only one root leaves disconnected chains (e.g. two separate size hierarchies
+        // in longer stories) with no rank → query_size_rank returns None for cross-chain queries.
+        let chain_depth = (size_rels.len() as f32).max(5.0);
+        let mut bt_roots: Vec<String> = size_rels.iter()
             .filter(|r| r.relation == "bigger_than")
             .map(|r| r.source.clone())
-            .find(|src| !smaller_entities.contains(src))
-            .unwrap_or_else(|| size_rels[0].source.clone());
+            .filter(|src| !smaller_entities.contains(src))
+            .collect();
+        bt_roots.dedup();
 
-        self.size_rank.insert(root, (size_rels.len() as f32).max(5.0));
+        if bt_roots.is_empty() {
+            // Fallback for fits_inside-only stories: find entities that are always containers
+            // (targets of fits_inside but never sources of fits_inside).
+            let fi_sources: std::collections::HashSet<String> = size_rels.iter()
+                .filter(|r| r.relation == "fits_inside")
+                .map(|r| r.source.clone())
+                .collect();
+            let fi_roots: Vec<String> = size_rels.iter()
+                .filter(|r| r.relation == "fits_inside")
+                .map(|r| r.target.clone())
+                .filter(|tgt| !fi_sources.contains(tgt))
+                .collect();
+            if fi_roots.is_empty() {
+                // Last resort: seed the first entity we see
+                self.size_rank.insert(size_rels[0].source.clone(), chain_depth);
+            } else {
+                for (i, root) in fi_roots.iter().enumerate() {
+                    self.size_rank.insert(root.clone(), chain_depth + (i as f32 * 10.0));
+                }
+            }
+        } else {
+            // Seed every bt_root with a distinct high rank offset to avoid inter-chain collisions
+            for (i, root) in bt_roots.iter().enumerate() {
+                self.size_rank.insert(root.clone(), chain_depth + (i as f32 * 10.0));
+            }
+        }
 
         for _ in 0..self.max_chain_depth {
             let mut changed = false;
@@ -758,8 +787,18 @@ impl TransitiveFluxReasoner {
             return 0.0;
         }
         
-        // Query the transitive graph
-        let (holds, confidence) = self.query_relation(&source, &relation, &target);
+        // For size relations, use rank-based query first (authoritative for multi-hop chains)
+        // query_relation can return (false, 0.5) when both entities are known but no direct
+        // relation — this heuristic is wrong for fits_inside which must be inferred from rank.
+        let (holds, confidence) = if matches!(relation.as_str(), "bigger_than" | "smaller_than" | "fits_inside") {
+            if let Some((rank_holds, rank_conf)) = self.query_size_rank(&source, &relation, &target) {
+                (rank_holds, rank_conf)
+            } else {
+                self.query_relation(&source, &relation, &target)
+            }
+        } else {
+            self.query_relation(&source, &relation, &target)
+        };
         
         // Only apply scoring if we have actual relations in our graph
         if self.relations.is_empty() {

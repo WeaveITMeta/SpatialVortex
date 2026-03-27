@@ -19,7 +19,7 @@ use std::time::Instant;
 use vortex::data::{
     RealBenchmarkEvaluator, RealBenchmarkResult,
     load_commonsenseqa, load_squad, load_babi,
-    load_mmlu, load_gsm8k, load_arc, load_hellaswag, load_truthfulqa, load_humaneval,
+    load_mmlu, load_gsm8k, load_arc, load_arc_agi, load_hellaswag, load_truthfulqa, load_humaneval,
     load_swebench,
     HFDatasetLoader, DatasetLoaderConfig,
 };
@@ -170,7 +170,7 @@ fn main() -> Result<()> {
     // Parse tasks
     let tasks: Vec<&str> = if args.tasks == "all" {
         vec![
-            "mmlu", "gsm8k", "arc", "hellaswag", "truthfulqa", "humaneval", "swebench",
+            "mmlu", "gsm8k", "arc", "arc-agi", "hellaswag", "truthfulqa", "humaneval", "swebench",
             "commonsenseqa", "squad", "babi1", "babi2", "babi3", "babi15", "babi16"
         ]
     } else {
@@ -209,6 +209,7 @@ fn main() -> Result<()> {
             "mmlu" => evaluate_mmlu(&mut evaluator, &args)?,
             "gsm8k" => evaluate_gsm8k(&mut evaluator, &args)?,
             "arc" => evaluate_arc(&mut evaluator, &args)?,
+            "arc-agi" => evaluate_arc_agi(&mut evaluator, &args)?,
             "hellaswag" => evaluate_hellaswag(&mut evaluator, &args)?,
             "truthfulqa" => evaluate_truthfulqa(&mut evaluator, &args)?,
             "humaneval" => evaluate_humaneval(&mut evaluator, &args)?,
@@ -386,6 +387,17 @@ fn evaluate_arc(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<R
         Ok(evaluator.evaluate_parallel("ARC-Challenge", &questions[..limit], args.batch_size))
     } else {
         Ok(evaluator.evaluate("ARC-Challenge", &questions[..limit]))
+    }
+}
+
+fn evaluate_arc_agi(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<RealBenchmarkResult> {
+    let questions = load_arc_agi(&args.data_dir)
+        .map_err(|e| anyhow::anyhow!("Failed to load ARC-AGI: {}", e))?;
+    let limit = if args.limit > 0 { args.limit.min(questions.len()) } else { questions.len().min(100) };
+    if args.parallel {
+        Ok(evaluator.evaluate_parallel("ARC-AGI", &questions[..limit], args.batch_size))
+    } else {
+        Ok(evaluator.evaluate("ARC-AGI", &questions[..limit]))
     }
 }
 

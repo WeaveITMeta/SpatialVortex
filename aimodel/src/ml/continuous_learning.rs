@@ -675,6 +675,9 @@ pub struct ContinuousTrainer {
     current_loss: f64,
     /// Best loss achieved
     best_loss: f64,
+    /// Indefinite embedvec learner for continuous embedding refinement.
+    /// Uses Welford's online algorithm — O(embed_dim) memory, learns forever.
+    embedvec_learner: IndefiniteEmbedvecLearner,
 }
 
 impl ContinuousTrainer {
@@ -693,6 +696,7 @@ impl ContinuousTrainer {
             stats: TrainingStats::default(),
             current_loss: f64::MAX,
             best_loss: f64::MAX,
+            embedvec_learner: IndefiniteEmbedvecLearner::new(256),
         }
     }
 
@@ -1082,10 +1086,241 @@ impl ContinuousTrainer {
     
     /// Learn from interaction for continuous improvement
     pub fn learn_from_interaction(&mut self, query: &str, reasoning_result: &crate::ml::stacked_flux::ReasoningResult) {
-        // Simple learning - in practice, this would update the model based on
-        // the interaction and reasoning result
-        println!("Learning from interaction: {} -> {} (confidence: {:.2})", 
-                query, reasoning_result.answer, reasoning_result.confidence);
+        // Update embedvec learner with this interaction's embedding
+        let embedding = self.create_context_embedding(query);
+        self.embedvec_learner.observe(&embedding, reasoning_result.confidence as f64);
+    }
+
+    /// Get the indefinite embedvec learner for direct access
+    pub fn embedvec_learner(&self) -> &IndefiniteEmbedvecLearner {
+        &self.embedvec_learner
+    }
+
+    /// Get mutable reference to the indefinite embedvec learner
+    pub fn embedvec_learner_mut(&mut self) -> &mut IndefiniteEmbedvecLearner {
+        &mut self.embedvec_learner
+    }
+}
+
+// =============================================================================
+// 8. IndefiniteEmbedvecLearner — Continuous Embedding Refinement
+// =============================================================================
+//
+// Implements indefinite online learning for embedding vectors using Welford's
+// algorithm for numerically stable incremental mean and variance computation.
+//
+// Key properties:
+// - Learns indefinitely without catastrophic forgetting
+// - Per-dimension running statistics (mean, variance, count)
+// - Confidence grows monotonically with observation count
+// - Federated updates blend remote observations with local state
+// - Memory bounded: O(embed_dim) regardless of observation count
+
+/// Running statistics for a single embedding dimension.
+/// Uses Welford's online algorithm for numerically stable incremental computation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DimensionStats {
+    /// Number of observations incorporated
+    pub count: u64,
+    /// Running mean (Welford's algorithm)
+    pub mean: f64,
+    /// Running M2 for variance (Welford's: variance = m2 / count)
+    pub m2: f64,
+    /// Exponentially weighted recent mean (for detecting drift)
+    pub ema_mean: f64,
+    /// EMA decay factor
+    pub ema_decay: f64,
+}
+
+impl Default for DimensionStats {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            mean: 0.0,
+            m2: 0.0,
+            ema_mean: 0.0,
+            ema_decay: 0.99,
+        }
+    }
+}
+
+impl DimensionStats {
+    /// Incorporate a new observation using Welford's online algorithm.
+    /// Numerically stable for arbitrarily many observations.
+    pub fn observe(&mut self, value: f64, weight: f64) {
+        let w = weight.clamp(0.01, 1.0);
+        self.count += 1;
+        let delta = value - self.mean;
+        self.mean += delta * w / self.count as f64;
+        let delta2 = value - self.mean;
+        self.m2 += w * delta * delta2;
+
+        // EMA update for drift detection.
+        // Initialize EMA to the first observed value to avoid false drift from default 0.0.
+        if self.count == 1 {
+            self.ema_mean = value;
+        } else {
+            self.ema_mean = self.ema_decay * self.ema_mean + (1.0 - self.ema_decay) * value;
+        }
+    }
+
+    /// Get the current variance estimate
+    pub fn variance(&self) -> f64 {
+        if self.count < 2 { return 1.0; }
+        (self.m2 / (self.count - 1) as f64).max(1e-12)
+    }
+
+    /// Get the standard deviation
+    pub fn standard_deviation(&self) -> f64 {
+        self.variance().sqrt()
+    }
+
+    /// Confidence in this dimension's estimate [0, 1].
+    /// Grows logarithmically with observation count — more observations = higher confidence.
+    /// Reaches 0.5 at ~10 observations, 0.9 at ~1000.
+    pub fn confidence(&self) -> f64 {
+        if self.count == 0 { return 0.0; }
+        1.0 - 1.0 / (1.0 + (self.count as f64).ln())
+    }
+
+    /// Detect concept drift: returns true if the EMA mean has diverged
+    /// significantly from the running mean (more than 2 standard deviations).
+    pub fn has_drift(&self) -> bool {
+        if self.count < 10 { return false; }
+        let deviation = (self.ema_mean - self.mean).abs();
+        deviation > 2.0 * self.standard_deviation()
+    }
+}
+
+/// Indefinite embedding vector learner that refines embeddings continuously
+/// across arbitrarily many sessions without catastrophic forgetting.
+///
+/// Uses per-dimension running statistics (Welford's algorithm) so that memory
+/// usage is O(embed_dim) regardless of how many observations are incorporated.
+/// Each new observation is blended with the running statistics, and confidence
+/// grows monotonically with observation count.
+///
+/// Supports federated updates: remote observations can be merged into local
+/// state using the `federated_merge` method.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndefiniteEmbedvecLearner {
+    /// Per-dimension running statistics
+    pub dimension_stats: Vec<DimensionStats>,
+    /// Total observations across all sessions
+    pub total_observations: u64,
+    /// Total sessions (each learn_from_interaction call is one observation,
+    /// each train_session call is one session)
+    pub total_sessions: u64,
+    /// Dimensions that have detected concept drift since last consolidation
+    pub drift_dimensions: Vec<usize>,
+}
+
+impl IndefiniteEmbedvecLearner {
+    /// Create a new learner for embeddings of the given dimension
+    pub fn new(embed_dim: usize) -> Self {
+        Self {
+            dimension_stats: vec![DimensionStats::default(); embed_dim],
+            total_observations: 0,
+            total_sessions: 0,
+            drift_dimensions: Vec::new(),
+        }
+    }
+
+    /// Incorporate a new embedding observation with the given confidence weight.
+    /// This is the core indefinite learning step — each call refines the
+    /// running statistics without bound.
+    pub fn observe(&mut self, embedding: &[f32], confidence: f64) {
+        let weight = confidence.clamp(0.01, 1.0);
+        for (i, &value) in embedding.iter().enumerate() {
+            if i < self.dimension_stats.len() {
+                self.dimension_stats[i].observe(value as f64, weight);
+            }
+        }
+        self.total_observations += 1;
+    }
+
+    /// Get the current best-estimate embedding (running mean across all observations)
+    pub fn current_embedding(&self) -> Vec<f32> {
+        self.dimension_stats.iter()
+            .map(|s| s.mean as f32)
+            .collect()
+    }
+
+    /// Get per-dimension confidence scores [0, 1]
+    pub fn dimension_confidences(&self) -> Vec<f64> {
+        self.dimension_stats.iter()
+            .map(|s| s.confidence())
+            .collect()
+    }
+
+    /// Get overall embedding confidence (mean of per-dimension confidences)
+    pub fn overall_confidence(&self) -> f64 {
+        if self.dimension_stats.is_empty() { return 0.0; }
+        let sum: f64 = self.dimension_stats.iter().map(|s| s.confidence()).sum();
+        sum / self.dimension_stats.len() as f64
+    }
+
+    /// Detect concept drift across dimensions.
+    /// Returns indices of dimensions where the recent EMA mean has diverged
+    /// significantly from the long-term running mean.
+    pub fn detect_drift(&mut self) -> &[usize] {
+        self.drift_dimensions.clear();
+        for (i, stats) in self.dimension_stats.iter().enumerate() {
+            if stats.has_drift() {
+                self.drift_dimensions.push(i);
+            }
+        }
+        &self.drift_dimensions
+    }
+
+    /// Federated merge: incorporate running statistics from a remote learner.
+    /// Uses the parallel Welford merge formula to combine two sets of
+    /// running statistics without loss of numerical stability.
+    ///
+    /// This enables distributed/federated continuous learning where multiple
+    /// agents can independently observe embeddings and then merge their knowledge.
+    pub fn federated_merge(&mut self, remote: &IndefiniteEmbedvecLearner) {
+        for (i, remote_stats) in remote.dimension_stats.iter().enumerate() {
+            if i >= self.dimension_stats.len() { break; }
+            if remote_stats.count == 0 { continue; }
+
+            let local = &mut self.dimension_stats[i];
+            if local.count == 0 {
+                *local = remote_stats.clone();
+                continue;
+            }
+
+            // Parallel Welford merge formula
+            let combined_count = local.count + remote_stats.count;
+            let delta = remote_stats.mean - local.mean;
+            let combined_mean = local.mean
+                + delta * (remote_stats.count as f64 / combined_count as f64);
+            let combined_m2 = local.m2
+                + remote_stats.m2
+                + delta * delta
+                    * (local.count as f64 * remote_stats.count as f64 / combined_count as f64);
+
+            local.count = combined_count;
+            local.mean = combined_mean;
+            local.m2 = combined_m2;
+            // Blend EMA means weighted by count
+            local.ema_mean = (local.ema_mean * local.count as f64
+                + remote_stats.ema_mean * remote_stats.count as f64)
+                / combined_count as f64;
+        }
+
+        self.total_observations += remote.total_observations;
+        self.total_sessions += remote.total_sessions;
+    }
+
+    /// Record the start of a new training session
+    pub fn start_session(&mut self) {
+        self.total_sessions += 1;
+    }
+
+    /// Get the embedding dimension
+    pub fn embed_dim(&self) -> usize {
+        self.dimension_stats.len()
     }
 }
 
@@ -1249,5 +1484,100 @@ mod tests {
 
         let verification = trainer.verify_training(&result);
         assert!(verification.verified);
+    }
+
+    // =========================================================================
+    // IndefiniteEmbedvecLearner Tests
+    // =========================================================================
+
+    #[test]
+    fn test_embedvec_learner_basic() {
+        let mut learner = IndefiniteEmbedvecLearner::new(4);
+        assert_eq!(learner.embed_dim(), 4);
+        assert_eq!(learner.total_observations, 0);
+        assert!((learner.overall_confidence() - 0.0).abs() < 1e-10);
+
+        // Observe a single embedding
+        learner.observe(&[1.0, 2.0, 3.0, 4.0], 1.0);
+        assert_eq!(learner.total_observations, 1);
+
+        let embed = learner.current_embedding();
+        assert_eq!(embed.len(), 4);
+        // After one observation, mean should approximate the observed value
+        assert!((embed[0] - 1.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_embedvec_confidence_grows_monotonically() {
+        let mut learner = IndefiniteEmbedvecLearner::new(4);
+
+        let mut prev_confidence = 0.0;
+        for i in 0..100 {
+            learner.observe(&[1.0, 2.0, 3.0, 4.0], 0.8);
+            let conf = learner.overall_confidence();
+            assert!(conf >= prev_confidence,
+                "Confidence should grow monotonically: step {} prev={:.4} now={:.4}", i, prev_confidence, conf);
+            prev_confidence = conf;
+        }
+
+        // After 100 observations, confidence should be high
+        assert!(prev_confidence > 0.5, "Confidence after 100 observations should be >0.5, got {}", prev_confidence);
+    }
+
+    #[test]
+    fn test_embedvec_dimension_stats_welford() {
+        let mut stats = DimensionStats::default();
+
+        // Feed known values: 2, 4, 6 → mean=4, variance=4
+        stats.observe(2.0, 1.0);
+        stats.observe(4.0, 1.0);
+        stats.observe(6.0, 1.0);
+
+        assert_eq!(stats.count, 3);
+        // Mean should be close to 4.0 (Welford with uniform weight)
+        assert!((stats.mean - 4.0).abs() < 0.5, "Mean should be ~4.0, got {}", stats.mean);
+        // Variance should be positive
+        assert!(stats.variance() > 0.0, "Variance should be positive");
+    }
+
+    #[test]
+    fn test_embedvec_federated_merge() {
+        let mut local = IndefiniteEmbedvecLearner::new(2);
+        let mut remote = IndefiniteEmbedvecLearner::new(2);
+
+        // Local observes [1, 1] repeatedly
+        for _ in 0..50 {
+            local.observe(&[1.0, 1.0], 1.0);
+        }
+
+        // Remote observes [3, 3] repeatedly
+        for _ in 0..50 {
+            remote.observe(&[3.0, 3.0], 1.0);
+        }
+
+        // Before merge: local mean should be ~1.0
+        let pre_merge = local.current_embedding();
+        assert!((pre_merge[0] - 1.0).abs() < 0.5, "Pre-merge should be ~1.0, got {}", pre_merge[0]);
+
+        // Merge remote into local
+        local.federated_merge(&remote);
+
+        // After merge: combined mean should be ~2.0 (average of 1 and 3)
+        let post_merge = local.current_embedding();
+        assert!((post_merge[0] - 2.0).abs() < 0.5, "Post-merge should be ~2.0, got {}", post_merge[0]);
+        assert_eq!(local.total_observations, 100);
+    }
+
+    #[test]
+    fn test_embedvec_no_drift_on_stable_data() {
+        let mut learner = IndefiniteEmbedvecLearner::new(4);
+
+        // Feed stable data — no drift expected
+        for _ in 0..100 {
+            learner.observe(&[1.0, 2.0, 3.0, 4.0], 1.0);
+        }
+
+        let drifted = learner.detect_drift();
+        assert!(drifted.is_empty(), "Stable data should not trigger drift, got {} drifted dimensions", drifted.len());
     }
 }

@@ -1,0 +1,1190 @@
++===============================================================+
+|         SPATIALVORTEX EVALUATION HARNESS                      |
+|         (Rust equivalent of lm-evaluation-harness)            |
++===============================================================+
+| Tasks:        babi4,babi3                                              
+| Data dir:     ../benchmarks/data                                              
+| Batch size:   8                                              
+| Few-shot:     5                                              
+| Limit:        all                                              
+| Debug:        normal                                              
+| Output:       "eval_babi34.json"                                            
++===============================================================+
+   [--skip-hf] Skipping HuggingFace dataset downloads
+[Vortex] Pre-seeded from HF: 0 subjects, 0 attrs, 0 relations (health=0.0%) in 0.00s
+   RAG engine knowledge from datasets: 23 topics, 69 facts
+
+[PHASE 3] Web Learning - DISABLED for deterministic baseline measurement
+[CALM] Pretraining CALM weights...
+Pre-training CALM weights on 69 texts for 5 epochs...
+   [BPE] Merge 1/1000: 'i' + 'n' ΓåÆ 'in' (freq=46)
+   [BPE] Merge 2/1000: 'r' + 'e' ΓåÆ 're' (freq=43)
+   [BPE] Merge 3/1000: 'i' + 's' ΓåÆ 'is' (freq=36)
+   [BPE] Merge 4/1000: 'a' + 't' ΓåÆ 'at' (freq=35)
+   [BPE] Merge 5/1000: 'a' + 'n' ΓåÆ 'an' (freq=35)
+   [BPE] Merge 200/1000: 'activ' + 'ity' ΓåÆ 'activity' (freq=2)
+   [BPE] Learned 254 merges, vocab size: 333
+  Pre-computing 69 embeddings...
+  Epoch 1/5: gen_loss=74.9964, calm_loss=0.0160, contrastive=0.9358 (lr=0.010000)
+  Epoch 2/5: gen_loss=65.2809, calm_loss=0.0160, contrastive=0.9397 (lr=0.009045)
+  Epoch 3/5: gen_loss=63.4442, calm_loss=0.0160, contrastive=0.9383 (lr=0.006545)
+  Epoch 4/5: gen_loss=63.0796, calm_loss=0.0160, contrastive=0.9504 (lr=0.003455)
+  Epoch 5/5: gen_loss=62.9324, calm_loss=0.0160, contrastive=0.9373 (lr=0.000955)
+CALM pre-training complete. 345 total steps.
+[CALM] Pretraining complete in 2.87s on 69 texts
+[Pipeline] Building unified knowledge pipeline...
+[Pipeline] Building knowledge base from 69 documents...
+[Pipeline] Knowledge base built: 32 subjects, 45 facts
+[Pipeline] Built in 0.00s: 32 subjects, 45 facts, 32 embeddings
+   Generative mode ENABLED - using autoregressive generation
+
+[EVAL] Running task: babi4
+
+   Running bAbI Task 4 evaluation (95 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 0 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_4
+   [Test-Time Train] Knowledge base: 28 topics, 75 facts
+   [   1/95] [OK] The garden is east of the bathroom.
+The  -> "garden" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_4
+   [   2/95] [X] The kitchen is east of the bedroom.
+The  -> "garden" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=548chars q="What is the garden south of?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   3/95] [OK] The garden is north of the bedroom.
+The  -> "bathroom" (conf: 0.25)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_4
+   [   4/95] [OK] The kitchen is south of the office.
+The  -> "kitchen" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_4
+   [RSI-GEN-1] Retuning strategy for 'babi/babi_task_4': accuracy=60.0% (3/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+   [   5/95] [X] The office is east of the hallway.
+The h -> "garden" (conf: 0.80)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_4 src=bAbI/babi_task_4
+   [PIPELINE] [WRONG] conf=1.00 chose[1]="bathroom" correct[0]="garden" src=bAbI q="The hallway is south of the office.
+The garden is north of t"
+   [PIPELINE] conf 1.00 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is north of the office?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The hallway is south of the office.
+The garden is north of t"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_4 src=bAbI/babi_task_4
+   [PIPELINE] [WRONG] conf=0.82 chose[1]="bathroom" correct[0]="garden" src=bAbI q="The garden is south of the kitchen.
+The office is north of t"
+   [PIPELINE] conf 0.82 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=547chars q="What is south of the kitchen?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.75 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[knowledge=50.0,entity_attr=30.0,comprehensive=10.0] q="The garden is south of the kitchen.
+The office is north of t"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_4 src=bAbI/babi_task_4
+   [PIPELINE] [OK] conf=0.30 chose[0]="bathroom" correct[0]="bathroom" src=bAbI q="The bathroom is east of the kitchen.
+The bedroom is east of "
+   [PIPELINE] conf 0.30 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_4 src=bAbI/babi_task_4
+   [PIPELINE] [WRONG] conf=0.86 chose[1]="bathroom" correct[0]="garden" src=bAbI q="The bathroom is east of the kitchen.
+The garden is west of t"
+   [PIPELINE] conf 0.86 <= 0.6, falling through
+   [Test-Time Train] Knowledge base: 31 topics, 97 facts
+   [RSI] strategy=rsi-gen-1/babi/babi_task_4 src=bAbI/babi_task_4
+   [PIPELINE] [WRONG] conf=0.83 chose[1]="bathroom" correct[0]="garden" src=bAbI q="The garden is north of the bedroom.
+The bedroom is north of "
+   [PIPELINE] conf 0.83 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=547chars q="What is north of the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The garden is north of the bedroom.
+The bedroom is north of "
+   [RSI-GEN-2] Retuning strategy for 'babi/babi_task_4': accuracy=60.0% (6/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-2/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-2/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-2/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-2/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=546chars q="What is the kitchen west of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The garden is east of the kitchen.
+The bedroom is west of th"
+   [RSI-GEN-3] Retuning strategy for 'babi/babi_task_4': accuracy=60.0% (9/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=544chars q="What is the office east of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The hallway is east of the office.
+The garden is west of the"
+   [Test-Time Train] Knowledge base: 31 topics, 111 facts
+   [RSI] strategy=rsi-gen-3/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-3/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-3/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-3/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=546chars q="What is the bedroom west of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[entity_attr=300.0] q="The hallway is east of the bedroom.
+The office is west of th"
+   [RSI-GEN-4] Retuning strategy for 'babi/babi_task_4': accuracy=60.0% (12/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-4/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=548chars q="What is north of the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[knowledge=45.0,entity_attr=30.0,rag=7.9] q="The office is north of the bedroom.
+The bedroom is north of "
+   [RSI] strategy=rsi-gen-4/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=548chars q="What is west of the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="bathroom" correct[0]="hallway" top=[knowledge=50.0,entity_attr=30.0,comprehensive=10.0] q="The office is east of the bathroom.
+The hallway is west of t"
+   [Test-Time Train] Knowledge base: 31 topics, 122 facts
+   [RSI] strategy=rsi-gen-4/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=549chars q="What is the bathroom north of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The garden is south of the bathroom.
+The office is north of "
+   [RSI] strategy=rsi-gen-4/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI-GEN-5] Retuning strategy for 'babi/babi_task_4': accuracy=60.0% (15/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-5/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-5/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=548chars q="What is north of the garden?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.81 path=expert-high chose[3]="garden" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=30.0,comprehensive=10.0] q="The bathroom is north of the garden.
+The bedroom is south of"
+   [RSI] strategy=rsi-gen-5/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=547chars q="What is the bedroom west of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[entity_attr=300.0] q="The kitchen is east of the bedroom.
+The hallway is west of t"
+   [RSI] strategy=rsi-gen-5/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=549chars q="What is the kitchen south of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="bedroom" correct[0]="bedroom" top=[entity_attr=300.0] q="The hallway is south of the kitchen.
+The bedroom is north of"
+   [RSI-GEN-6] Retuning strategy for 'babi/babi_task_4': accuracy=63.3% (19/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-6/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-6/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=551chars q="What is north of the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="bathroom" correct[0]="bedroom" top=[knowledge=50.0,entity_attr=30.0,comprehensive=10.0] q="The hallway is south of the bathroom.
+The bedroom is north o"
+   [RSI] strategy=rsi-gen-6/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=548chars q="What is the bathroom east of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="bedroom" correct[0]="bedroom" top=[entity_attr=300.0] q="The bedroom is west of the bathroom.
+The bathroom is west of"
+   [RSI] strategy=rsi-gen-6/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI-GEN-7] Retuning strategy for 'babi/babi_task_4': accuracy=62.9% (22/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-7/babi/babi_task_4 src=bAbI/babi_task_4
+   [Test-Time Train] Knowledge base: 31 topics, 144 facts
+   [RSI] strategy=rsi-gen-7/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-7/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-7/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is the office south of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The garden is north of the office.
+The hallway is south of t"
+   [RSI-GEN-8] Retuning strategy for 'babi/babi_task_4': accuracy=67.5% (27/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=545chars q="What is the office east of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[entity_attr=300.0] q="The office is west of the bedroom.
+The hallway is west of th"
+   [RSI] strategy=rsi-gen-8/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-8/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-8/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is east of the hallway?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The garden is east of the hallway.
+The bedroom is west of th"
+   [Test-Time Train] Knowledge base: 31 topics, 146 facts
+   [RSI] strategy=rsi-gen-8/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is the office south of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The garden is north of the office.
+The hallway is south of t"
+   [RSI-GEN-9] Retuning strategy for 'babi/babi_task_4': accuracy=68.9% (31/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-9/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-9/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-9/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-9/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=547chars q="What is west of the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The office is east of the bedroom.
+The bathroom is west of t"
+   [RSI-GEN-10] Retuning strategy for 'babi/babi_task_4': accuracy=68.0% (34/50)
+   [RSI-GEN-10] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is east of the hallway?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The garden is east of the hallway.
+The bedroom is west of th"
+   [Test-Time Train] Knowledge base: 31 topics, 147 facts
+   [RSI] strategy=rsi-gen-10/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-10/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-10/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-10/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI-GEN-11] Retuning strategy for 'babi/babi_task_4': accuracy=67.3% (37/55)
+   [RSI-GEN-11] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-11/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-11/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-11/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-11/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=544chars q="What is east of the garden?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="bedroom" top=[knowledge=50.0,entity_attr=30.0,comprehensive=15.0] q="The garden is east of the office.
+The bedroom is east of the"
+   [RSI-GEN-12] Retuning strategy for 'babi/babi_task_4': accuracy=66.7% (40/60)
+   [RSI-GEN-12] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [Test-Time Train] Knowledge base: 31 topics, 152 facts
+   [RSI] strategy=rsi-gen-12/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-12/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=550chars q="What is the bedroom north of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[entity_attr=300.0] q="The hallway is north of the bedroom.
+The bathroom is south o"
+   [RSI] strategy=rsi-gen-12/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=546chars q="What is the garden south of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[entity_attr=300.0] q="The bedroom is south of the garden.
+The office is north of t"
+   [RSI] strategy=rsi-gen-12/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-12/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI-GEN-13] Retuning strategy for 'babi/babi_task_4': accuracy=64.6% (42/65)
+   [RSI-GEN-13] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=550chars q="What is south of the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The hallway is north of the bedroom.
+The bathroom is south o"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=546chars q="What is the garden south of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[entity_attr=300.0] q="The kitchen is north of the garden.
+The office is south of t"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-13/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=548chars q="What is north of the office?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The hallway is south of the office.
+The bathroom is north of"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=549chars q="What is the hallway north of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[entity_attr=300.0] q="The hallway is south of the office.
+The bathroom is south of"
+   [RSI-GEN-14] Retuning strategy for 'babi/babi_task_4': accuracy=67.1% (47/70)
+   [RSI-GEN-14] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-14/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-14/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-14/babi/babi_task_4 src=bAbI/babi_task_4
+   [Test-Time Train] Knowledge base: 31 topics, 158 facts
+   [RSI] strategy=rsi-gen-14/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=548chars q="What is the kitchen south of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[entity_attr=300.0] q="The office is south of the kitchen.
+The hallway is north of "
+   [RSI-GEN-15] Retuning strategy for 'babi/babi_task_4': accuracy=66.7% (50/75)
+   [RSI-GEN-15] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-15/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=544chars q="What is west of the office?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The bedroom is east of the office.
+The garden is west of the"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-15/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-15/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-15/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=549chars q="What is north of the hallway?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=30.0,rag=7.9] q="The office is south of the hallway.
+The bathroom is north of"
+   [RSI-GEN-16] Retuning strategy for 'babi/babi_task_4': accuracy=67.5% (54/80)
+   [RSI-GEN-16] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_4 src=bAbI/babi_task_4
+   [Test-Time Train] Knowledge base: 31 topics, 161 facts
+   [RSI] strategy=rsi-gen-16/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="office" ctx=544chars q="What is west of the garden?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="office" top=[knowledge=50.0,entity_attr=30.0,comprehensive=15.0] q="The garden is west of the hallway.
+The office is west of the"
+   [RSI] strategy=rsi-gen-16/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-16/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-16/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=547chars q="What is the bedroom west of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[entity_attr=300.0] q="The kitchen is east of the bedroom.
+The hallway is west of t"
+   [RSI-GEN-17] Retuning strategy for 'babi/babi_task_4': accuracy=68.2% (58/85)
+   [RSI-GEN-17] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-17/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-17/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-17/babi/babi_task_4 src=bAbI/babi_task_4
+   [Test-Time Train] Knowledge base: 31 topics, 161 facts
+   [RSI] strategy=rsi-gen-17/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is the bedroom west of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The hallway is west of the bedroom.
+The garden is east of th"
+   [RSI-GEN-18] Retuning strategy for 'babi/babi_task_4': accuracy=68.9% (62/90)
+   [RSI-GEN-18] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-18/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-18/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-18/babi/babi_task_4 src=bAbI/babi_task_4
+   [RSI] strategy=rsi-gen-18/babi/babi_task_4 src=bAbI/babi_task_4
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=546chars q="What is the office north of?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[entity_attr=300.0] q="The bedroom is north of the office.
+The garden is south of t"
+   [RSI-GEN-19] Retuning strategy for 'babi/babi_task_4': accuracy=68.4% (65/95)
+   [RSI-GEN-19] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [  95/95] [OK] The bedroom is north of the office.
+The  -> "garden" (conf: 0.50)
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 2)
+   ===============================================================
+   [FULL QUESTION]:
+      The kitchen is east of the bedroom.
+      The garden is west of the bedroom.
+      What is east of the bedroom?
+
+   [CHOICES]:
+      [0] kitchen <- CORRECT
+      [1] bathroom 
+      [2] kitchen 
+      [3] garden <- PREDICTED
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      |   Attention: weight=0.64
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "kitchen"
+      Got:      "garden"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #2 (Question 5)
+   ===============================================================
+   [FULL QUESTION]:
+      The office is east of the hallway.
+      The hallway is east of the garden.
+      What is east of the hallway?
+
+   [CHOICES]:
+      [0] office <- CORRECT
+      [1] bathroom 
+      [2] kitchen 
+      [3] garden <- PREDICTED
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      |   Attention: weight=0.64
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "office"
+      Got:      "garden"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 7)
+   ===============================================================
+   [FULL QUESTION]:
+      The garden is south of the kitchen.
+      The office is north of the kitchen.
+      What is south of the kitchen?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      |   Attention: weight=0.64
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.75
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 9)
+   ===============================================================
+   [FULL QUESTION]:
+      The bathroom is east of the kitchen.
+      The garden is west of the kitchen.
+      What is west of the kitchen?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      |   Attention: weight=0.64
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 13)
+   ===============================================================
+   [FULL QUESTION]:
+      The office is south of the bathroom.
+      The kitchen is north of the bathroom.
+      What is south of the bathroom?
+
+   [CHOICES]:
+      [0] office <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Semantic: weight=1.00
+      |   Attention: weight=0.64
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.60 Logos=0.60 Pathos=0.70 (from Semantic)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "office"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ... and 25 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   bAbI Task 4 Result: 68.4% accuracy (65/95 correct, 5-shot)
+  [DONE] babi4: 68.4% (65/95) in 1.1s
+
+[EVAL] Running task: babi3
+
+   Running bAbI Task 3 evaluation (95 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 129 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_3
+   [   1/95] [OK] John went back to the kitchen.
+Daniel pi -> "garden" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_3
+   [Test-Time Train] Knowledge base: 52 topics, 200 facts
+   [   2/95] [OK] John went back to the kitchen.
+Daniel pi -> "kitchen" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_3
+   [   3/95] [OK] John went back to the kitchen.
+Daniel pi -> "kitchen" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_3
+   [   4/95] [OK] John went back to the kitchen.
+Daniel pi -> "kitchen" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_3
+   [RSI-GEN-1] Retuning strategy for 'babi/babi_task_3': accuracy=80.0% (4/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+   [   5/95] [X] John went back to the kitchen.
+Daniel pi -> "kitchen" (conf: 0.80)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_3 src=bAbI/babi_task_3
+   [PIPELINE] [WRONG] conf=0.84 chose[1]="bathroom" correct[0]="garden" src=bAbI q="Sandra moved to the bathroom.
+John picked up the football.
+J"
+   [PIPELINE] conf 0.84 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_3 src=bAbI/babi_task_3
+   [PIPELINE] [WRONG] conf=0.84 chose[1]="bathroom" correct[0]="garden" src=bAbI q="Sandra moved to the bathroom.
+John picked up the football.
+J"
+   [PIPELINE] conf 0.84 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_3 src=bAbI/babi_task_3
+   [PIPELINE] [WRONG] conf=0.84 chose[1]="bathroom" correct[0]="garden" src=bAbI q="Sandra moved to the bathroom.
+John picked up the football.
+J"
+   [PIPELINE] conf 0.84 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_3 src=bAbI/babi_task_3
+   [PIPELINE] [WRONG] conf=0.84 chose[1]="bathroom" correct[0]="garden" src=bAbI q="Sandra moved to the bathroom.
+John picked up the football.
+J"
+   [PIPELINE] conf 0.84 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_3 src=bAbI/babi_task_3
+   [PIPELINE] [WRONG] conf=0.84 chose[1]="bathroom" correct[0]="garden" src=bAbI q="Sandra moved to the bathroom.
+John picked up the football.
+J"
+   [PIPELINE] conf 0.84 <= 0.6, falling through
+   [RSI-GEN-2] Retuning strategy for 'babi/babi_task_3': accuracy=90.0% (9/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_3 src=bAbI/babi_task_3
+   [Test-Time Train] Knowledge base: 53 topics, 205 facts
+   [RSI] strategy=rsi-gen-2/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-3] Retuning strategy for 'babi/babi_task_3': accuracy=73.3% (11/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=1580chars q="Where was the football before the garden?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="hallway" top=[knowledge=45.0,entity_attr=15.0,rag=7.7] q="John took the football.
+Daniel went back to the garden.
+Mary"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-4] Retuning strategy for 'babi/babi_task_3': accuracy=65.0% (13/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bathroom" ctx=1460chars q="Where was the football before the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,comprehensive=45.0,entity_attr=15.0] q="John went to the hallway.
+Mary went back to the office.
+Mary"
+   [RSI] strategy=rsi-gen-4/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-5] Retuning strategy for 'babi/babi_task_3': accuracy=60.0% (15/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="hallway" ctx=1334chars q="Where was the milk before the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.61 path=expert-high chose[1]="bathroom" correct[0]="hallway" top=[knowledge=20.0,entity_attr=15.0,rag=7.7] q="Mary went back to the garden.
+John went back to the hallway."
+   [Test-Time Train] Knowledge base: 53 topics, 249 facts
+   [RSI] strategy=rsi-gen-5/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-6] Retuning strategy for 'babi/babi_task_3': accuracy=63.3% (19/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=3022chars q="Where was the apple before the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,comprehensive=45.0,entity_attr=15.0] q="Sandra travelled to the kitchen.
+Daniel took the milk.
+Sandr"
+   [RSI] strategy=rsi-gen-6/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=3075chars q="Where was the apple before the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,comprehensive=45.0,entity_attr=15.0] q="Sandra travelled to the kitchen.
+Daniel took the milk.
+Sandr"
+   [RSI-GEN-7] Retuning strategy for 'babi/babi_task_3': accuracy=65.7% (23/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=2056chars q="Where was the football before the hallway?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.91 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[comprehensive=45.0,knowledge=20.0,entity_attr=15.0] q="Sandra took the milk.
+Daniel journeyed to the office.
+John t"
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-7/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=2108chars q="Where was the football before the hallway?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[comprehensive=45.0,knowledge=20.0,entity_attr=15.0] q="Sandra took the milk.
+Daniel journeyed to the office.
+John t"
+   [RSI] strategy=rsi-gen-7/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=3887chars q="Where was the football before the hallway?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="bathroom" top=[comprehensive=45.0,knowledge=20.0,entity_attr=15.0] q="Sandra took the milk.
+Daniel journeyed to the office.
+John t"
+   [RSI-GEN-8] Retuning strategy for 'babi/babi_task_3': accuracy=60.0% (24/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_3 src=bAbI/babi_task_3
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-8/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-9] Retuning strategy for 'babi/babi_task_3': accuracy=64.4% (29/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-10] Retuning strategy for 'babi/babi_task_3': accuracy=64.0% (32/50)
+   [RSI-GEN-10] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=996chars q="Where was the football before the garden?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.97 path=expert-high chose[3]="garden" correct[0]="office" top=[knowledge=45.0,entity_attr=15.0,rag=7.7] q="Mary got the football.
+Mary discarded the football.
+Mary pic"
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-10/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-11] Retuning strategy for 'babi/babi_task_3': accuracy=65.5% (36/55)
+   [RSI-GEN-11] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=1595chars q="Where was the football before the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.63 path=expert-high chose[1]="bathroom" correct[0]="garden" top=[knowledge=45.0,entity_attr=15.0,rag=7.7] q="Daniel picked up the football.
+Daniel left the football.
+San"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=1650chars q="Where was the football before the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.63 path=expert-high chose[1]="bathroom" correct[0]="garden" top=[knowledge=45.0,entity_attr=15.0,rag=7.7] q="Daniel picked up the football.
+Daniel left the football.
+San"
+   [RSI-GEN-12] Retuning strategy for 'babi/babi_task_3': accuracy=65.0% (39/60)
+   [RSI-GEN-12] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_3 src=bAbI/babi_task_3
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-12/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=2424chars q="Where was the football before the bedroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.43 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=15.0,rag=7.7] q="John picked up the football.
+John dropped the football there"
+   [RSI] strategy=rsi-gen-12/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=2840chars q="Where was the football before the bathroom?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.63 path=expert-high chose[1]="bathroom" correct[0]="kitchen" top=[knowledge=45.0,entity_attr=15.0,rag=7.7] q="John picked up the football.
+John dropped the football there"
+   [RSI-GEN-13] Retuning strategy for 'babi/babi_task_3': accuracy=66.2% (43/65)
+   [RSI-GEN-13] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_3 src=bAbI/babi_task_3
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-13/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-14] Retuning strategy for 'babi/babi_task_3': accuracy=67.1% (47/70)
+   [RSI-GEN-14] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-15] Retuning strategy for 'babi/babi_task_3': accuracy=68.0% (51/75)
+   [RSI-GEN-15] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-15/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=652chars q="Where was the milk before the office?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.43 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=45.0,entity_attr=15.0,rag=7.8] q="John went to the garden.
+Mary got the milk.
+Mary moved to th"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=713chars q="Where was the milk before the office?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.36 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.8] q="John went to the garden.
+Mary got the milk.
+Mary moved to th"
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-15/babi/babi_task_3 src=bAbI/babi_task_3
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=775chars q="Where was the milk before the office?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.45 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.8] q="John went to the garden.
+Mary got the milk.
+Mary moved to th"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-15/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-16] Retuning strategy for 'babi/babi_task_3': accuracy=68.8% (55/80)
+   [RSI-GEN-16] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-17] Retuning strategy for 'babi/babi_task_3': accuracy=70.6% (60/85)
+   [RSI-GEN-17] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_3 src=bAbI/babi_task_3
+   [Test-Time Train] Knowledge base: 53 topics, 293 facts
+   [RSI] strategy=rsi-gen-17/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-18] Retuning strategy for 'babi/babi_task_3': accuracy=70.0% (63/90)
+   [RSI-GEN-18] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_3 src=bAbI/babi_task_3
+   [RSI-GEN-19] Retuning strategy for 'babi/babi_task_3': accuracy=69.5% (66/95)
+   [RSI-GEN-19] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [  95/95] [OK] Sandra travelled to the garden.
+Mary tra -> "bathroom" (conf: 0.80)
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 5)
+   ===============================================================
+   [FULL QUESTION]:
+      John went back to the kitchen.
+      Daniel picked up the milk.
+      Sandra went back to the bedroom.
+      Mary moved to the garden.
+      Sandra got the apple.
+      Mary journeyed to the office.
+      Mary journeyed to the garden.
+      Sandra went to the hallway.
+      Daniel moved to the bedroom.
+      Sandra grabbed the football.
+      Daniel discarded the milk.
+      John journeyed to the garden.
+      John went to the hallway.
+      Mary journeyed to the office.
+      John journeyed to the bedroom.
+      Sandra moved to the garden.
+      John travelled to the garden.
+      Daniel grabbed the milk.
+      Mary journeyed to the bathroom.
+      Daniel dropped the milk.
+      Daniel went to the office.
+      Daniel travelled to the garden.
+      John went back to the bedroom.
+      Sandra discarded the football.
+      Mary went back to the hallway.
+      John journeyed to the garden.
+      Daniel went back to the hallway.
+      John went to the bedroom.
+      Sandra travelled to the bathroom.
+      John moved to the hallway.
+      Daniel travelled to the kitchen.
+      Daniel journeyed to the bedroom.
+      John journeyed to the office.
+      Mary travelled to the garden.
+      Daniel went to the hallway.
+      Daniel went to the garden.
+      Daniel travelled to the hallway.
+      Mary journeyed to the bathroom.
+      John travelled to the kitchen.
+      Sandra dropped the apple.
+      Sandra grabbed the apple there.
+      Mary went to the office.
+      Sandra left the apple there.
+      Daniel went to the bedroom.
+      Sandra went back to the bedroom.
+      Mary travelled to the hallway.
+      Mary went to the office.
+      Sandra took the milk.
+      Mary went to the bathroom.
+      John moved to the bathroom.
+      Daniel moved to the kitchen.
+      Mary grabbed the apple.
+      Daniel moved to the office.
+      Sandra went to the kitchen.
+      Sandra went back to the office.
+      Mary dropped the apple.
+      Sandra dropped the milk.
+      John went to the kitchen.
+      Daniel grabbed the milk.
+      Mary picked up the apple.
+      Sandra went back to the hallway.
+      Daniel journeyed to the hallway.
+      John moved to the bedroom.
+      John went to the bathroom.
+      Daniel discarded the milk there.
+      Mary moved to the kitchen.
+      Mary journeyed to the office.
+      Daniel got the milk.
+      John moved to the garden.
+      Sandra travelled to the kitchen.
+      Mary put down the apple.
+      John took the football.
+      Sandra travelled to the garden.
+      Sandra travelled to the bedroom.
+      Mary got the apple.
+      Sandra travelled to the hallway.
+      Mary put down the apple there.
+      Mary grabbed the apple.
+      Mary moved to the bedroom.
+      Daniel left the milk.
+      Daniel got the milk there.
+      John left the football.
+      John moved to the bathroom.
+      Mary went to the office.
+      John went back to the office.
+      John went back to the bathroom.
+      Mary dropped the apple.
+      Sandra went to the kitchen.
+      Where was the apple before the office?
+
+   [CHOICES]:
+      [0] bedroom <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.60
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "bedroom"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #2 (Question 13)
+   ===============================================================
+   [FULL QUESTION]:
+      Daniel moved to the bathroom.
+      John got the football.
+      Sandra grabbed the milk.
+      Sandra put down the milk.
+      Daniel journeyed to the bedroom.
+      Sandra took the milk.
+      Sandra put down the milk there.
+      John put down the football.
+      Mary travelled to the hallway.
+      John took the football.
+      Sandra went back to the office.
+      Mary moved to the garden.
+      Daniel moved to the garden.
+      Daniel went back to the office.
+      Sandra journeyed to the hallway.
+      Mary went to the office.
+      Sandra went back to the office.
+      Sandra moved to the bathroom.
+      John dropped the football.
+      Sandra got the football.
+      Sandra left the football there.
+      Daniel moved to the bedroom.
+      Daniel journeyed to the office.
+      John went back to the office.
+      Sandra got the football.
+      Sandra discarded the football.
+      Mary travelled to the bathroom.
+      Mary got the football.
+      Mary went back to the kitchen.
+      Mary journeyed to the garden.
+      Mary journeyed to the bedroom.
+      Mary took the milk.
+      John went to the kitchen.
+      Mary travelled to the garden.
+      John grabbed the apple.
+      John discarded the apple.
+      John travelled to the garden.
+      Mary went to the bedroom.
+      Mary discarded the milk.
+      John went back to the office.
+      Where was the milk before the bedroom?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.60
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 14)
+   ===============================================================
+   [FULL QUESTION]:
+      Daniel moved to the bathroom.
+      John got the football.
+      Sandra grabbed the milk.
+      Sandra put down the milk.
+      Daniel journeyed to the bedroom.
+      Sandra took the milk.
+      Sandra put down the milk there.
+      John put down the football.
+      Mary travelled to the hallway.
+      John took the football.
+      Sandra went back to the office.
+      Mary moved to the garden.
+      Daniel moved to the garden.
+      Daniel went back to the office.
+      Sandra journeyed to the hallway.
+      Mary went to the office.
+      Sandra went back to the office.
+      Sandra moved to the bathroom.
+      John dropped the football.
+      Sandra got the football.
+      Sandra left the football there.
+      Daniel moved to the bedroom.
+      Daniel journeyed to the office.
+      John went back to the office.
+      Sandra got the football.
+      Sandra discarded the football.
+      Mary travelled to the bathroom.
+      Mary got the football.
+      Mary went back to the kitchen.
+      Mary journeyed to the garden.
+      Mary journeyed to the bedroom.
+      Mary took the milk.
+      John went to the kitchen.
+      Mary travelled to the garden.
+      John grabbed the apple.
+      John discarded the apple.
+      John travelled to the garden.
+      Mary went to the bedroom.
+      Mary discarded the milk.
+      John went back to the office.
+      Mary went back to the bathroom.
+      Mary journeyed to the garden.
+      Where was the milk before the bedroom?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.60
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 15)
+   ===============================================================
+   [FULL QUESTION]:
+      Daniel moved to the bathroom.
+      John got the football.
+      Sandra grabbed the milk.
+      Sandra put down the milk.
+      Daniel journeyed to the bedroom.
+      Sandra took the milk.
+      Sandra put down the milk there.
+      John put down the football.
+      Mary travelled to the hallway.
+      John took the football.
+      Sandra went back to the office.
+      Mary moved to the garden.
+      Daniel moved to the garden.
+      Daniel went back to the office.
+      Sandra journeyed to the hallway.
+      Mary went to the office.
+      Sandra went back to the office.
+      Sandra moved to the bathroom.
+      John dropped the football.
+      Sandra got the football.
+      Sandra left the football there.
+      Daniel moved to the bedroom.
+      Daniel journeyed to the office.
+      John went back to the office.
+      Sandra got the football.
+      Sandra discarded the football.
+      Mary travelled to the bathroom.
+      Mary got the football.
+      Mary went back to the kitchen.
+      Mary journeyed to the garden.
+      Mary journeyed to the bedroom.
+      Mary took the milk.
+      John went to the kitchen.
+      Mary travelled to the garden.
+      John grabbed the apple.
+      John discarded the apple.
+      John travelled to the garden.
+      Mary went to the bedroom.
+      Mary discarded the milk.
+      John went back to the office.
+      Mary went back to the bathroom.
+      Mary journeyed to the garden.
+      Daniel journeyed to the kitchen.
+      John went back to the garden.
+      Daniel grabbed the apple.
+      John went to the hallway.
+      Mary went back to the office.
+      Mary left the football.
+      Where was the football before the bathroom?
+
+   [CHOICES]:
+      [0] bedroom <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.60
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "bedroom"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 17)
+   ===============================================================
+   [FULL QUESTION]:
+      John took the football.
+      Daniel went back to the garden.
+      Mary moved to the bathroom.
+      Mary went to the bedroom.
+      Mary went to the hallway.
+      John dropped the football.
+      Daniel journeyed to the hallway.
+      Sandra grabbed the football.
+      John moved to the office.
+      Sandra put down the football.
+      Sandra took the football.
+      Daniel went to the bedroom.
+      Mary moved to the office.
+      Mary journeyed to the bedroom.
+      Mary grabbed the apple there.
+      Sandra went back to the kitchen.
+      Sandra picked up the milk there.
+      Mary discarded the apple.
+      John went back to the bathroom.
+      Mary got the apple.
+      Mary left the apple.
+      Mary took the apple.
+      Mary put down the apple.
+      Sandra put down the milk.
+      Daniel went to the kitchen.
+      Sandra journeyed to the office.
+      Sandra journeyed to the bedroom.
+      John moved to the garden.
+      Sandra journeyed to the garden.
+      Mary got the apple.
+      Mary discarded the apple.
+      Mary travelled to the hallway.
+      Daniel went to the garden.
+      Sandra went back to the hallway.
+      Sandra travelled to the garden.
+      Sandra went back to the office.
+      Daniel went to the bathroom.
+      Sandra dropped the football.
+      Mary went back to the kitchen.
+      Mary went back to the hallway.
+      Where was the football before the office?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.60
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ... and 24 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   bAbI Task 3 Result: 69.5% accuracy (66/95 correct, 5-shot)
+  [DONE] babi3: 69.5% (66/95) in 2.6s
+
++===============================================================+
+|                    EVALUATION RESULTS                         |
++===============================================================+
+| Task                 | Score  | Correct  | Time    |
++----------------------+--------+----------+---------+
+| babi4                |  68.4% |  65/  95 |    1.1s |
+| babi3                |  69.5% |  66/  95 |    2.6s |
++----------------------+--------+----------+---------+
+| OVERALL              |  68.9% | 131/ 190 |    7.8s |
++===============================================================+
+
+[SAVED] Results written to "eval_babi34.json"
+
++===============================================================+
+|                    SOTA COMPARISON                            |
++===============================================================+
+| Task                 | Ours   | SOTA   | Gap     |
++----------------------+--------+--------+---------+
+| babi4                |  68.4% | 100.0% |   -31.6 |
+| babi3                |  69.5% | 100.0% |   -30.5 |
++===============================================================+
+| Average gap to SOTA: -18.6%                                   |
++===============================================================+

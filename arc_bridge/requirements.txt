@@ -1,0 +1,7 @@
+# ARC-AGI-3 SDK
+arc-agi
+
+# Iggy native Python client (optional — HTTP REST fallback is used if absent)
+# iggy-py
+
+# No other runtime deps needed: stdlib urllib handles the REST fallback.

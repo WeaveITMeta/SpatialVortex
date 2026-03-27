@@ -66,6 +66,23 @@ pub mod learning_to_rank;
 pub mod pillar_integration;
 pub mod vortex_diffusion;
 pub mod vortex_planner;
+pub mod parallel_fusion;
+pub mod grid_encoder;
+
+pub use parallel_fusion::{
+    SpectralConsensus,
+    Color3, SubjectMetadata,
+    ReasoningOp, SeedGenerator,
+    FusionPathNode, ReasoningPath, Implication,
+    TransitiveChainValidator,
+    FluxRule, RuleExplosionConfig, RuleExplosionEngine,
+    PathwayQuality, JEPAPathwayPredictor,
+    ReasoningScale, ScaledReasoning,
+    FluxObject, FluxMatrixProcessor,
+    Projection, VonNeumannMerger,
+    ExplorerConfig, ExhaustiveExplorer,
+    factorial, index_to_permutation,
+};
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
 pub use ebrm_alignment::{
@@ -84,6 +101,7 @@ pub use continuous_learning::{
     ContinuousTrainer, ContinuousLearningConfig,
     RSIEpochScheduler, RSISignal, TrainingRecommendation,
     SyntheticDataGenerator, SyntheticExample,
+    IndefiniteEmbedvecLearner, DimensionStats,
     TrainingBatch, AdaptiveLearningRate,
     EpochResult, TrainingSessionResult,
 };
@@ -91,6 +109,7 @@ pub use jepa::{
     JEPAConfig, JEPAPredictor, JEPATrainer, JEPAStats,
     HierarchicalDeductionEngine, DeductionRules, DeductionStep,
     jepa_mse_loss, jepa_infonce_loss, QuantumJEPAOptimizer,
+    TemporalStraighteningEngine, EMATargetEncoder, straightening_loss,
 };
 pub use transitive_flux::{
     TransitiveFluxReasoner, TransitiveRelation,
@@ -156,6 +175,10 @@ pub use reasoning_engine::{
 };
 pub use recursive_chains::{SNOATNode, SNOATChain, ChainPathwayReasoner};
 pub use vortex_planner::{VortexSymbolicPlanner, PlanStep, PlanTrace, SacredGateResult};
+pub use grid_encoder::{
+    GridEncoder, GridEncoderConfig, EncodedGrid, TransformEncoding,
+    ArcGrid, CellEmbedding, FluxPositionMap, SacredGateResult as GridSacredGateResult,
+};
 pub use conceptual_agglomeration::{
     ConceptNode, ConceptGraph, ConceptualReasoner,
     ConceptRef, ConceptRelation, ConceptRelationType,

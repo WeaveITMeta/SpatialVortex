@@ -76,3 +76,7 @@ web/static/bevy/
 
 # Training checkpoints (large binary files)
 checkpoints/
+
+# EustressEngine sparse checkout — build artefacts only, source is tracked
+eustress/target/
+eustress/.git/

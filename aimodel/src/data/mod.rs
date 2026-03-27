@@ -29,6 +29,6 @@ pub use benchmark_eval::{
 pub use real_benchmarks::{
     RealBenchmarkEvaluator, RealBenchmarkResult, RealBenchmarkQuestion,
     load_commonsenseqa, load_squad, load_babi,
-    load_mmlu, load_gsm8k, load_arc, load_hellaswag, load_truthfulqa, load_humaneval,
+    load_mmlu, load_gsm8k, load_arc, load_arc_agi, load_hellaswag, load_truthfulqa, load_humaneval,
     load_swebench,
 };

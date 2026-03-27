@@ -1,0 +1,2162 @@
++===============================================================+
+|         SPATIALVORTEX EVALUATION HARNESS                      |
+|         (Rust equivalent of lm-evaluation-harness)            |
++===============================================================+
+| Tasks:        babi10,babi12,babi18,babi20                                              
+| Data dir:     ../benchmarks/data                                              
+| Batch size:   8                                              
+| Few-shot:     5                                              
+| Limit:        all                                              
+| Debug:        normal                                              
+| Output:       "eval_babi10_12_18_20.json"                                            
++===============================================================+
+   [--skip-hf] Skipping HuggingFace dataset downloads
+[Vortex] Pre-seeded from HF: 0 subjects, 0 attrs, 0 relations (health=0.0%) in 0.00s
+   RAG engine knowledge from datasets: 23 topics, 69 facts
+
+[PHASE 3] Web Learning - DISABLED for deterministic baseline measurement
+[CALM] Pretraining CALM weights...
+Pre-training CALM weights on 69 texts for 5 epochs...
+   [BPE] Merge 1/1000: 'i' + 'n' ΓåÆ 'in' (freq=46)
+   [BPE] Merge 2/1000: 'r' + 'e' ΓåÆ 're' (freq=43)
+   [BPE] Merge 3/1000: 'i' + 's' ΓåÆ 'is' (freq=36)
+   [BPE] Merge 4/1000: 'a' + 'n' ΓåÆ 'an' (freq=35)
+   [BPE] Merge 5/1000: 'a' + 't' ΓåÆ 'at' (freq=35)
+   [BPE] Merge 200/1000: 'em' + 'p' ΓåÆ 'emp' (freq=2)
+   [BPE] Learned 253 merges, vocab size: 332
+  Pre-computing 69 embeddings...
+  Epoch 1/5: gen_loss=75.1484, calm_loss=0.0164, contrastive=0.9612 (lr=0.010000)
+  Epoch 2/5: gen_loss=65.4502, calm_loss=0.0164, contrastive=0.9689 (lr=0.009045)
+  Epoch 3/5: gen_loss=63.5573, calm_loss=0.0164, contrastive=0.9617 (lr=0.006545)
+  Epoch 4/5: gen_loss=63.1971, calm_loss=0.0164, contrastive=0.9700 (lr=0.003455)
+  Epoch 5/5: gen_loss=63.0540, calm_loss=0.0164, contrastive=0.9773 (lr=0.000955)
+CALM pre-training complete. 345 total steps.
+[CALM] Pretraining complete in 2.67s on 69 texts
+[Pipeline] Building unified knowledge pipeline...
+[Pipeline] Building knowledge base from 69 documents...
+[Pipeline] Knowledge base built: 32 subjects, 45 facts
+[Pipeline] Built in 0.00s: 32 subjects, 45 facts, 32 embeddings
+   Generative mode ENABLED - using autoregressive generation
+
+[EVAL] Running task: babi10
+
+   Running bAbI Task 10 evaluation (95 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 0 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 23 topics, 69 facts
+   [   1/95] [X] Fred journeyed to the office.
+Fred went  -> "yes" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_10
+   [   2/95] [OK] Fred journeyed to the office.
+Fred went  -> "yes" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_10
+   [   3/95] [OK] Fred journeyed to the office.
+Fred went  -> "yes" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_10
+   [   4/95] [OK] Fred journeyed to the office.
+Fred went  -> "no" (conf: 0.80)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_10
+   [RSI-GEN-1] Retuning strategy for 'babi/babi_task_10': accuracy=80.0% (4/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+   [   5/95] [OK] Fred journeyed to the office.
+Fred went  -> "yes" (conf: 0.80)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_10 src=bAbI/babi_task_10
+   [PIPELINE] [WRONG] conf=0.91 chose[2]="maybe" correct[0]="no" src=bAbI q="Bill is in the kitchen.
+Julie is either in the school or the"
+   [PIPELINE] conf 0.91 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_10 src=bAbI/babi_task_10
+   [PIPELINE] [WRONG] conf=0.91 chose[2]="maybe" correct[0]="no" src=bAbI q="Bill is in the kitchen.
+Julie is either in the school or the"
+   [PIPELINE] conf 0.91 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_10 src=bAbI/babi_task_10
+   [PIPELINE] [WRONG] conf=0.76 chose[1]="bathroom" correct[0]="maybe" src=bAbI q="Bill is in the kitchen.
+Julie is either in the school or the"
+   [PIPELINE] conf 0.76 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=533chars q="Is Julie in the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_10 src=bAbI/babi_task_10
+   [PIPELINE] [WRONG] conf=0.93 chose[2]="maybe" correct[0]="yes" src=bAbI q="Bill is in the kitchen.
+Julie is either in the school or the"
+   [PIPELINE] conf 0.93 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_10 src=bAbI/babi_task_10
+   [PIPELINE] [WRONG] conf=0.94 chose[2]="maybe" correct[0]="yes" src=bAbI q="Bill is in the kitchen.
+Julie is either in the school or the"
+   [PIPELINE] conf 0.94 <= 0.6, falling through
+   [RSI-GEN-2] Retuning strategy for 'babi/babi_task_10': accuracy=80.0% (8/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_10 src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 36 topics, 100 facts
+   [RSI] strategy=rsi-gen-2/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-2/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-2/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=627chars q="Is Mary in the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-2/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=700chars q="Is Mary in the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-3] Retuning strategy for 'babi/babi_task_10': accuracy=73.3% (11/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.27 chose[2]="kitchen" correct[0]="maybe" ctx=418chars q="Is Fred in the park?"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="maybe" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Bill went to the kitchen.
+Fred is either in the office or th"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-3/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-3/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-3/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-4] Retuning strategy for 'babi/babi_task_10': accuracy=70.0% (14/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [Test-Time Train] Knowledge base: 36 topics, 102 facts
+   [RSI] strategy=rsi-gen-4/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-4/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-4/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-4/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-4/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-5] Retuning strategy for 'babi/babi_task_10': accuracy=76.0% (19/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-5/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-5/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-5/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-5/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-6] Retuning strategy for 'babi/babi_task_10': accuracy=80.0% (24/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [Test-Time Train] Knowledge base: 36 topics, 102 facts
+   [RSI] strategy=rsi-gen-6/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-6/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-6/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-6/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-6/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=642chars q="Is Mary in the school?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-7] Retuning strategy for 'babi/babi_task_10': accuracy=80.0% (28/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="maybe" correct[0]="no" ctx=439chars q="Is Bill in the cinema?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.27), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.26 path=unified-tiebreak chose[2]="maybe" correct[0]="no" top=[knowledge=20.0,rag=8.0,mha=5.0] q="Bill is either in the school or the school.
+Mary is either i"
+   [RSI] strategy=rsi-gen-7/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=500chars q="Is Bill in the school?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-7/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-7/babi/babi_task_10 src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 36 topics, 104 facts
+   [RSI] strategy=rsi-gen-7/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-8] Retuning strategy for 'babi/babi_task_10': accuracy=75.0% (30/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-8/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-8/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-8/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-8/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-9] Retuning strategy for 'babi/babi_task_10': accuracy=73.3% (33/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-9/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.27 chose[2]="kitchen" correct[0]="maybe" ctx=476chars q="Is Fred in the bedroom?"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="maybe" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Julie moved to the kitchen.
+Fred is either in the bedroom or"
+   [RSI] strategy=rsi-gen-9/babi/babi_task_10 src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 36 topics, 104 facts
+   [RSI] strategy=rsi-gen-9/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [OK] conf=0.57 chose[0]="yes" correct[0]="yes" ctx=599chars q="Is Mary in the kitchen?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.30), using unified answer[0] conf=0.57
+   [MULTI-EXPERT] [OK] conf=0.44 path=unified-tiebreak chose[0]="yes" correct[0]="yes" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Julie moved to the kitchen.
+Fred is either in the bedroom or"
+   [RSI] strategy=rsi-gen-9/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-10] Retuning strategy for 'babi/babi_task_10': accuracy=74.0% (37/50)
+   [RSI-GEN-10] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-10/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-10/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-10/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-10/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-11] Retuning strategy for 'babi/babi_task_10': accuracy=76.4% (42/55)
+   [RSI-GEN-11] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [OK] conf=1.00 chose[0]="maybe" correct[0]="maybe" ctx=416chars q="Is Julie in the school?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-11/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.27 chose[2]="kitchen" correct[0]="maybe" ctx=484chars q="Is Julie in the school?"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.73 path=expert-high chose[2]="kitchen" correct[0]="maybe" top=[knowledge=20.0,entity_attr=15.0,rag=7.9] q="Mary is in the park.
+Julie is either in the school or the of"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-11/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.27 chose[2]="kitchen" correct[0]="maybe" ctx=614chars q="Is Julie in the school?"
+   [UNIFIED] Low conf 0.27 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.73 path=expert-high chose[2]="kitchen" correct[0]="maybe" top=[knowledge=20.0,entity_attr=15.0,rag=7.8] q="Mary is in the park.
+Julie is either in the school or the of"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-12] Retuning strategy for 'babi/babi_task_10': accuracy=75.0% (45/60)
+   [RSI-GEN-12] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="maybe" correct[0]="yes" ctx=401chars q="Is Mary in the park?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.25), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.25 path=unified-tiebreak chose[2]="maybe" correct[0]="yes" top=[knowledge=20.0,rag=8.1,mha=5.0] q="Mary went back to the park.
+Fred is in the cinema.
+Is Mary i"
+   [RSI] strategy=rsi-gen-12/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=471chars q="Is Mary in the school?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-12/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-12/babi/babi_task_10 src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 36 topics, 114 facts
+   [RSI] strategy=rsi-gen-12/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-13] Retuning strategy for 'babi/babi_task_10': accuracy=73.8% (48/65)
+   [RSI-GEN-13] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-13/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-13/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-13/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-13/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-14] Retuning strategy for 'babi/babi_task_10': accuracy=74.3% (52/70)
+   [RSI-GEN-14] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-14/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-14/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [OK] conf=0.57 chose[0]="no" correct[0]="no" ctx=530chars q="Is Fred in the office?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.29), using unified answer[0] conf=0.57
+   [MULTI-EXPERT] [OK] conf=0.43 path=unified-tiebreak chose[0]="no" correct[0]="no" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Julie is in the cinema.
+Julie went to the school.
+Fred went "
+   [Test-Time Train] Knowledge base: 36 topics, 114 facts
+   [RSI] strategy=rsi-gen-14/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-14/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-15] Retuning strategy for 'babi/babi_task_10': accuracy=76.0% (57/75)
+   [RSI-GEN-15] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-15/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=426chars q="Is Julie in the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-15/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-15/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=569chars q="Is Fred in the cinema?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-15/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-15/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-16] Retuning strategy for 'babi/babi_task_10': accuracy=75.0% (60/80)
+   [RSI-GEN-16] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-16/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-16/babi/babi_task_10 src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 36 topics, 114 facts
+   [RSI] strategy=rsi-gen-16/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=623chars q="Is Mary in the park?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-16/babi/babi_task_10 src=bAbI/babi_task_10
+   [UNIFIED] [WRONG] conf=0.90 chose[2]="kitchen" correct[0]="maybe" ctx=699chars q="Is Fred in the cinema?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-17] Retuning strategy for 'babi/babi_task_10': accuracy=74.1% (63/85)
+   [RSI-GEN-17] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-17/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-17/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-17/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-17/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-18] Retuning strategy for 'babi/babi_task_10': accuracy=75.6% (68/90)
+   [RSI-GEN-18] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-18/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-18/babi/babi_task_10 src=bAbI/babi_task_10
+   [Test-Time Train] Knowledge base: 36 topics, 114 facts
+   [RSI] strategy=rsi-gen-18/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI] strategy=rsi-gen-18/babi/babi_task_10 src=bAbI/babi_task_10
+   [RSI-GEN-19] Retuning strategy for 'babi/babi_task_10': accuracy=76.8% (73/95)
+   [RSI-GEN-19] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [  95/95] [OK] Mary travelled to the park.
+Mary travell -> "no" (conf: 0.80)
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 1)
+   ===============================================================
+   [FULL QUESTION]:
+      Fred journeyed to the office.
+      Fred went back to the cinema.
+      Is Fred in the office?
+
+   [CHOICES]:
+      [0] no <- CORRECT
+      [1] yes <- PREDICTED
+      [2] maybe 
+      [3] unknown 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.62
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.80
+
+   [FAILURE ANALYSIS]:
+      Expected: "no"
+      Got:      "yes"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #2 (Question 8)
+   ===============================================================
+   [FULL QUESTION]:
+      Bill is in the kitchen.
+      Julie is either in the school or the cinema.
+      Fred is in the bedroom.
+      Bill is in the school.
+      Julie is either in the bedroom or the office.
+      Fred is in the park.
+      Is Julie in the bedroom?
+
+   [CHOICES]:
+      [0] maybe <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.23
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.90
+
+   [FAILURE ANALYSIS]:
+      Expected: "maybe"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 14)
+   ===============================================================
+   [FULL QUESTION]:
+      Julie journeyed to the bedroom.
+      Julie travelled to the park.
+      Fred is either in the office or the kitchen.
+      Julie travelled to the bedroom.
+      Julie moved to the office.
+      Mary is either in the office or the kitchen.
+      Bill is in the kitchen.
+      Bill is either in the bedroom or the park.
+      Is Mary in the kitchen?
+
+   [CHOICES]:
+      [0] maybe <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.90
+
+   [FAILURE ANALYSIS]:
+      Expected: "maybe"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 15)
+   ===============================================================
+   [FULL QUESTION]:
+      Julie journeyed to the bedroom.
+      Julie travelled to the park.
+      Fred is either in the office or the kitchen.
+      Julie travelled to the bedroom.
+      Julie moved to the office.
+      Mary is either in the office or the kitchen.
+      Bill is in the kitchen.
+      Bill is either in the bedroom or the park.
+      Fred is either in the bedroom or the bedroom.
+      Julie went to the bedroom.
+      Is Mary in the kitchen?
+
+   [CHOICES]:
+      [0] maybe <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.90
+
+   [FAILURE ANALYSIS]:
+      Expected: "maybe"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 16)
+   ===============================================================
+   [FULL QUESTION]:
+      Bill went to the kitchen.
+      Fred is either in the office or the park.
+      Is Fred in the park?
+
+   [CHOICES]:
+      [0] maybe <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.62
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: "maybe"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ... and 17 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   bAbI Task 10 Result: 76.8% accuracy (73/95 correct, 5-shot)
+  [DONE] babi10: 76.8% (73/95) in 0.3s
+
+[EVAL] Running task: babi12
+
+   Running bAbI Task 12 evaluation (95 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 103 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="bedroom" ctx=575chars q="Where is Mary?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   1/95] [X] Daniel and Mary journeyed to the office. -> "bathroom" (conf: 0.25)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bathroom" ctx=662chars q="Where is Sandra?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   2/95] [X] Daniel and Mary journeyed to the office. -> "kitchen" (conf: 0.25)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="bedroom" correct[0]="bedroom" ctx=744chars q="Where is Mary?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   3/95] [OK] Daniel and Mary journeyed to the office. -> "bedroom" (conf: 0.57)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=817chars q="Where is Daniel?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   4/95] [X] Daniel and Mary journeyed to the office. -> "bathroom" (conf: 0.25)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="kitchen" correct[0]="kitchen" ctx=892chars q="Where is John?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [RSI-GEN-1] Retuning strategy for 'babi/babi_task_12': accuracy=40.0% (2/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+   [   5/95] [OK] Daniel and Mary journeyed to the office. -> "kitchen" (conf: 0.57)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_12 src=bAbI/babi_task_12
+   [PIPELINE] [OK] conf=0.30 chose[0]="bathroom" correct[0]="bathroom" src=bAbI q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [PIPELINE] conf 0.30 <= 0.6, falling through
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=572chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[comprehensive=50.0,knowledge=45.0,entity_attr=30.0] q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_12 src=bAbI/babi_task_12
+   [PIPELINE] [WRONG] conf=0.71 chose[1]="bathroom" correct[0]="office" src=bAbI q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [PIPELINE] conf 0.71 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=649chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_12 src=bAbI/babi_task_12
+   [PIPELINE] [WRONG] conf=0.71 chose[1]="bathroom" correct[0]="office" src=bAbI q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [PIPELINE] conf 0.71 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=728chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_12 src=bAbI/babi_task_12
+   [PIPELINE] [WRONG] conf=0.79 chose[1]="bathroom" correct[0]="garden" src=bAbI q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [PIPELINE] conf 0.79 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.57 chose[2]="kitchen" correct[0]="garden" ctx=807chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_12 src=bAbI/babi_task_12
+   [PIPELINE] [WRONG] conf=0.79 chose[1]="bathroom" correct[0]="hallway" src=bAbI q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [PIPELINE] conf 0.79 <= 0.6, falling through
+   [UNIFIED] [WRONG] conf=0.57 chose[1]="bathroom" correct[0]="hallway" ctx=883chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="bathroom" correct[0]="hallway" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Mary and Sandra went to the bathroom.
+Daniel and John journe"
+   [RSI-GEN-2] Retuning strategy for 'babi/babi_task_12': accuracy=50.0% (5/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="bathroom" correct[0]="bathroom" ctx=568chars q="Where is Mary?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-2/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=649chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.34), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.32 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Sandra and Mary moved to the bathroom.
+Sandra and John went "
+   [Test-Time Train] Knowledge base: 42 topics, 172 facts
+   [RSI] strategy=rsi-gen-2/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=730chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.44 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Sandra and Mary moved to the bathroom.
+Sandra and John went "
+   [RSI] strategy=rsi-gen-2/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=804chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="Sandra and Mary moved to the bathroom.
+Sandra and John went "
+   [RSI] strategy=rsi-gen-2/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[1]="bathroom" correct[0]="hallway" ctx=888chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="bathroom" correct[0]="hallway" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Sandra and Mary moved to the bathroom.
+Sandra and John went "
+   [RSI-GEN-3] Retuning strategy for 'babi/babi_task_12': accuracy=60.0% (9/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=1.00 chose[3]="garden" correct[0]="kitchen" ctx=564chars q="Where is John?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-3/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=645chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="hallway" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Sandra and John went to the garden.
+Mary and John moved to t"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=724chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.45 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Sandra and John went to the garden.
+Mary and John moved to t"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="garden" correct[0]="garden" ctx=804chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="Sandra and John went to the garden.
+Mary and John moved to t"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=883chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Sandra and John went to the garden.
+Mary and John moved to t"
+   [RSI-GEN-4] Retuning strategy for 'babi/babi_task_12': accuracy=60.0% (12/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="bedroom" correct[0]="bedroom" ctx=568chars q="Where is Sandra?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-4/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=649chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="garden" correct[0]="garden" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Sandra moved to the bedroom.
+John and Daniel went t"
+   [RSI] strategy=rsi-gen-4/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="kitchen" correct[0]="kitchen" ctx=729chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Sandra moved to the bedroom.
+John and Daniel went t"
+   [Test-Time Train] Knowledge base: 42 topics, 195 facts
+   [RSI] strategy=rsi-gen-4/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="bathroom" correct[0]="bathroom" ctx=813chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Sandra moved to the bedroom.
+John and Daniel went t"
+   [RSI] strategy=rsi-gen-4/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="kitchen" correct[0]="kitchen" ctx=892chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Sandra moved to the bedroom.
+John and Daniel went t"
+   [RSI-GEN-5] Retuning strategy for 'babi/babi_task_12': accuracy=68.0% (17/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="bathroom" correct[0]="bathroom" ctx=570chars q="Where is Sandra?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-5/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=650chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Mary and John travelled to the office.
+John and Sandra moved"
+   [RSI] strategy=rsi-gen-5/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=724chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Mary and John travelled to the office.
+John and Sandra moved"
+   [RSI] strategy=rsi-gen-5/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bathroom" ctx=809chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=15.0,rag=7.8] q="Mary and John travelled to the office.
+John and Sandra moved"
+   [RSI] strategy=rsi-gen-5/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=893chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Mary and John travelled to the office.
+John and Sandra moved"
+   [RSI-GEN-6] Retuning strategy for 'babi/babi_task_12': accuracy=73.3% (22/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=573chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="kitchen" top=[comprehensive=50.0,entity_attr=30.0,knowledge=20.0] q="John and Daniel travelled to the garden.
+Mary and John went "
+   [RSI] strategy=rsi-gen-6/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=647chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="bathroom" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Daniel travelled to the garden.
+Mary and John went "
+   [RSI] strategy=rsi-gen-6/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="garden" correct[0]="garden" ctx=728chars q="Where is John?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Daniel travelled to the garden.
+Mary and John went "
+   [RSI] strategy=rsi-gen-6/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="kitchen" correct[0]="kitchen" ctx=807chars q="Where is Daniel?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [Test-Time Train] Knowledge base: 42 topics, 197 facts
+   [RSI] strategy=rsi-gen-6/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="bathroom" correct[0]="bathroom" ctx=887chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Daniel travelled to the garden.
+Mary and John went "
+   [RSI-GEN-7] Retuning strategy for 'babi/babi_task_12': accuracy=71.4% (25/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=1.00 chose[3]="garden" correct[0]="office" ctx=568chars q="Where is John?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-7/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="garden" correct[0]="garden" ctx=643chars q="Where is John?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-7/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.56 chose[0]="kitchen" correct[0]="kitchen" ctx=722chars q="Where is John?"
+   [UNIFIED] Low conf 0.56 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Mary and John moved to the garden.
+Sandra and John went back"
+   [RSI] strategy=rsi-gen-7/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=796chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.45 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Mary and John moved to the garden.
+Sandra and John went back"
+   [RSI] strategy=rsi-gen-7/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="kitchen" correct[0]="kitchen" ctx=868chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="Mary and John moved to the garden.
+Sandra and John went back"
+   [RSI-GEN-8] Retuning strategy for 'babi/babi_task_12': accuracy=72.5% (29/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [Test-Time Train] Knowledge base: 42 topics, 197 facts
+   [RSI] strategy=rsi-gen-8/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="kitchen" correct[0]="kitchen" ctx=571chars q="Where is John?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-8/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="garden" correct[0]="garden" ctx=651chars q="Where is Daniel?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-8/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.56 chose[0]="hallway" correct[0]="hallway" ctx=725chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.56 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.55 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,entity_attr=15.0,knowledge=8.7] q="Mary and John went to the kitchen.
+Sandra and Daniel travell"
+   [RSI] strategy=rsi-gen-8/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=807chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Mary and John went to the kitchen.
+Sandra and Daniel travell"
+   [RSI] strategy=rsi-gen-8/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[2]="kitchen" correct[0]="bedroom" ctx=890chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="bedroom" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Mary and John went to the kitchen.
+Sandra and Daniel travell"
+   [RSI-GEN-9] Retuning strategy for 'babi/babi_task_12': accuracy=73.3% (33/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="office" correct[0]="office" ctx=568chars q="Where is Mary?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-9/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=644chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Mary went to the office.
+Daniel and John went back "
+   [RSI] strategy=rsi-gen-9/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[2]="kitchen" correct[0]="garden" ctx=729chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Mary went to the office.
+Daniel and John went back "
+   [RSI] strategy=rsi-gen-9/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="hallway" correct[0]="hallway" ctx=813chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Mary went to the office.
+Daniel and John went back "
+   [RSI] strategy=rsi-gen-9/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[1]="bathroom" correct[0]="garden" ctx=896chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="bathroom" correct[0]="garden" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Mary went to the office.
+Daniel and John went back "
+   [RSI-GEN-10] Retuning strategy for 'babi/babi_task_12': accuracy=72.0% (36/50)
+   [RSI-GEN-10] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="office" ctx=565chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=30.0] q="John and Daniel went to the kitchen.
+Daniel and John went to"
+   [RSI] strategy=rsi-gen-10/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=642chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Daniel went to the kitchen.
+Daniel and John went to"
+   [RSI] strategy=rsi-gen-10/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="hallway" correct[0]="hallway" ctx=723chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Daniel went to the kitchen.
+Daniel and John went to"
+   [RSI] strategy=rsi-gen-10/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bathroom" ctx=804chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.45 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="John and Daniel went to the kitchen.
+Daniel and John went to"
+   [RSI] strategy=rsi-gen-10/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="hallway" correct[0]="hallway" ctx=890chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Daniel went to the kitchen.
+Daniel and John went to"
+   [RSI-GEN-11] Retuning strategy for 'babi/babi_task_12': accuracy=72.7% (40/55)
+   [RSI-GEN-11] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=575chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="bedroom" top=[comprehensive=50.0,entity_attr=30.0,knowledge=20.0] q="Sandra and Mary journeyed to the garden.
+John and Sandra jou"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=655chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="kitchen" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Sandra and Mary journeyed to the garden.
+John and Sandra jou"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="bathroom" correct[0]="bathroom" ctx=736chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Sandra and Mary journeyed to the garden.
+John and Sandra jou"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="hallway" correct[0]="hallway" ctx=821chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Sandra and Mary journeyed to the garden.
+John and Sandra jou"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[1]="bathroom" correct[0]="garden" ctx=903chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[1]="bathroom" correct[0]="garden" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Sandra and Mary journeyed to the garden.
+John and Sandra jou"
+   [RSI-GEN-12] Retuning strategy for 'babi/babi_task_12': accuracy=70.0% (42/60)
+   [RSI-GEN-12] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=565chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="bedroom" correct[0]="bedroom" top=[comprehensive=50.0,knowledge=45.0,entity_attr=30.0] q="Sandra and Mary went to the garden.
+John and Daniel went to "
+   [RSI] strategy=rsi-gen-12/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=651chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.47 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=8.0] q="Sandra and Mary went to the garden.
+John and Daniel went to "
+   [RSI] strategy=rsi-gen-12/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=728chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Sandra and Mary went to the garden.
+John and Daniel went to "
+   [RSI] strategy=rsi-gen-12/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="bedroom" correct[0]="bedroom" ctx=806chars q="Where is Daniel?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-12/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bedroom" correct[0]="bedroom" ctx=881chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="bedroom" correct[0]="bedroom" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Sandra and Mary went to the garden.
+John and Daniel went to "
+   [RSI-GEN-13] Retuning strategy for 'babi/babi_task_12': accuracy=72.3% (47/65)
+   [RSI-GEN-13] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=573chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,entity_attr=30.0,knowledge=20.0] q="Daniel and John travelled to the hallway.
+John and Mary went"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=651chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="office" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Daniel and John travelled to the hallway.
+John and Mary went"
+   [Test-Time Train] Knowledge base: 42 topics, 214 facts
+   [RSI] strategy=rsi-gen-13/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=733chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Daniel and John travelled to the hallway.
+John and Mary went"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=812chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.47 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Daniel and John travelled to the hallway.
+John and Mary went"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=892chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Daniel and John travelled to the hallway.
+John and Mary went"
+   [RSI-GEN-14] Retuning strategy for 'babi/babi_task_12': accuracy=72.9% (51/70)
+   [RSI-GEN-14] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=1.00 chose[0]="hallway" correct[0]="hallway" ctx=569chars q="Where is Mary?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-14/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=648chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Sandra travelled to the bedroom.
+John and Mary went"
+   [RSI] strategy=rsi-gen-14/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=726chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Sandra travelled to the bedroom.
+John and Mary went"
+   [RSI] strategy=rsi-gen-14/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="hallway" correct[0]="hallway" ctx=807chars q="Where is John?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Sandra travelled to the bedroom.
+John and Mary went"
+   [RSI] strategy=rsi-gen-14/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[3]="garden" correct[0]="bedroom" ctx=884chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="bedroom" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Sandra travelled to the bedroom.
+John and Mary went"
+   [RSI-GEN-15] Retuning strategy for 'babi/babi_task_12': accuracy=73.3% (55/75)
+   [RSI-GEN-15] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-15/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=562chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=30.0,rag=8.0] q="John and Mary moved to the office.
+Mary and John went to the"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=641chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Mary moved to the office.
+Mary and John went to the"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="bathroom" correct[0]="bathroom" ctx=722chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="bathroom" correct[0]="bathroom" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="John and Mary moved to the office.
+Mary and John went to the"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[2]="kitchen" correct[0]="bedroom" ctx=800chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="bedroom" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="John and Mary moved to the office.
+Mary and John went to the"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="kitchen" correct[0]="kitchen" ctx=877chars q="Where is John?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="John and Mary moved to the office.
+Mary and John went to the"
+   [RSI-GEN-16] Retuning strategy for 'babi/babi_task_12': accuracy=73.8% (59/80)
+   [RSI-GEN-16] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="office" ctx=575chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[knowledge=45.0,entity_attr=30.0,rag=8.0] q="Sandra and John travelled to the kitchen.
+Sandra and John we"
+   [RSI] strategy=rsi-gen-16/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=1.00 chose[1]="bathroom" correct[0]="kitchen" ctx=654chars q="Where is Mary?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-16/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.56 chose[0]="hallway" correct[0]="hallway" ctx=735chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.56 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Sandra and John travelled to the kitchen.
+Sandra and John we"
+   [Test-Time Train] Knowledge base: 42 topics, 214 facts
+   [RSI] strategy=rsi-gen-16/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[3]="garden" correct[0]="bathroom" ctx=815chars q="Where is John?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="bathroom" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Sandra and John travelled to the kitchen.
+Sandra and John we"
+   [RSI] strategy=rsi-gen-16/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="office" correct[0]="office" ctx=892chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="office" correct[0]="office" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Sandra and John travelled to the kitchen.
+Sandra and John we"
+   [RSI-GEN-17] Retuning strategy for 'babi/babi_task_12': accuracy=72.9% (62/85)
+   [RSI-GEN-17] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=576chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=30.0,rag=8.0] q="Daniel and John journeyed to the bedroom.
+Sandra and John tr"
+   [RSI] strategy=rsi-gen-17/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=656chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="garden" correct[0]="garden" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Daniel and John journeyed to the bedroom.
+Sandra and John tr"
+   [RSI] strategy=rsi-gen-17/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="bedroom" correct[0]="bedroom" ctx=734chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="bedroom" correct[0]="bedroom" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Daniel and John journeyed to the bedroom.
+Sandra and John tr"
+   [Test-Time Train] Knowledge base: 42 topics, 214 facts
+   [RSI] strategy=rsi-gen-17/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[3]="garden" correct[0]="hallway" ctx=815chars q="Where is John?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="hallway" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Daniel and John journeyed to the bedroom.
+Sandra and John tr"
+   [RSI] strategy=rsi-gen-17/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="hallway" correct[0]="hallway" ctx=897chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Daniel and John journeyed to the bedroom.
+Sandra and John tr"
+   [RSI-GEN-18] Retuning strategy for 'babi/babi_task_12': accuracy=73.3% (66/90)
+   [RSI-GEN-18] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="hallway" correct[0]="hallway" ctx=572chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="hallway" correct[0]="hallway" top=[knowledge=45.0,entity_attr=30.0,rag=8.0] q="Daniel and John moved to the kitchen.
+Mary and Sandra journe"
+   [RSI] strategy=rsi-gen-18/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=656chars q="Where is Sandra?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.50 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,comprehensive=50.0,entity_attr=15.0] q="Daniel and John moved to the kitchen.
+Mary and Sandra journe"
+   [RSI] strategy=rsi-gen-18/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=741chars q="Where is John?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.47 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Daniel and John moved to the kitchen.
+Mary and Sandra journe"
+   [Test-Time Train] Knowledge base: 42 topics, 214 facts
+   [RSI] strategy=rsi-gen-18/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [OK] conf=0.57 chose[0]="bedroom" correct[0]="bedroom" ctx=826chars q="Where is Mary?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=1.00 path=expert-high chose[0]="bedroom" correct[0]="bedroom" top=[comprehensive=50.0,knowledge=45.0,entity_attr=15.0] q="Daniel and John moved to the kitchen.
+Mary and Sandra journe"
+   [RSI] strategy=rsi-gen-18/babi/babi_task_12 src=bAbI/babi_task_12
+   [UNIFIED] [WRONG] conf=0.57 chose[3]="garden" correct[0]="office" ctx=906chars q="Where is Daniel?"
+   [UNIFIED] Low conf 0.57 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[3]="garden" correct[0]="office" top=[comprehensive=50.0,knowledge=20.0,entity_attr=15.0] q="Daniel and John moved to the kitchen.
+Mary and Sandra journe"
+   [RSI-GEN-19] Retuning strategy for 'babi/babi_task_12': accuracy=73.7% (70/95)
+   [RSI-GEN-19] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [  95/95] [X] Daniel and John moved to the kitchen.
+Ma -> "garden" (conf: 1.00)
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 1)
+   ===============================================================
+   [FULL QUESTION]:
+      Daniel and Mary journeyed to the office.
+      Mary and Sandra went back to the bedroom.
+      Where is Mary?
+
+   [CHOICES]:
+      [0] bedroom <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   EntityAttribute: weight=1.00
+      |   Attention: weight=0.40
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.95 Pathos=0.30 (from EntityAttribute)
+      +-- Final Confidence: 0.25
+
+   [FAILURE ANALYSIS]:
+      Expected: "bedroom"
+      Got:      "bathroom"
+      Suggestion: May need deeper transitive reasoning chains
+
+   ===============================================================
+   Wrong Answer #2 (Question 2)
+   ===============================================================
+   [FULL QUESTION]:
+      Daniel and Mary journeyed to the office.
+      Mary and Sandra went back to the bedroom.
+      Daniel and Sandra journeyed to the hallway.
+      Mary and Sandra travelled to the bathroom.
+      Where is Sandra?
+
+   [CHOICES]:
+      [0] bathroom <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.75
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.25
+
+   [FAILURE ANALYSIS]:
+      Expected: "bathroom"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 4)
+   ===============================================================
+   [FULL QUESTION]:
+      Daniel and Mary journeyed to the office.
+      Mary and Sandra went back to the bedroom.
+      Daniel and Sandra journeyed to the hallway.
+      Mary and Sandra travelled to the bathroom.
+      Mary and John travelled to the kitchen.
+      Mary and Daniel journeyed to the bedroom.
+      John and Daniel moved to the office.
+      John and Mary moved to the hallway.
+      Where is Daniel?
+
+   [CHOICES]:
+      [0] office <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.62
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.25
+
+   [FAILURE ANALYSIS]:
+      Expected: "office"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 9)
+   ===============================================================
+   [FULL QUESTION]:
+      Mary and Sandra went to the bathroom.
+      Daniel and John journeyed to the hallway.
+      Mary and John moved to the bedroom.
+      John and Sandra travelled to the office.
+      Sandra and Mary journeyed to the kitchen.
+      Mary and Daniel moved to the office.
+      John and Sandra travelled to the garden.
+      Mary and Daniel moved to the hallway.
+      Where is Sandra?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.62
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 10)
+   ===============================================================
+   [FULL QUESTION]:
+      Mary and Sandra went to the bathroom.
+      Daniel and John journeyed to the hallway.
+      Mary and John moved to the bedroom.
+      John and Sandra travelled to the office.
+      Sandra and Mary journeyed to the kitchen.
+      Mary and Daniel moved to the office.
+      John and Sandra travelled to the garden.
+      Mary and Daniel moved to the hallway.
+      Mary and Sandra went to the bathroom.
+      Sandra and Mary moved to the hallway.
+      Where is Mary?
+
+   [CHOICES]:
+      [0] hallway <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.60
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: "hallway"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ... and 20 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   bAbI Task 12 Result: 73.7% accuracy (70/95 correct, 5-shot)
+  [DONE] babi12: 73.7% (70/95) in 3.6s
+
+[EVAL] Running task: babi18
+
+   Running bAbI Task 18 evaluation (95 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 275 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_18
+   [   1/95] [OK] The box fits inside the chest.
+The choco -> "no" (conf: 0.95)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_18
+   [   2/95] [OK] The box fits inside the chest.
+The choco -> "no" (conf: 0.95)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_18
+   [   3/95] [OK] The box fits inside the chest.
+The choco -> "no" (conf: 0.90)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_18
+   [   4/95] [OK] The box fits inside the chest.
+The choco -> "yes" (conf: 0.95)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_18
+   [RSI-GEN-1] Retuning strategy for 'babi/babi_task_18': accuracy=100.0% (5/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+   [   5/95] [OK] The box fits inside the chest.
+The choco -> "no" (conf: 0.50)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_18 src=bAbI/babi_task_18
+   [PIPELINE] [WRONG] conf=0.87 chose[2]="maybe" correct[0]="yes" src=bAbI q="The box is bigger than the suitcase.
+The suitcase fits insid"
+   [PIPELINE] conf 0.87 <= 0.6, falling through
+   [Test-Time Train] Knowledge base: 52 topics, 233 facts
+   [RSI] strategy=rsi-gen-1/babi/babi_task_18 src=bAbI/babi_task_18
+   [PIPELINE] [WRONG] conf=0.87 chose[2]="maybe" correct[0]="yes" src=bAbI q="The box is bigger than the suitcase.
+The suitcase fits insid"
+   [PIPELINE] conf 0.87 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_18 src=bAbI/babi_task_18
+   [PIPELINE] [WRONG] conf=0.87 chose[2]="maybe" correct[0]="yes" src=bAbI q="The box is bigger than the suitcase.
+The suitcase fits insid"
+   [PIPELINE] conf 0.87 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_18 src=bAbI/babi_task_18
+   [PIPELINE] [WRONG] conf=0.87 chose[2]="maybe" correct[0]="yes" src=bAbI q="The box is bigger than the suitcase.
+The suitcase fits insid"
+   [PIPELINE] conf 0.87 <= 0.6, falling through
+   [RSI] strategy=rsi-gen-1/babi/babi_task_18 src=bAbI/babi_task_18
+   [PIPELINE] [WRONG] conf=0.88 chose[2]="maybe" correct[0]="no" src=bAbI q="The box is bigger than the suitcase.
+The suitcase fits insid"
+   [PIPELINE] conf 0.88 <= 0.6, falling through
+   [RSI-GEN-2] Retuning strategy for 'babi/babi_task_18': accuracy=100.0% (10/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-2/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-2/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-2/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-2/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-3] Retuning strategy for 'babi/babi_task_18': accuracy=93.3% (14/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-3/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-3/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-3/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-3/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-4] Retuning strategy for 'babi/babi_task_18': accuracy=75.0% (15/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-4/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-4/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-4/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-4/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-5] Retuning strategy for 'babi/babi_task_18': accuracy=72.0% (18/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-5/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-5/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-5/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-5/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-6] Retuning strategy for 'babi/babi_task_18': accuracy=73.3% (22/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-6/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-6/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-6/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-6/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-7] Retuning strategy for 'babi/babi_task_18': accuracy=68.6% (24/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-7/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-7/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-7/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-7/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-8] Retuning strategy for 'babi/babi_task_18': accuracy=72.5% (29/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-8/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-8/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-8/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-8/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-9] Retuning strategy for 'babi/babi_task_18': accuracy=71.1% (32/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-9/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-9/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-9/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-9/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-10] Retuning strategy for 'babi/babi_task_18': accuracy=74.0% (37/50)
+   [RSI-GEN-10] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-10/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-10/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-10/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-10/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-11] Retuning strategy for 'babi/babi_task_18': accuracy=70.9% (39/55)
+   [RSI-GEN-11] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-11/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-11/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-11/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-11/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-12] Retuning strategy for 'babi/babi_task_18': accuracy=70.0% (42/60)
+   [RSI-GEN-12] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-12/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-12/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-12/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-12/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-13] Retuning strategy for 'babi/babi_task_18': accuracy=72.3% (47/65)
+   [RSI-GEN-13] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-13/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-13/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-13/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-13/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-14] Retuning strategy for 'babi/babi_task_18': accuracy=74.3% (52/70)
+   [RSI-GEN-14] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-14/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-14/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-14/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-14/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-15] Retuning strategy for 'babi/babi_task_18': accuracy=73.3% (55/75)
+   [RSI-GEN-15] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-15/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-15/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-15/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-15/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-15/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-16] Retuning strategy for 'babi/babi_task_18': accuracy=75.0% (60/80)
+   [RSI-GEN-16] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-16/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-16/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-16/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-16/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-17] Retuning strategy for 'babi/babi_task_18': accuracy=75.3% (64/85)
+   [RSI-GEN-17] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_18 src=bAbI/babi_task_18
+   [Test-Time Train] Knowledge base: 52 topics, 234 facts
+   [RSI] strategy=rsi-gen-17/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-17/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-17/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-17/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-18] Retuning strategy for 'babi/babi_task_18': accuracy=76.7% (69/90)
+   [RSI-GEN-18] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-18/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-18/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-18/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI] strategy=rsi-gen-18/babi/babi_task_18 src=bAbI/babi_task_18
+   [RSI-GEN-19] Retuning strategy for 'babi/babi_task_18': accuracy=76.8% (73/95)
+   [RSI-GEN-19] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [  95/95] [X] The box of chocolates is bigger than the -> "no" (conf: 0.50)
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 12)
+   ===============================================================
+   [FULL QUESTION]:
+      The suitcase is bigger than the box of chocolates.
+      The container fits inside the suitcase.
+      The suitcase is bigger than the chocolate.
+      The suitcase is bigger than the box.
+      The box is bigger than the box of chocolates.
+      Does the box of chocolates fit in the suitcase?
+
+   [CHOICES]:
+      [0] yes <- CORRECT
+      [1] no <- PREDICTED
+      [2] maybe 
+      [3] unknown 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.24
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.50
+
+   [FAILURE ANALYSIS]:
+      Expected: "yes"
+      Got:      "no"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #2 (Question 16)
+   ===============================================================
+   [FULL QUESTION]:
+      The container is bigger than the suitcase.
+      The chest fits inside the box.
+      The chest is bigger than the box of chocolates.
+      The box is bigger than the chocolate.
+      The container is bigger than the suitcase.
+      Is the box bigger than the box of chocolates?
+
+   [CHOICES]:
+      [0] yes <- CORRECT
+      [1] no <- PREDICTED
+      [2] maybe 
+      [3] unknown 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.24
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.50
+
+   [FAILURE ANALYSIS]:
+      Expected: "yes"
+      Got:      "no"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 17)
+   ===============================================================
+   [FULL QUESTION]:
+      The container is bigger than the suitcase.
+      The chest fits inside the box.
+      The chest is bigger than the box of chocolates.
+      The box is bigger than the chocolate.
+      The container is bigger than the suitcase.
+      Does the box of chocolates fit in the box?
+
+   [CHOICES]:
+      [0] yes <- CORRECT
+      [1] no <- PREDICTED
+      [2] maybe 
+      [3] unknown 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.24
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.50
+
+   [FAILURE ANALYSIS]:
+      Expected: "yes"
+      Got:      "no"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 18)
+   ===============================================================
+   [FULL QUESTION]:
+      The container is bigger than the suitcase.
+      The chest fits inside the box.
+      The chest is bigger than the box of chocolates.
+      The box is bigger than the chocolate.
+      The container is bigger than the suitcase.
+      Does the box of chocolates fit in the box?
+
+   [CHOICES]:
+      [0] yes <- CORRECT
+      [1] no <- PREDICTED
+      [2] maybe 
+      [3] unknown 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.24
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.50
+
+   [FAILURE ANALYSIS]:
+      Expected: "yes"
+      Got:      "no"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 20)
+   ===============================================================
+   [FULL QUESTION]:
+      The container is bigger than the suitcase.
+      The chest fits inside the box.
+      The chest is bigger than the box of chocolates.
+      The box is bigger than the chocolate.
+      The container is bigger than the suitcase.
+      Is the box bigger than the box of chocolates?
+
+   [CHOICES]:
+      [0] yes <- CORRECT
+      [1] no <- PREDICTED
+      [2] maybe 
+      [3] unknown 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.24
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.50
+
+   [FAILURE ANALYSIS]:
+      Expected: "yes"
+      Got:      "no"
+      Suggestion: May need more training data or better embeddings
+
+   ... and 17 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   bAbI Task 18 Result: 76.8% accuracy (73/95 correct, 5-shot)
+  [DONE] babi18: 76.8% (73/95) in 0.0s
+
+[EVAL] Running task: babi20
+
+   Running bAbI Task 20 evaluation (95 REAL questions from ../benchmarks/data)...
+   AI Model: 0 training iterations, 370 samples seen
+   Few-shot: 5-shot (first 5 questions used as exemplars)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=526chars q="Why did antoine get the football?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [Test-Time Train] Knowledge base: 61 topics, 247 facts
+   [   1/95] [OK] Jason is thirsty.
+Antoine is bored.
+Jaso -> "bored" (conf: 1.00)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=553chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   2/95] [OK] Jason is thirsty.
+Antoine is bored.
+Jaso -> "hungry" (conf: 1.00)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=580chars q="Why did jason get the milk?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   3/95] [OK] Jason is thirsty.
+Antoine is bored.
+Jaso -> "thirsty" (conf: 1.00)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=608chars q="Why did sumit get the apple?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [   4/95] [OK] Jason is thirsty.
+Antoine is bored.
+Jaso -> "hungry" (conf: 1.00)
+   [RSI] strategy=seed:structured-reasoning src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=625chars q="Where will yann go?"
+   [UNIFIED] Committing (conf >= 0.00)
+   [RSI-GEN-1] Retuning strategy for 'babi/babi_task_20': accuracy=100.0% (5/5)
+   [RSI-GEN-1] New strategy: pipeline=true/0.6 unified=true/0.7 multi_expert=true passes=3
+   [   5/95] [OK] Jason is thirsty.
+Antoine is bored.
+Jaso -> "kitchen" (conf: 0.25)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_20 src=bAbI/babi_task_20
+   [PIPELINE] [WRONG] conf=0.72 chose[1]="bathroom" correct[0]="thirsty" src=bAbI q="Jason is thirsty.
+Antoine is bored.
+Jason went to the kitche"
+   [PIPELINE] conf 0.72 <= 0.6, falling through
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=656chars q="Why did yann go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_20 src=bAbI/babi_task_20
+   [PIPELINE] [WRONG] conf=0.74 chose[1]="bathroom" correct[0]="kitchen" src=bAbI q="Yann is thirsty.
+Where will yann go?"
+   [PIPELINE] conf 0.74 <= 0.6, falling through
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=394chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.37 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Yann is thirsty.
+Where will yann go?"
+   [RSI] strategy=rsi-gen-1/babi/babi_task_20 src=bAbI/babi_task_20
+   [PIPELINE] [WRONG] conf=0.69 chose[1]="bathroom" correct[0]="thirsty" src=bAbI q="Yann is thirsty.
+Yann journeyed to the kitchen.
+Why did yann"
+   [PIPELINE] conf 0.69 <= 0.6, falling through
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=425chars q="Why did yann go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_20 src=bAbI/babi_task_20
+   [PIPELINE] [WRONG] conf=0.76 chose[1]="bathroom" correct[0]="thirsty" src=bAbI q="Yann is thirsty.
+Yann journeyed to the kitchen.
+Yann took th"
+   [PIPELINE] conf 0.76 <= 0.6, falling through
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=451chars q="Why did yann get the milk?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-1/babi/babi_task_20 src=bAbI/babi_task_20
+   [PIPELINE] [WRONG] conf=0.81 chose[1]="bathroom" correct[0]="kitchen" src=bAbI q="Yann is thirsty.
+Yann journeyed to the kitchen.
+Yann took th"
+   [PIPELINE] conf 0.81 <= 0.6, falling through
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=468chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Yann is thirsty.
+Yann journeyed to the kitchen.
+Yann took th"
+   [RSI-GEN-2] Retuning strategy for 'babi/babi_task_20': accuracy=100.0% (10/10)
+   [RSI] Pipeline never commits (rate=0% after 10 questions) ΓåÆ disabled
+   [RSI-GEN-2] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-2/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=486chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Yann is thirsty.
+Yann journeyed to the kitchen.
+Yann took th"
+   [RSI] strategy=rsi-gen-2/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=519chars q="Why did antoine go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-2/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=536chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.8] q="Yann is thirsty.
+Yann journeyed to the kitchen.
+Yann took th"
+   [RSI] strategy=rsi-gen-2/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=568chars q="Why did jason go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-2/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=595chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-3] Retuning strategy for 'babi/babi_task_20': accuracy=93.3% (14/15)
+   [RSI-GEN-3] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-3/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=626chars q="Why did jason get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-3/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=662chars q="Why did antoine get the football?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [Test-Time Train] Knowledge base: 66 topics, 304 facts
+   [RSI] strategy=rsi-gen-3/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=397chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.34), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.30 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Antoine is thirsty.
+Where will antoine go?"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=414chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.32), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.29 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Antoine is thirsty.
+Sumit is hungry.
+Where will sumit go?"
+   [RSI] strategy=rsi-gen-3/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=430chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.55 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Antoine is thirsty.
+Sumit is hungry.
+Jason is bored.
+Where w"
+   [RSI-GEN-4] Retuning strategy for 'babi/babi_task_20': accuracy=90.0% (18/20)
+   [RSI-GEN-4] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-4/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="bedroom" ctx=445chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.34), using unified answer[1] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.30 path=unified-tiebreak chose[1]="bathroom" correct[0]="bedroom" top=[knowledge=11.4,rag=7.8,mha=5.0] q="Antoine is thirsty.
+Sumit is hungry.
+Jason is bored.
+Yann is"
+   [RSI] strategy=rsi-gen-4/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=476chars q="Why did yann go to the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-4/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=502chars q="Why did jason go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [Test-Time Train] Knowledge base: 67 topics, 316 facts
+   [RSI] strategy=rsi-gen-4/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=536chars q="Why did antoine go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-4/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=565chars q="Why did antoine get the milk?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-5] Retuning strategy for 'babi/babi_task_20': accuracy=88.0% (22/25)
+   [RSI-GEN-5] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-5/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=593chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-5/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=624chars q="Why did sumit get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-5/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=652chars q="Why did yann get the pajamas?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-5/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=686chars q="Why did jason get the football?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-5/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=394chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.32), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.29 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Yann is thirsty.
+Where will yann go?"
+   [RSI-GEN-6] Retuning strategy for 'babi/babi_task_20': accuracy=90.0% (27/30)
+   [RSI-GEN-6] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-6/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=425chars q="Why did yann go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-6/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=451chars q="Why did yann get the milk?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [Test-Time Train] Knowledge base: 68 topics, 333 facts
+   [RSI] strategy=rsi-gen-6/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=467chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Yann is thirsty.
+Yann travelled to the kitchen.
+Yann took th"
+   [RSI] strategy=rsi-gen-6/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=484chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Yann is thirsty.
+Yann travelled to the kitchen.
+Yann took th"
+   [RSI] strategy=rsi-gen-6/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=516chars q="Why did jason go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-7] Retuning strategy for 'babi/babi_task_20': accuracy=88.6% (31/35)
+   [RSI-GEN-7] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-7/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=547chars q="Why did sumit go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-7/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=578chars q="Why did sumit get the football?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-7/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=606chars q="Why did jason get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-7/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bedroom" ctx=624chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=1.00 path=expert-high chose[2]="kitchen" correct[0]="bedroom" top=[knowledge=45.0,entity_attr=15.0,rag=7.7] q="Yann is thirsty.
+Yann travelled to the kitchen.
+Yann took th"
+   [Test-Time Train] Knowledge base: 68 topics, 333 facts
+   [RSI] strategy=rsi-gen-7/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=658chars q="Why did antoine go to the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-8] Retuning strategy for 'babi/babi_task_20': accuracy=87.5% (35/40)
+   [RSI-GEN-8] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-8/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=695chars q="Why did antoine get the pajamas?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-8/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=393chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.48 path=expert-high chose[2]="kitchen" correct[0]="garden" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Sumit is bored.
+Where will sumit go?"
+   [RSI] strategy=rsi-gen-8/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=412chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.27), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.26 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Sumit is bored.
+Antoine is hungry.
+Where will antoine go?"
+   [RSI] strategy=rsi-gen-8/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=427chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.29), using unified answer[1] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.27 path=unified-tiebreak chose[1]="bathroom" correct[0]="garden" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Sumit is bored.
+Antoine is hungry.
+Yann is bored.
+Where will"
+   [RSI] strategy=rsi-gen-8/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=458chars q="Why did sumit go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-9] Retuning strategy for 'babi/babi_task_20': accuracy=84.4% (38/45)
+   [RSI-GEN-9] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-9/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=475chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.66 path=expert-high chose[3]="garden" correct[0]="kitchen" top=[knowledge=15.2,entity_attr=15.0,rag=7.8] q="Sumit is bored.
+Antoine is hungry.
+Yann is bored.
+Sumit jour"
+   [RSI] strategy=rsi-gen-9/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=511chars q="Why did sumit get the football?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-9/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=545chars q="Why did antoine go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-9/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=570chars q="Why did yann go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-9/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=597chars q="Why did jason go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-10] Retuning strategy for 'babi/babi_task_20': accuracy=84.0% (42/50)
+   [RSI-GEN-10] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-10/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=627chars q="Why did antoine get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-10/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bedroom" ctx=393chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.34), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.30 path=unified-tiebreak chose[2]="kitchen" correct[0]="bedroom" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Jason is tired.
+Where will jason go?"
+   [RSI] strategy=rsi-gen-10/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=410chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.30), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.28 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Jason is tired.
+Yann is thirsty.
+Where will yann go?"
+   [Test-Time Train] Knowledge base: 69 topics, 340 facts
+   [RSI] strategy=rsi-gen-10/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=427chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.27), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.26 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Jason is tired.
+Yann is thirsty.
+Sumit is hungry.
+Where will"
+   [RSI] strategy=rsi-gen-10/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=458chars q="Why did yann go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-11] Retuning strategy for 'babi/babi_task_20': accuracy=83.6% (46/55)
+   [RSI-GEN-11] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-11/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=485chars q="Why did jason go to the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-11/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=512chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-11/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=531chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.49 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=50.0,entity_attr=15.0,rag=7.9] q="Jason is tired.
+Yann is thirsty.
+Sumit is hungry.
+Yann trave"
+   [RSI] strategy=rsi-gen-11/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=560chars q="Why did antoine go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-11/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=589chars q="Why did jason get the pajamas?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-12] Retuning strategy for 'babi/babi_task_20': accuracy=85.0% (51/60)
+   [RSI-GEN-12] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-12/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=618chars q="Why did antoine get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [Test-Time Train] Knowledge base: 69 topics, 341 facts
+   [RSI] strategy=rsi-gen-12/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=643chars q="Why did yann get the milk?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-12/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bedroom" ctx=393chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.32), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.29 path=unified-tiebreak chose[2]="kitchen" correct[0]="bedroom" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Jason is tired.
+Where will jason go?"
+   [RSI] strategy=rsi-gen-12/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=421chars q="Why did jason go to the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-12/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=440chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.27), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.26 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Jason is tired.
+Jason moved to the bedroom.
+Antoine is hungr"
+   [RSI-GEN-13] Retuning strategy for 'babi/babi_task_20': accuracy=84.6% (55/65)
+   [RSI-GEN-13] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-13/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=456chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.26), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.25 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Jason is tired.
+Jason moved to the bedroom.
+Antoine is hungr"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=483chars q="Why did yann go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-13/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=501chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [OK] conf=0.48 path=expert-high chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=45.0,entity_attr=15.0,rag=7.9] q="Jason is tired.
+Jason moved to the bedroom.
+Antoine is hungr"
+   [RSI] strategy=rsi-gen-13/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=530chars q="Why did antoine go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-13/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=560chars q="Why did jason get the pajamas?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-14] Retuning strategy for 'babi/babi_task_20': accuracy=85.7% (60/70)
+   [RSI-GEN-14] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-14/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=592chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-14/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=619chars q="Why did yann get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-14/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="thirsty" correct[0]="thirsty" ctx=649chars q="Why did sumit get the milk?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-14/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bedroom" ctx=392chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.30), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.28 path=unified-tiebreak chose[2]="kitchen" correct[0]="bedroom" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Yann is tired.
+Where will yann go?"
+   [RSI] strategy=rsi-gen-14/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=408chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.29), using unified answer[1] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.27 path=unified-tiebreak chose[1]="bathroom" correct[0]="garden" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Yann is tired.
+Jason is bored.
+Where will jason go?"
+   [RSI-GEN-15] Retuning strategy for 'babi/babi_task_20': accuracy=84.0% (63/75)
+   [RSI-GEN-15] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [Test-Time Train] Knowledge base: 69 topics, 343 facts
+   [RSI] strategy=rsi-gen-15/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="garden" ctx=426chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.27), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.26 path=unified-tiebreak chose[2]="kitchen" correct[0]="garden" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Yann is tired.
+Jason is bored.
+Antoine is bored.
+Where will "
+   [RSI] strategy=rsi-gen-15/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=455chars q="Why did antoine go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-15/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=487chars q="Why did antoine get the football?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-15/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=504chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [MULTI-EXPERT] [WRONG] conf=0.67 path=expert-high chose[3]="garden" correct[0]="kitchen" top=[knowledge=15.7,entity_attr=15.0,rag=7.8] q="Yann is tired.
+Jason is bored.
+Antoine is bored.
+Antoine mov"
+   [RSI] strategy=rsi-gen-15/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=536chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-16] Retuning strategy for 'babi/babi_task_20': accuracy=82.5% (66/80)
+   [RSI-GEN-16] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-16/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=567chars q="Why did yann go to the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-16/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=598chars q="Why did sumit get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-16/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=627chars q="Why did yann get the pajamas?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [Test-Time Train] Knowledge base: 69 topics, 343 facts
+   [RSI] strategy=rsi-gen-16/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=654chars q="Why did jason go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-16/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[2]="kitchen" correct[0]="bedroom" ctx=393chars q="Where will jason go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.29), using unified answer[2] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.27 path=unified-tiebreak chose[2]="kitchen" correct[0]="bedroom" top=[knowledge=20.0,rag=7.9,mha=1.2] q="Jason is tired.
+Where will jason go?"
+   [RSI-GEN-17] Retuning strategy for 'babi/babi_task_20': accuracy=82.4% (70/85)
+   [RSI-GEN-17] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-17/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=425chars q="Why did jason go to the bedroom?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-17/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=442chars q="Where will sumit go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.26), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.26 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Jason is tired.
+Jason travelled to the bedroom.
+Sumit is hun"
+   [RSI] strategy=rsi-gen-17/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=0.25 chose[0]="kitchen" correct[0]="kitchen" ctx=461chars q="Where will antoine go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.25), using unified answer[0] conf=0.25
+   [MULTI-EXPERT] [OK] conf=0.25 path=unified-tiebreak chose[0]="kitchen" correct[0]="kitchen" top=[knowledge=20.0,rag=7.9,mha=5.0] q="Jason is tired.
+Jason travelled to the bedroom.
+Sumit is hun"
+   [RSI] strategy=rsi-gen-17/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [WRONG] conf=0.25 chose[1]="bathroom" correct[0]="garden" ctx=476chars q="Where will yann go?"
+   [UNIFIED] Low conf 0.25 < 0.70, falling through to multi-expert
+   [TIEBREAK] Multi-expert uncertain (prob=0.25), using unified answer[1] conf=0.25
+   [MULTI-EXPERT] [WRONG] conf=0.25 path=unified-tiebreak chose[1]="bathroom" correct[0]="garden" top=[knowledge=20.0,rag=7.8,mha=5.0] q="Jason is tired.
+Jason travelled to the bedroom.
+Sumit is hun"
+   [Test-Time Train] Knowledge base: 69 topics, 343 facts
+   [RSI] strategy=rsi-gen-17/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=506chars q="Why did yann go to the garden?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-18] Retuning strategy for 'babi/babi_task_20': accuracy=82.2% (74/90)
+   [RSI-GEN-18] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [RSI] strategy=rsi-gen-18/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=538chars q="Why did sumit go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-18/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=565chars q="Why did sumit get the apple?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-18/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="hungry" correct[0]="hungry" ctx=599chars q="Why did antoine go to the kitchen?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-18/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="tired" correct[0]="tired" ctx=628chars q="Why did jason get the pajamas?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI] strategy=rsi-gen-18/babi/babi_task_20 src=bAbI/babi_task_20
+   [UNIFIED] [OK] conf=1.00 chose[0]="bored" correct[0]="bored" ctx=663chars q="Why did yann get the football?"
+   [UNIFIED] Committing (conf >= 0.70)
+   [RSI-GEN-19] Retuning strategy for 'babi/babi_task_20': accuracy=83.2% (79/95)
+   [RSI-GEN-19] New strategy: pipeline=false/0.6 unified=true/0.7 multi_expert=true passes=3
+   [  95/95] [OK] Jason is tired.
+Jason travelled to the b -> "bored" (conf: 1.00)
+
+   +-------------------------------------------------------------+
+   | VERBOSE DEBUG: Analyzing 5 wrong answers                    |
+   +-------------------------------------------------------------+
+
+   ===============================================================
+   Wrong Answer #1 (Question 11)
+   ===============================================================
+   [FULL QUESTION]:
+      Yann is thirsty.
+      Yann journeyed to the kitchen.
+      Yann took the milk there.
+      Jason is hungry.
+      Antoine is bored.
+      Where will antoine go?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.45
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #2 (Question 20)
+   ===============================================================
+   [FULL QUESTION]:
+      Antoine is thirsty.
+      Sumit is hungry.
+      Jason is bored.
+      Where will jason go?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.56
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.55
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #3 (Question 21)
+   ===============================================================
+   [FULL QUESTION]:
+      Antoine is thirsty.
+      Sumit is hungry.
+      Jason is bored.
+      Yann is tired.
+      Where will yann go?
+
+   [CHOICES]:
+      [0] bedroom <- CORRECT
+      [1] bathroom <- PREDICTED
+      [2] kitchen 
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.50
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 0.30
+
+   [FAILURE ANALYSIS]:
+      Expected: "bedroom"
+      Got:      "bathroom"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #4 (Question 33)
+   ===============================================================
+   [FULL QUESTION]:
+      Yann is thirsty.
+      Yann travelled to the kitchen.
+      Yann took the milk there.
+      Sumit is bored.
+      Where will sumit go?
+
+   [CHOICES]:
+      [0] garden <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   EntityAttribute: weight=0.50
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: "garden"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ===============================================================
+   Wrong Answer #5 (Question 39)
+   ===============================================================
+   [FULL QUESTION]:
+      Yann is thirsty.
+      Yann travelled to the kitchen.
+      Yann took the milk there.
+      Sumit is bored.
+      Jason is hungry.
+      Jason journeyed to the kitchen.
+      Sumit journeyed to the garden.
+      Sumit took the football there.
+      Jason took the apple there.
+      Antoine is tired.
+      Where will antoine go?
+
+   [CHOICES]:
+      [0] bedroom <- CORRECT
+      [1] bathroom 
+      [2] kitchen <- PREDICTED
+      [3] garden 
+
+   [ARCHITECTURE REASONING TRACE]:
+      +-- MoE Expert Routing:
+      |   Attention: weight=1.00
+      |   Semantic: weight=0.20
+      +-- Vortex Cycle: 1->2->4->8->7->5->1
+      +-- Sacred Checkpoints: 3, 6, 9
+      +-- ELP Balance: Ethos=0.70 Logos=0.80 Pathos=0.60 (from Attention)
+      +-- Final Confidence: 1.00
+
+   [FAILURE ANALYSIS]:
+      Expected: "bedroom"
+      Got:      "kitchen"
+      Suggestion: May need more training data or better embeddings
+
+   ... and 11 more wrong answers (showing first 5)
+
+   ===============================================================
+
+   -----------------------------------------------------------
+   bAbI Task 20 Result: 83.2% accuracy (79/95 correct, 5-shot)
+  [DONE] babi20: 83.2% (79/95) in 1.7s
+
++===============================================================+
+|                    EVALUATION RESULTS                         |
++===============================================================+
+| Task                 | Score  | Correct  | Time    |
++----------------------+--------+----------+---------+
+| babi10               |  76.8% |  73/  95 |    0.3s |
+| babi12               |  73.7% |  70/  95 |    3.6s |
+| babi18               |  76.8% |  73/  95 |    0.0s |
+| babi20               |  83.2% |  79/  95 |    1.7s |
++----------------------+--------+----------+---------+
+| OVERALL              |  77.6% | 295/ 380 |    9.6s |
++===============================================================+
+
+[SAVED] Results written to "eval_babi10_12_18_20.json"
+
++===============================================================+
+|                    SOTA COMPARISON                            |
++===============================================================+
+| Task                 | Ours   | SOTA   | Gap     |
++----------------------+--------+--------+---------+
+| babi10               |  76.8% | 100.0% |   -23.2 |
+| babi12               |  73.7% | 100.0% |   -26.3 |
+| babi18               |  76.8% | 100.0% |   -23.2 |
+| babi20               |  83.2% | 100.0% |   -16.8 |
++===============================================================+
+| Average gap to SOTA: -9.9%                                   |
++===============================================================+

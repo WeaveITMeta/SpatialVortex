@@ -122,6 +122,29 @@ impl TemporalStateTracker {
                 Polarity::Positive
             };
             
+            // GROUP MOVEMENT (bAbI Task 12): "X and Y went/moved/journeyed/travelled to Z"
+            // extract_subject() only grabs first word (X), missing Y's location update.
+            // Detect "and" before the movement verb and add facts for the second person too.
+            let group_move_verbs = [" went to ", " moved to ", " journeyed to ", " travelled to ",
+                                    " traveled to ", " went back to ", " moved back to "];
+            let mut second_person_group: Option<(String, String)> = None; // (person2, location)
+            for verb in &group_move_verbs {
+                if let Some(verb_pos) = sentence.find(verb) {
+                    let subject_part = sentence[..verb_pos].trim();
+                    if let Some(and_pos) = subject_part.find(" and ") {
+                        let person2 = subject_part[and_pos + " and ".len()..].trim().to_string();
+                        let loc_raw = sentence[verb_pos + verb.len()..].trim();
+                        let loc = loc_raw.trim_start_matches("the ")
+                            .split(|c: char| c == '.' || c == ',' || c == '?')
+                            .next().unwrap_or("").trim().to_string();
+                        if !person2.is_empty() && !loc.is_empty() {
+                            second_person_group = Some((person2, loc));
+                        }
+                    }
+                    break;
+                }
+            }
+
             // Extract subject (first capitalized word or known entity)
             let subject = self.extract_subject(sentence);
             if let Some(ref subj) = subject {
@@ -132,7 +155,13 @@ impl TemporalStateTracker {
             for (pattern, predicate) in &location_patterns {
                 if let Some(object) = self.extract_object_after_pattern(sentence, pattern) {
                     if let Some(ref subj) = subject {
-                        self.add_fact(subj.clone(), predicate.to_string(), object, polarity);
+                        self.add_fact(subj.clone(), predicate.to_string(), object.clone(), polarity);
+                    }
+                    // Also add fact for the second person in group movement
+                    if let Some((ref person2, ref loc2)) = second_person_group {
+                        if object == *loc2 {
+                            self.add_fact(person2.clone(), predicate.to_string(), object, polarity);
+                        }
                     }
                 }
             }

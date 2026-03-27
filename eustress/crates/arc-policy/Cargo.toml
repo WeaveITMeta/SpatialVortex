@@ -1,0 +1,9 @@
+[package]
+name = "eustress-arc-policy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eustress-arc-types = { path = "../arc-types" }
+serde_json = "1"
+rand = "0.8"

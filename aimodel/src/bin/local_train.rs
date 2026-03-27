@@ -199,6 +199,12 @@ fn main() {
         sacred_weight: 0.1,
         hierarchical_deduction: true,
         ladder_levels: 9, // Sacred 9 levels
+        straightening_lambda: 0.5,  // Temporal straightening (arXiv:2603.12231)
+        trajectory_window: 16,
+        ema_decay: 0.996,
+        max_rules_per_level: 1024,   // Rule explosion prevention
+        novelty_threshold_base: 0.3, // Asymptotic novelty gate
+        novelty_half_life: 256.0,
     };
     let mut jepa_trainer = JEPATrainer::new(jepa_config);
     println!("   ✓ JEPA predictor initialized (LoRA rank=8)");
