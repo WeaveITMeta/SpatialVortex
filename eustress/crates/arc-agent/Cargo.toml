@@ -1,6 +1,6 @@
 [package]
 name = "eustress-arc-agent"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [[bin]]
@@ -8,13 +8,20 @@ name = "eustress-arc-agent"
 path = "src/main.rs"
 
 [dependencies]
-eustress-common = { path = "../common", features = ["iggy-streaming"] }
 eustress-arc-types = { path = "../arc-types" }
 eustress-arc-policy = { path = "../arc-policy" }
-tokio = { version = "1", features = ["full"] }
-iggy = { version = "0.9", default-features = false, features = ["tokio-runtime"] }
+eustress-vortex-grid2d = { path = "../vortex-grid2d" }
 serde_json = "1"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1", features = ["v4"] }
+tokio = { version = "1", features = ["full"] }
+
+# Iggy streaming (optional — standalone mode works without it)
+eustress-common = { path = "../../EustressEngine/eustress/crates/common", features = ["iggy-streaming"], optional = true }
+iggy = { version = "0.9", default-features = false, optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
+
+[features]
+default = []
+iggy-streaming = ["eustress-common", "iggy", "uuid"]

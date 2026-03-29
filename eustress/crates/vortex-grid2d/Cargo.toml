@@ -1,0 +1,11 @@
+[package]
+name = "eustress-vortex-grid2d"
+version = "0.1.0"
+edition = "2024"
+description = "Grid2D WorldState for ARC-AGI-3: DSL primitives, grid analysis, symmetry detection"
+
+[dependencies]
+eustress-vortex-core = { path = "../vortex-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"

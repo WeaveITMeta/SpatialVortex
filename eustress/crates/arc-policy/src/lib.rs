@@ -1,3 +1,8 @@
+pub mod scene_mirror;
+pub mod space_writer;
+pub mod symbolic_decomposer;
+pub mod world_model;
+
 use eustress_arc_types::{ArcStep, PolicyDecision};
 
 // ─── Phase 1: Random valid action (baseline) ────────────────────────────────
@@ -32,10 +37,6 @@ pub fn decide(history: &[ArcStep], available_actions: &[String]) -> PolicyDecisi
 // ─── Phase 2 stub: Frequency heuristic (no ML) ──────────────────────────────
 
 /// Weight actions by their frequency in successful (goal_reached) past episodes.
-/// Activate by swapping the call-site in the agent loop.
-///
-/// `success_action_counts` is built from [`eustress_common::ArcEpisodeRecord`]
-/// log replay — maintained externally, passed in here to keep this module pure.
 pub fn decide_heuristic(
     history: &[ArcStep],
     available_actions: &[String],
@@ -45,7 +46,6 @@ pub fn decide_heuristic(
         return decide(history, available_actions);
     }
 
-    // Pick the available action with the highest success-episode frequency.
     let best = available_actions
         .iter()
         .max_by_key(|a| success_action_counts.get(*a).copied().unwrap_or(0))
@@ -69,17 +69,15 @@ pub fn decide_heuristic(
     }
 }
 
-// ─── Phase 3 stub: World model (Monte Carlo transition model) ────────────────
+// ─── Phase 3: Vortex World Model (full Eustress pipeline) ───────────────────
 
-/// Placeholder — wired in Phase 3 once TransitionTable + Bayesian MC rollouts
-/// are available from eustress-common's Scenarios engine.
+/// World-model decision using full Eustress vortex-core infrastructure:
+/// CausalGraph, HypothesisTree, Grid2D WorldState, solve loop.
 ///
-/// Signature mirrors the eventual interface so the call-site swap is trivial.
+/// The VortexWorldModel must be maintained across calls (it learns).
 pub fn decide_world_model(
-    history: &[ArcStep],
-    available_actions: &[String],
-    // transition_table: &TransitionTable,  // uncomment in Phase 3
+    model: &mut world_model::VortexWorldModel,
+    step: &ArcStep,
 ) -> PolicyDecision {
-    // Fall through to Phase 2 / Phase 1 until world model is wired.
-    decide(history, available_actions)
+    model.decide(step)
 }

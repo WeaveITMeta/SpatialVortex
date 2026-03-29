@@ -79,6 +79,14 @@ linfa-reduction = { version = "0.8", optional = true }
 linfa-linear = { version = "0.8", optional = true }
 ndarray = { version = "0.16", optional = true, features = ["rayon"] }
 
+# Apache Iggy streaming (ARC-AGI-3 agent bridge, Eustress platform)
+iggy = { version = "0.9", default-features = false }
+bytes = "1.7"
+
+# Vortex Grid2D — structural analysis for ARC-AGI-3 grids
+eustress-vortex-grid2d = { path = "../eustress/crates/vortex-grid2d" }
+eustress-vortex-core = { path = "../eustress/crates/vortex-core" }
+
 # Math/SIMD
 rayon = "1.10"
 num-traits = "0.2"
@@ -129,6 +137,19 @@ name = "vortex-cli"
 path = "src/bin/vortex_cli.rs"
 
 [[bin]]
+name = "arc-eval"
+path = "src/bin/arc_eval.rs"
+
+[[bin]]
+name = "arc-agent-iggy"
+path = "src/bin/arc_agent_iggy.rs"
+
+[[bin]]
 name = "vortex-api"
 path = "src/bin/vortex_api.rs"
 required-features = ["web"]
+
+# Patch iggy_common 0.9.0: fix cfg guard on posix_fadvise to exclude Windows.
+# Same patch used in eustress workspace.
+[patch.crates-io]
+iggy_common = { path = "../eustress/EustressEngine/eustress/.patches/iggy_common-0.9.0" }

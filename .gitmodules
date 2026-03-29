@@ -1,0 +1,3 @@
+[submodule "eustress/EustressEngine"]
+	path = eustress/EustressEngine
+	url = https://github.com/WeaveITMeta/EustressEngine.git

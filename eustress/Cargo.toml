@@ -1,29 +1,34 @@
 [workspace]
 members = [
-    "crates/common",
-    "crates/common/bevy-camera-controller",
-    "crates/common/eustress-networking",
-    "crates/runtime",
-    "crates/engine",
-    "crates/client",
-    "crates/server",
-    "crates/web",
-    "crates/backend",
-    "crates/forge",
-    "crates/forge-sdk",
-    "crates/mcp",
-    "crates/player-mobile",
-    "crates/bliss",
-    "crates/embedvec",
-    "crates/spatial-llm",
-    "crates/geo",
-    "crates/texture-gen",
-    "crates/workshop",
-    "crates/cli",
-    "benches/instance-capacity",
+    # ── EustressEngine submodule crates ──────────────────────────
+    "EustressEngine/eustress/crates/common",
+    "EustressEngine/eustress/crates/common/bevy-camera-controller",
+    "EustressEngine/eustress/crates/common/eustress-networking",
+    "EustressEngine/eustress/crates/runtime",
+    "EustressEngine/eustress/crates/engine",
+    "EustressEngine/eustress/crates/client",
+    "EustressEngine/eustress/crates/server",
+    "EustressEngine/eustress/crates/web",
+    "EustressEngine/eustress/crates/backend",
+    "EustressEngine/eustress/crates/forge",
+    "EustressEngine/eustress/crates/forge-sdk",
+    "EustressEngine/eustress/crates/mcp",
+    "EustressEngine/eustress/crates/player-mobile",
+    "EustressEngine/eustress/crates/bliss",
+    "EustressEngine/eustress/crates/embedvec",
+    "EustressEngine/eustress/crates/spatial-llm",
+    "EustressEngine/eustress/crates/geo",
+    "EustressEngine/eustress/crates/texture-gen",
+    "EustressEngine/eustress/crates/workshop",
+    "EustressEngine/eustress/crates/cli",
+    "EustressEngine/eustress/benches/instance-capacity",
+    # ── Local crates (not in submodule) ──────────────────────────
     "crates/arc-types",
     "crates/arc-agent",
     "crates/arc-policy",
+    "crates/vortex-core",
+    "crates/vortex-grid2d",
+    "crates/vortex-scene3d",
 ]
 
 resolver = "2"
@@ -102,8 +107,5 @@ codegen-units = 8
 strip = true
 
 # Patch iggy_common 0.9.0: fix cfg guard on posix_fadvise to exclude Windows.
-# The upstream source uses #[cfg(not(target_os = "macos"))] which resolves nix
-# on Windows where nix is only a cfg(unix) dep — compile error on Windows.
 [patch.crates-io]
-iggy_common = { path = ".patches/iggy_common-0.9.0" }
-
+iggy_common = { path = "EustressEngine/eustress/.patches/iggy_common-0.9.0" }

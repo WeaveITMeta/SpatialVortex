@@ -1,0 +1,57 @@
+{
+  "causal_graph": {
+    "nodes": {
+      "color_conservation": {
+        "Law": {
+          "name": "color_conservation",
+          "symbolic_form": "histogram(input) ~= histogram(output) => recolor_preserves_count",
+          "conditions": [
+            "color_histogram_match"
+          ],
+          "effect_template": "colors_remapped",
+          "evidence_rules": [],
+          "confidence": 0.3
+        }
+      },
+      "gravity_settles": {
+        "Law": {
+          "name": "gravity_settles",
+          "symbolic_form": "unsupported(obj) => position(obj).y = min_valid_y(obj)",
+          "conditions": [
+            "has_unsupported_objects"
+          ],
+          "effect_template": "objects_move_down",
+          "evidence_rules": [],
+          "confidence": 0.5
+        }
+      },
+      "symmetry_rotation": {
+        "Law": {
+          "name": "symmetry_rotation",
+          "symbolic_form": "asymmetric(axis_k) => rotate(align_k_to_target)",
+          "conditions": [
+            "input_asymmetric"
+          ],
+          "effect_template": "alignment_improved",
+          "evidence_rules": [],
+          "confidence": 0.3
+        }
+      }
+    },
+    "edges": [],
+    "outgoing": {},
+    "incoming": {}
+  },
+  "decomposer": {
+    "action_history": {},
+    "equiv_cache": {
+      "entries": {},
+      "total_lookups": 0,
+      "total_hits": 0
+    },
+    "confidence_threshold": 0.6,
+    "archetypes": {}
+  },
+  "global_ira": 0.0,
+  "games_played": 0
+}
