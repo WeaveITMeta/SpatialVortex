@@ -1,11 +1,11 @@
 @echo off
 REM ─────────────────────────────────────────────────────────────────────────
-REM start_arc_session.bat — Launch Iggy + EustressEngine + ARC Agent (Windows)
+REM start_arc_session.bat — Launch EustressEngine + ARC Agent (Windows)
 REM
 REM Usage:
 REM   scripts\start_arc_session.bat [--standalone]
 REM
-REM Default: Iggy mode (full Eustress Iggy streaming pipeline)
+REM Default: EustressStream mode (in-process pub/sub, no external server)
 REM ─────────────────────────────────────────────────────────────────────────
 
 setlocal enabledelayedexpansion
@@ -22,8 +22,8 @@ if defined ARC_UNIVERSE_ROOT (
     set "UNIVERSE_DIR=%USERPROFILE%\Documents\Eustress\ARC-AGI-3"
 )
 
-set "USE_IGGY=1"
-if "%~1"=="--standalone" set "USE_IGGY=0"
+set "USE_STREAM=1"
+if "%~1"=="--standalone" set "USE_STREAM=0"
 
 echo [arc-session] Universe: %UNIVERSE_DIR%
 
@@ -31,29 +31,11 @@ REM ─── Ensure Universe directory exists ───────────
 if not exist "%UNIVERSE_DIR%\spaces" mkdir "%UNIVERSE_DIR%\spaces"
 if not exist "%UNIVERSE_DIR%\knowledge" mkdir "%UNIVERSE_DIR%\knowledge"
 
-REM ─── Iggy Server (default — always started unless --standalone) ───────
-if %USE_IGGY%==1 (
-    tasklist /FI "IMAGENAME eq iggy-server.exe" 2>NUL | find /I "iggy-server.exe" >NUL
-    if errorlevel 1 (
-        where iggy-server >NUL 2>&1
-        if errorlevel 1 (
-            echo [arc-session] ERROR: iggy-server not found in PATH.
-            echo [arc-session] Install with: cargo install --path path\to\iggy\core\server
-            exit /b 1
-        )
-        echo [arc-session] Starting Iggy server...
-        start "" iggy-server
-        timeout /t 2 /nobreak >NUL
-    ) else (
-        echo [arc-session] Iggy server already running
-    )
-)
-
 REM ─── Build if needed ──────────────────────────────────────────────────
 if not exist "%AGENT_BIN%" (
     echo [arc-session] Building eustress-arc-agent...
     pushd "%REPO_ROOT%"
-    cargo build --release -p eustress-arc-agent --features iggy-streaming
+    cargo build --release -p eustress-arc-agent --features eustress-streaming
     popd
 )
 
@@ -71,10 +53,10 @@ if exist "%ENGINE_BIN%" (
 )
 
 REM ─── ARC Agent ────────────────────────────────────────────────────────
-if %USE_IGGY%==1 (
+if %USE_STREAM%==1 (
     tasklist /FI "IMAGENAME eq eustress-arc-agent.exe" 2>NUL | find /I "eustress-arc-agent.exe" >NUL
     if errorlevel 1 (
-        echo [arc-session] Starting ARC agent (Iggy mode — default^)...
+        echo [arc-session] Starting ARC agent (EustressStream mode^)...
         set "ARC_UNIVERSE_ROOT=%UNIVERSE_DIR%"
         set "RUST_LOG=eustress_arc_agent=info"
         start "" "%AGENT_BIN%"
@@ -89,10 +71,9 @@ echo.
 echo [arc-session] ═══════════════════════════════════════════
 echo [arc-session]   ARC-AGI-3 Session Ready
 echo [arc-session] ═══════════════════════════════════════════
-if %USE_IGGY%==1 (
-    echo [arc-session]   Mode: Iggy streaming (default^)
-    echo [arc-session]   Iggy: iggy://iggy:iggy@127.0.0.1:8090
-    echo [arc-session]   Stream: eustress
+if %USE_STREAM%==1 (
+    echo [arc-session]   Mode: EustressStream (in-process, no server^)
+    echo [arc-session]   Latency: ^< 1 us in-process, ~50 ns SHM
 ) else (
     echo [arc-session]   Mode: Standalone (stdin/stdout^)
     echo [arc-session]   To start: cd ARC-AGI-3-Agents ^&^& python main.py -a vortex

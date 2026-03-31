@@ -77,10 +77,7 @@ avian3d = { version = "0.6", default-features = false, features = ["3d", "f32", 
 # Luau scripting runtime (Roblox Luau via mlua)
 mlua = { version = "0.10", features = ["luau", "serialize", "send"] }
 
-# Apache Iggy — Rust-native 1M+ msg/s append-only streaming platform
-iggy = { version = "0.9", default-features = false }
-
-# bytes — shared buffer type used by Iggy SDK payloads
+# bytes — shared buffer type for EustressStream payloads
 bytes = "1.7"
 
 # Zero-copy serialization for ECS scene deltas (rkyv 0.8)
@@ -106,6 +103,3 @@ lto = false
 codegen-units = 8
 strip = true
 
-# Patch iggy_common 0.9.0: fix cfg guard on posix_fadvise to exclude Windows.
-[patch.crates-io]
-iggy_common = { path = "EustressEngine/eustress/.patches/iggy_common-0.9.0" }

@@ -17,11 +17,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1", features = ["full"] }
 
-# Iggy streaming (optional — standalone mode works without it)
-eustress-common = { path = "../../EustressEngine/eustress/crates/common", features = ["iggy-streaming"], optional = true }
-iggy = { version = "0.9", default-features = false, optional = true }
+# EustressStream (optional — standalone mode works without it)
+eustress-common = { path = "../../EustressEngine/eustress/crates/common", features = ["streaming"], optional = true }
+eustress-stream = { path = "../../EustressEngine/eustress/crates/stream", optional = true }
 uuid = { version = "1", features = ["v4"], optional = true }
+bytes = { version = "1.7", optional = true }
+rkyv = { version = "0.8", features = ["std"], optional = true }
 
 [features]
 default = []
-iggy-streaming = ["eustress-common", "iggy", "uuid"]
+eustress-streaming = ["eustress-common", "eustress-stream", "uuid", "bytes", "rkyv"]

@@ -1,0 +1,1796 @@
+warning: unused imports: `ExprArray`, `ExprLit`, `Expr`, `Lit`, `parse_quote`, and `parse`
+  --> rsi_macros\src\lib.rs:37:38
+   |
+37 | use syn::{parse_macro_input, ItemFn, parse, Lit, Expr, ExprArray, ExprLit, parse_quote};
+   |                                      ^^^^^  ^^^  ^^^^  ^^^^^^^^^  ^^^^^^^  ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::HashMap`
+  --> rsi_macros\src\lib.rs:38:5
+   |
+38 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ExtractedRelationship` is never constructed
+   --> rsi_macros\src\lib.rs:416:8
+    |
+416 | struct ExtractedRelationship {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `SemanticChainPattern` is never constructed
+   --> rsi_macros\src\lib.rs:424:8
+    |
+424 | struct SemanticChainPattern {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: `rsi_macros` (lib) generated 4 warnings (run `cargo fix --lib -p rsi_macros` to apply 2 suggestions)
+warning: unused import: `crate::ml::calm::CALMEngine`
+ --> src\data\benchmark_eval.rs:7:5
+  |
+7 | use crate::ml::calm::CALMEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::HashMap`
+  --> src\core\unified_generative.rs:10:5
+   |
+10 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `TraceEnergy`
+  --> src\ml\ebrm_alignment.rs:14:50
+   |
+14 | use crate::ml::ebrm::{EnergyBasedReasoningModel, TraceEnergy};
+   |                                                  ^^^^^^^^^^^
+
+warning: unused import: `SpectralScaler`
+  --> src\ml\training\burn_sso.rs:10:51
+   |
+10 | use super::spectral_sphere_optimizer::{SSOConfig, SpectralScaler};
+   |                                                   ^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:109:54
+    |
+109 |             w_q: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.1).sin() * scale)).collect(),
+    |                                                      ^                              ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+109 -             w_q: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.1).sin() * scale)).collect(),
+109 +             w_q: (0..latent_dim * total_dim).map(|i| (i as f32 * 0.1).sin() * scale).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:110:54
+    |
+110 |             w_k: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.13).cos() * scale)).collect(),
+    |                                                      ^                               ^
+    |
+help: remove these parentheses
+    |
+110 -             w_k: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.13).cos() * scale)).collect(),
+110 +             w_k: (0..latent_dim * total_dim).map(|i| (i as f32 * 0.13).cos() * scale).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:111:54
+    |
+111 |             w_v: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.17).sin() * scale)).collect(),
+    |                                                      ^                               ^
+    |
+help: remove these parentheses
+    |
+111 -             w_v: (0..latent_dim * total_dim).map(|i| ((i as f32 * 0.17).sin() * scale)).collect(),
+111 +             w_v: (0..latent_dim * total_dim).map(|i| (i as f32 * 0.17).sin() * scale).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:112:54
+    |
+112 |             w_o: (0..total_dim * latent_dim).map(|i| ((i as f32 * 0.11).cos() * scale)).collect(),
+    |                                                      ^                               ^
+    |
+help: remove these parentheses
+    |
+112 -             w_o: (0..total_dim * latent_dim).map(|i| ((i as f32 * 0.11).cos() * scale)).collect(),
+112 +             w_o: (0..total_dim * latent_dim).map(|i| (i as f32 * 0.11).cos() * scale).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:457:26
+    |
+457 |                 .map(|i| ((i as f32 * 0.1).sin() * encoder_scale))
+    |                          ^                                      ^
+    |
+help: remove these parentheses
+    |
+457 -                 .map(|i| ((i as f32 * 0.1).sin() * encoder_scale))
+457 +                 .map(|i| (i as f32 * 0.1).sin() * encoder_scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:460:26
+    |
+460 |                 .map(|i| ((i as f32 * 0.1).cos() * decoder_scale))
+    |                          ^                                      ^
+    |
+help: remove these parentheses
+    |
+460 -                 .map(|i| ((i as f32 * 0.1).cos() * decoder_scale))
+460 +                 .map(|i| (i as f32 * 0.1).cos() * decoder_scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\calm.rs:463:26
+    |
+463 |                 .map(|i| ((i as f32 * 0.1).sin() * predictor_scale))
+    |                          ^                                        ^
+    |
+help: remove these parentheses
+    |
+463 -                 .map(|i| ((i as f32 * 0.1).sin() * predictor_scale))
+463 +                 .map(|i| (i as f32 * 0.1).sin() * predictor_scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\huggingface.rs:168:26
+    |
+168 |                 .map(|i| ((i as f32 * 0.001).sin() * 0.02))
+    |                          ^                               ^
+    |
+help: remove these parentheses
+    |
+168 -                 .map(|i| ((i as f32 * 0.001).sin() * 0.02))
+168 +                 .map(|i| (i as f32 * 0.001).sin() * 0.02)
+    |
+
+warning: unused import: `BenchmarkResult`
+  --> src\ml\continuous_learning.rs:32:5
+   |
+32 |     BenchmarkResult, VerificationResult,
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `RSIImprovement`
+  --> src\ml\continuous_learning.rs:35:51
+   |
+35 | use crate::ml::huggingface::{RSIState, RSIMetric, RSIImprovement};
+   |                                                   ^^^^^^^^^^^^^^
+
+warning: unused import: `crate::ml::calm::LatentState`
+  --> src\ml\continuous_learning.rs:36:5
+   |
+36 | use crate::ml::calm::LatentState;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `BETRConfig`
+  --> src\ml\continuous_learning.rs:37:50
+   |
+37 | use crate::ml::betr_selector::{BETRDataSelector, BETRConfig};
+   |                                                  ^^^^^^^^^^
+
+warning: unused imports: `RealBenchmarkQuestion` and `RealBenchmarkResult`
+  --> src\ml\continuous_learning.rs:38:36
+   |
+38 | use crate::data::real_benchmarks::{RealBenchmarkQuestion, RealBenchmarkResult};
+   |                                    ^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src\ml\continuous_learning.rs:42:5
+   |
+42 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Duration`
+  --> src\ml\continuous_learning.rs:43:17
+   |
+43 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^
+
+warning: unnecessary parentheses around closure body
+  --> src\ml\gpu_trainer.rs:52:22
+   |
+52 |             .map(|i| ((i as f32 * 0.1).sin() * scale1))
+   |                      ^                               ^
+   |
+help: remove these parentheses
+   |
+52 -             .map(|i| ((i as f32 * 0.1).sin() * scale1))
+52 +             .map(|i| (i as f32 * 0.1).sin() * scale1)
+   |
+
+warning: unnecessary parentheses around closure body
+  --> src\ml\gpu_trainer.rs:55:22
+   |
+55 |             .map(|i| ((i as f32 * 0.1).cos() * scale2))
+   |                      ^                               ^
+   |
+help: remove these parentheses
+   |
+55 -             .map(|i| ((i as f32 * 0.1).cos() * scale2))
+55 +             .map(|i| (i as f32 * 0.1).cos() * scale2)
+   |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\jepa.rs:106:22
+    |
+106 |             .map(|i| ((i as f32 * 0.1).sin() * scale1))
+    |                      ^                               ^
+    |
+help: remove these parentheses
+    |
+106 -             .map(|i| ((i as f32 * 0.1).sin() * scale1))
+106 +             .map(|i| (i as f32 * 0.1).sin() * scale1)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\jepa.rs:109:22
+    |
+109 |             .map(|i| ((i as f32 * 0.13).sin() * scale2))
+    |                      ^                                ^
+    |
+help: remove these parentheses
+    |
+109 -             .map(|i| ((i as f32 * 0.13).sin() * scale2))
+109 +             .map(|i| (i as f32 * 0.13).sin() * scale2)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\jepa.rs:118:26
+    |
+118 |                 .map(|i| ((i as f32 * 0.17).sin() * lora_scale))
+    |                          ^                                    ^
+    |
+help: remove these parentheses
+    |
+118 -                 .map(|i| ((i as f32 * 0.17).sin() * lora_scale))
+118 +                 .map(|i| (i as f32 * 0.17).sin() * lora_scale)
+    |
+
+warning: unused import: `crate::data::models::BeamTensor`
+  --> src\ml\neuro_symbolic.rs:14:5
+   |
+14 | use crate::data::models::BeamTensor;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ExpertSpecialization`, `PHI`, and `RouterOutput`
+  --> src\ml\task_specific_moe.rs:26:36
+   |
+26 |     SacredMoEConfig, SacredExpert, ExpertSpecialization,
+   |                                    ^^^^^^^^^^^^^^^^^^^^
+27 |     GeometricRouter, RouterOutput, PHI, SACRED_POSITIONS,
+   |                      ^^^^^^^^^^^^  ^^^
+
+warning: unused import: `HashSet`
+  --> src\ml\task_specific_moe.rs:29:33
+   |
+29 | use std::collections::{HashMap, HashSet};
+   |                                 ^^^^^^^
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\sacred_moe.rs:169:22
+    |
+169 |             .map(|i| ((i as f32 * 0.1).sin() * scale))
+    |                      ^                              ^
+    |
+help: remove these parentheses
+    |
+169 -             .map(|i| ((i as f32 * 0.1).sin() * scale))
+169 +             .map(|i| (i as f32 * 0.1).sin() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\sacred_moe.rs:172:22
+    |
+172 |             .map(|i| ((i as f32 * 0.1).cos() * scale))
+    |                      ^                              ^
+    |
+help: remove these parentheses
+    |
+172 -             .map(|i| ((i as f32 * 0.1).cos() * scale))
+172 +             .map(|i| (i as f32 * 0.1).cos() * scale)
+    |
+
+warning: unused import: `ScoredPathway`
+  --> src\ml\generative_arch.rs:26:69
+   |
+26 | use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig, ScoredPathway};
+   |                                                                     ^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:113:22
+    |
+113 |             .map(|i| ((id as f32 * 0.1 + i as f32 * 0.01).sin() * scale))
+    |                      ^                                                 ^
+    |
+help: remove these parentheses
+    |
+113 -             .map(|i| ((id as f32 * 0.1 + i as f32 * 0.01).sin() * scale))
+113 +             .map(|i| (id as f32 * 0.1 + i as f32 * 0.01).sin() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:443:26
+    |
+443 |                 .map(|i| ((i as f32 * 0.1).sin() * scale))
+    |                          ^                              ^
+    |
+help: remove these parentheses
+    |
+443 -                 .map(|i| ((i as f32 * 0.1).sin() * scale))
+443 +                 .map(|i| (i as f32 * 0.1).sin() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:447:26
+    |
+447 |                 .map(|i| ((i as f32 * 0.15).cos() * scale))
+    |                          ^                               ^
+    |
+help: remove these parentheses
+    |
+447 -                 .map(|i| ((i as f32 * 0.15).cos() * scale))
+447 +                 .map(|i| (i as f32 * 0.15).cos() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:451:26
+    |
+451 |                 .map(|i| ((i as f32 * 0.2).sin() * scale))
+    |                          ^                              ^
+    |
+help: remove these parentheses
+    |
+451 -                 .map(|i| ((i as f32 * 0.2).sin() * scale))
+451 +                 .map(|i| (i as f32 * 0.2).sin() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:455:26
+    |
+455 |                 .map(|i| ((i as f32 * 0.05).cos() * scale))
+    |                          ^                               ^
+    |
+help: remove these parentheses
+    |
+455 -                 .map(|i| ((i as f32 * 0.05).cos() * scale))
+455 +                 .map(|i| (i as f32 * 0.05).cos() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:459:26
+    |
+459 |                 .map(|i| ((i as f32 * 0.1).sin() * scale))
+    |                          ^                              ^
+    |
+help: remove these parentheses
+    |
+459 -                 .map(|i| ((i as f32 * 0.1).sin() * scale))
+459 +                 .map(|i| (i as f32 * 0.1).sin() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:463:26
+    |
+463 |                 .map(|i| ((i as f32 * 0.08).cos() * scale))
+    |                          ^                               ^
+    |
+help: remove these parentheses
+    |
+463 -                 .map(|i| ((i as f32 * 0.08).cos() * scale))
+463 +                 .map(|i| (i as f32 * 0.08).cos() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:470:26
+    |
+470 |                 .map(|i| ((i as f32 * 0.12).sin() * scale))
+    |                          ^                               ^
+    |
+help: remove these parentheses
+    |
+470 -                 .map(|i| ((i as f32 * 0.12).sin() * scale))
+470 +                 .map(|i| (i as f32 * 0.12).sin() * scale)
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:945:52
+    |
+945 |             w_q_3: (0..latent_dim * dim_3).map(|i| ((i as f32 * 0.1).sin() * scale_3)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+945 -             w_q_3: (0..latent_dim * dim_3).map(|i| ((i as f32 * 0.1).sin() * scale_3)).collect(),
+945 +             w_q_3: (0..latent_dim * dim_3).map(|i| (i as f32 * 0.1).sin() * scale_3).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:946:52
+    |
+946 |             w_k_3: (0..latent_dim * dim_3).map(|i| ((i as f32 * 0.2).cos() * scale_3)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+946 -             w_k_3: (0..latent_dim * dim_3).map(|i| ((i as f32 * 0.2).cos() * scale_3)).collect(),
+946 +             w_k_3: (0..latent_dim * dim_3).map(|i| (i as f32 * 0.2).cos() * scale_3).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:947:52
+    |
+947 |             w_v_3: (0..latent_dim * dim_3).map(|i| ((i as f32 * 0.3).sin() * scale_3)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+947 -             w_v_3: (0..latent_dim * dim_3).map(|i| ((i as f32 * 0.3).sin() * scale_3)).collect(),
+947 +             w_v_3: (0..latent_dim * dim_3).map(|i| (i as f32 * 0.3).sin() * scale_3).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:948:52
+    |
+948 |             w_o_3: (0..dim_3 * latent_dim).map(|i| ((i as f32 * 0.15).cos() * scale_3)).collect(),
+    |                                                    ^                                 ^
+    |
+help: remove these parentheses
+    |
+948 -             w_o_3: (0..dim_3 * latent_dim).map(|i| ((i as f32 * 0.15).cos() * scale_3)).collect(),
+948 +             w_o_3: (0..dim_3 * latent_dim).map(|i| (i as f32 * 0.15).cos() * scale_3).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:950:52
+    |
+950 |             w_q_6: (0..latent_dim * dim_6).map(|i| ((i as f32 * 0.1).sin() * scale_6)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+950 -             w_q_6: (0..latent_dim * dim_6).map(|i| ((i as f32 * 0.1).sin() * scale_6)).collect(),
+950 +             w_q_6: (0..latent_dim * dim_6).map(|i| (i as f32 * 0.1).sin() * scale_6).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:951:52
+    |
+951 |             w_k_6: (0..latent_dim * dim_6).map(|i| ((i as f32 * 0.2).cos() * scale_6)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+951 -             w_k_6: (0..latent_dim * dim_6).map(|i| ((i as f32 * 0.2).cos() * scale_6)).collect(),
+951 +             w_k_6: (0..latent_dim * dim_6).map(|i| (i as f32 * 0.2).cos() * scale_6).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:952:52
+    |
+952 |             w_v_6: (0..latent_dim * dim_6).map(|i| ((i as f32 * 0.3).sin() * scale_6)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+952 -             w_v_6: (0..latent_dim * dim_6).map(|i| ((i as f32 * 0.3).sin() * scale_6)).collect(),
+952 +             w_v_6: (0..latent_dim * dim_6).map(|i| (i as f32 * 0.3).sin() * scale_6).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:953:52
+    |
+953 |             w_o_6: (0..dim_6 * latent_dim).map(|i| ((i as f32 * 0.15).cos() * scale_6)).collect(),
+    |                                                    ^                                 ^
+    |
+help: remove these parentheses
+    |
+953 -             w_o_6: (0..dim_6 * latent_dim).map(|i| ((i as f32 * 0.15).cos() * scale_6)).collect(),
+953 +             w_o_6: (0..dim_6 * latent_dim).map(|i| (i as f32 * 0.15).cos() * scale_6).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:955:52
+    |
+955 |             w_q_9: (0..latent_dim * dim_9).map(|i| ((i as f32 * 0.1).sin() * scale_9)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+955 -             w_q_9: (0..latent_dim * dim_9).map(|i| ((i as f32 * 0.1).sin() * scale_9)).collect(),
+955 +             w_q_9: (0..latent_dim * dim_9).map(|i| (i as f32 * 0.1).sin() * scale_9).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:956:52
+    |
+956 |             w_k_9: (0..latent_dim * dim_9).map(|i| ((i as f32 * 0.2).cos() * scale_9)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+956 -             w_k_9: (0..latent_dim * dim_9).map(|i| ((i as f32 * 0.2).cos() * scale_9)).collect(),
+956 +             w_k_9: (0..latent_dim * dim_9).map(|i| (i as f32 * 0.2).cos() * scale_9).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:957:52
+    |
+957 |             w_v_9: (0..latent_dim * dim_9).map(|i| ((i as f32 * 0.3).sin() * scale_9)).collect(),
+    |                                                    ^                                ^
+    |
+help: remove these parentheses
+    |
+957 -             w_v_9: (0..latent_dim * dim_9).map(|i| ((i as f32 * 0.3).sin() * scale_9)).collect(),
+957 +             w_v_9: (0..latent_dim * dim_9).map(|i| (i as f32 * 0.3).sin() * scale_9).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\generative_arch.rs:958:52
+    |
+958 |             w_o_9: (0..dim_9 * latent_dim).map(|i| ((i as f32 * 0.15).cos() * scale_9)).collect(),
+    |                                                    ^                                 ^
+    |
+help: remove these parentheses
+    |
+958 -             w_o_9: (0..dim_9 * latent_dim).map(|i| ((i as f32 * 0.15).cos() * scale_9)).collect(),
+958 +             w_o_9: (0..dim_9 * latent_dim).map(|i| (i as f32 * 0.15).cos() * scale_9).collect(),
+    |
+
+warning: unnecessary parentheses around closure body
+    --> src\ml\generative_arch.rs:1367:26
+     |
+1367 |                 .map(|i| ((i as f32 * 0.1).sin() * scale))
+     |                          ^                              ^
+     |
+help: remove these parentheses
+     |
+1367 -                 .map(|i| ((i as f32 * 0.1).sin() * scale))
+1367 +                 .map(|i| (i as f32 * 0.1).sin() * scale)
+     |
+
+warning: unnecessary parentheses around closure body
+    --> src\ml\generative_arch.rs:2045:35
+     |
+2045 |                         .map(|&l| ((l - max_logit).exp() / exp_sum))
+     |                                   ^                               ^
+     |
+help: remove these parentheses
+     |
+2045 -                         .map(|&l| ((l - max_logit).exp() / exp_sum))
+2045 +                         .map(|&l| (l - max_logit).exp() / exp_sum)
+     |
+
+warning: unnecessary parentheses around closure body
+    --> src\ml\generative_arch.rs:2261:39
+     |
+2261 | ...                   .map(|&l| ((l - max_logit).exp() / exp_sum))
+     |                                 ^                               ^
+     |
+help: remove these parentheses
+     |
+2261 -                             .map(|&l| ((l - max_logit).exp() / exp_sum))
+2261 +                             .map(|&l| (l - max_logit).exp() / exp_sum)
+     |
+
+warning: unused import: `std::collections::HashMap`
+ --> src\ml\stacked_flux.rs:8:5
+  |
+8 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ScoredPathway`
+  --> src\ml\recursive_chains.rs:26:69
+   |
+26 | use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig, ScoredPathway};
+   |                                                                     ^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src\ml\conceptual_agglomeration.rs:32:5
+   |
+32 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `LatentState`
+  --> src\ml\conceptual_agglomeration.rs:35:23
+   |
+35 | use crate::ml::calm::{LatentState, CALMConfig};
+   |                       ^^^^^^^^^^^
+
+warning: unnecessary parentheses around closure body
+   --> src\ml\geometric_world_model.rs:518:22
+    |
+518 |             .map(|i| ((i as f32 * 0.1).sin() * 0.1))
+    |                      ^                            ^
+    |
+help: remove these parentheses
+    |
+518 -             .map(|i| ((i as f32 * 0.1).sin() * 0.1))
+518 +             .map(|i| (i as f32 * 0.1).sin() * 0.1)
+    |
+
+warning: unused import: `Duration`
+  --> src\ml\consciousness_learner.rs:29:17
+   |
+29 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^
+
+warning: unused import: `CoordinateSpace`
+  --> src\ml\consciousness_learner.rs:30:75
+   |
+30 | use crate::ml::geometric_world_model::{GeometricWorldModel, WorldEncoder, CoordinateSpace};
+   |                                                                           ^^^^^^^^^^^^^^^
+
+warning: unused import: `FilterResult`
+  --> src\ml\web_knowledge.rs:18:52
+   |
+18 | use crate::ml::web_quality_filter::{BluWerpFilter, FilterResult};
+   |                                                    ^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src\ml\web_crawler.rs:19:5
+   |
+19 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::data::models::BeamTensor`
+ --> src\ml\calm_web_integration.rs:9:5
+  |
+9 | use crate::data::models::BeamTensor;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LatentState`
+  --> src\ml\calm_web_integration.rs:10:47
+   |
+10 | use crate::ml::calm::{CALMEngine, CALMConfig, LatentState};
+   |                                               ^^^^^^^^^^^
+
+warning: unused import: `std::path::Path`
+  --> src\ml\calm_web_integration.rs:14:5
+   |
+14 | use std::path::Path;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused imports: `Arc` and `Mutex`
+  --> src\ml\calm_web_integration.rs:15:17
+   |
+15 | use std::sync::{Arc, Mutex};
+   |                 ^^^  ^^^^^
+
+warning: unused import: `SacredMoEConfig`
+  --> src\ml\test_time_compute.rs:19:45
+   |
+19 | use crate::ml::sacred_moe::{SacredMoELayer, SacredMoEConfig};
+   |                                             ^^^^^^^^^^^^^^^
+
+warning: unused imports: `CALMEngine` and `LatentState`
+  --> src\ml\test_time_compute.rs:20:23
+   |
+20 | use crate::ml::calm::{CALMEngine, LatentState};
+   |                       ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src\ml\test_time_compute.rs:21:5
+   |
+21 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `EvidenceEvent`, `EvidenceType`, `StateTransition`, and `TransitionReward`
+  --> src\ml\writing_gate.rs:23:42
+   |
+23 |     QTable, DiscreteAction, PathCurator, EvidenceEvent, EvidenceType,
+   |                                          ^^^^^^^^^^^^^  ^^^^^^^^^^^^
+24 |     StateTransition, TransitionReward,
+   |     ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `TraitDelta` and `TraitValue`
+  --> src\ml\structured_prediction.rs:21:36
+   |
+21 | use crate::storage::trait_ledger::{TraitValue, TraitDelta};
+   |                                    ^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `TraitValue`
+  --> src\ml\secure_aggregation.rs:21:36
+   |
+21 | use crate::storage::trait_ledger::{TraitValue, TraitDelta};
+   |                                    ^^^^^^^^^^
+
+warning: unused import: `PHI`
+  --> src\ml\causal_model.rs:26:25
+   |
+26 | use super::sacred_moe::{PHI, PHI_INV};
+   |                         ^^^
+
+warning: unused import: `SymbolicDerivative`
+  --> src\ml\symbol_resolver.rs:20:61
+   |
+20 | use super::causal_model::{CausalModel, DerivativeSignature, SymbolicDerivative};
+   |                                                             ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `BTreeMap`
+  --> src\storage\trait_ledger.rs:19:33
+   |
+19 | use std::collections::{HashMap, BTreeMap};
+   |                                 ^^^^^^^^
+
+warning: unused import: `ContinuousLearningConfig`
+  --> src\cognition\vortex_runner.rs:26:24
+   |
+26 |     ContinuousTrainer, ContinuousLearningConfig, TrainingBatch,
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `EvidenceSource`, `Evidence`, and `VerificationConfig`
+  --> src\cognition\vortex_runner.rs:31:31
+   |
+31 |     VerifiedPatterningEngine, VerificationConfig, VerifiedPattern,
+   |                               ^^^^^^^^^^^^^^^^^^
+32 |     PatternHypothesis, Evidence, EvidenceSource, BenchmarkResult,
+   |                        ^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unexpected `cfg` condition value: `reqwest`
+   --> src\cognition\tools.rs:108:11
+    |
+108 |     #[cfg(feature = "reqwest")]
+    |           ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `actix-cors`, `actix-files`, `actix-web`, `bevy`, `bevy_viz`, `burn`, `burn-autodiff`, `burn-cpu`, `burn-gpu`, `burn-ndarray`, `burn-tch`, `burn-wgpu`, `default`, `diffusion-expert`, `embeddings`, `embedvec`, `gpu`, `linfa-ml`, `onnx`, `ort`, `rocksdb`, `storage`, `tokenizers`, `transport`, `web`, `web-learning`, and `wtransport`
+    = help: consider adding `reqwest` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `reqwest`
+   --> src\cognition\tools.rs:116:19
+    |
+116 |             #[cfg(feature = "reqwest")]
+    |                   ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `actix-cors`, `actix-files`, `actix-web`, `bevy`, `bevy_viz`, `burn`, `burn-autodiff`, `burn-cpu`, `burn-gpu`, `burn-ndarray`, `burn-tch`, `burn-wgpu`, `default`, `diffusion-expert`, `embeddings`, `embedvec`, `gpu`, `linfa-ml`, `onnx`, `ort`, `rocksdb`, `storage`, `tokenizers`, `transport`, `web`, `web-learning`, and `wtransport`
+    = help: consider adding `reqwest` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `reqwest`
+   --> src\cognition\tools.rs:246:15
+    |
+246 |         #[cfg(feature = "reqwest")]
+    |               ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `actix-cors`, `actix-files`, `actix-web`, `bevy`, `bevy_viz`, `burn`, `burn-autodiff`, `burn-cpu`, `burn-gpu`, `burn-ndarray`, `burn-tch`, `burn-wgpu`, `default`, `diffusion-expert`, `embeddings`, `embedvec`, `gpu`, `linfa-ml`, `onnx`, `ort`, `rocksdb`, `storage`, `tokenizers`, `transport`, `web`, `web-learning`, and `wtransport`
+    = help: consider adding `reqwest` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unused import: `crate::data::models::BeamTensor`
+  --> src\cognition\reasoning.rs:12:5
+   |
+12 | use crate::data::models::BeamTensor;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `VortexState`
+  --> src\serving\mcp_server.rs:12:38
+   |
+12 | use crate::cognition::{VortexRunner, VortexState};
+   |                                      ^^^^^^^^^^^
+
+warning: unused imports: `ExhaustivePathwayOptimizer`, `PathwayConfig`, and `StackedResult`
+  --> src\serving\mcp_server.rs:13:26
+   |
+13 | use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig, StackedResult};
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `rayon::prelude`
+  --> src\ml\generative_arch.rs:27:5
+   |
+27 | use rayon::prelude::*;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused variable: `path`
+   --> src\data\real_benchmarks.rs:875:9
+    |
+875 |     let path = format!("{}/babi/tasks_1-20_v1-2/en/qa{}_*_test.txt", data_dir, task_num);
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_path`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `embed1`
+    --> src\data\real_benchmarks.rs:2599:17
+     |
+2599 |             let embed1 = self.get_or_create_embedding(&word1_lower);
+     |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_embed1`
+
+warning: unused variable: `i`
+    --> src\data\real_benchmarks.rs:2947:26
+     |
+2947 |                     for (i, (similar_word, similarity)) in similar_to_question.iter().enumerate().take(10) {
+     |                          ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `is_gsm8k_source`
+    --> src\data\real_benchmarks.rs:4200:13
+     |
+4200 |         let is_gsm8k_source = question.source.to_lowercase().contains("gsm8k");
+     |             ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_gsm8k_source`
+
+warning: unused variable: `attended_output`
+    --> src\data\real_benchmarks.rs:4773:14
+     |
+4773 |         let (attended_output, attn_weights) = self.calm_engine.attend_to_context(&question_latent, &choice_latents);
+     |              ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_attended_output`
+
+warning: unused variable: `best_prob`
+    --> src\data\real_benchmarks.rs:5016:25
+     |
+5016 |         let (best_idx, &best_prob) = probs.iter()
+     |                         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_best_prob`
+
+warning: unused variable: `rel_type`
+    --> src\data\real_benchmarks.rs:5795:18
+     |
+5795 |             for (rel_type, target, conf) in &node.relations {
+     |                  ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_rel_type`
+
+warning: unused variable: `q_lower`
+    --> src\data\real_benchmarks.rs:6362:21
+     |
+6362 |                 let q_lower = q.question.to_lowercase();
+     |                     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_q_lower`
+
+warning: unused variable: `primary_weight`
+    --> src\data\real_benchmarks.rs:6368:38
+     |
+6368 |                 let (primary_expert, primary_weight) = routed_experts.first()
+     |                                      ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_primary_weight`
+
+warning: unused variable: `q_words`
+    --> src\data\real_benchmarks.rs:7189:13
+     |
+7189 |         let q_words: Vec<&str> = passage_context
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_q_words`
+
+warning: unused variable: `c`
+   --> src\data\inference_audit.rs:407:33
+    |
+407 |         paths.sort_by_key(|(_, (c, t))| std::cmp::Reverse(*t));
+    |                                 ^ help: if this is intentional, prefix it with an underscore: `_c`
+
+warning: unused variable: `qa`
+   --> src\ml\ebrm_alignment.rs:145:38
+    |
+145 |     fn create_reasoning_steps(&self, qa: &BenchmarkQA) -> Vec<BeamTensor> {
+    |                                      ^^ help: if this is intentional, prefix it with an underscore: `_qa`
+
+warning: unused variable: `positive`
+   --> src\ml\ebrm_alignment.rs:298:9
+    |
+298 |         positive: &[BeamTensor],
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_positive`
+
+warning: unused variable: `negative`
+   --> src\ml\ebrm_alignment.rs:299:9
+    |
+299 |         negative: &[BeamTensor],
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_negative`
+
+warning: unused variable: `remainder`
+   --> src\ml\calm.rs:123:13
+    |
+123 |         let remainder = len % 4;
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_remainder`
+
+warning: unused variable: `loss`
+   --> src\ml\calm.rs:641:13
+    |
+641 |         let loss = self.contrastive_loss(anchor, positive, negatives);
+    |             ^^^^ help: if this is intentional, prefix it with an underscore: `_loss`
+
+warning: unused variable: `entropic_value`
+   --> src\ml\pathway.rs:550:13
+    |
+550 |         let entropic_value = self.entropic_objective(&scores, beta);
+    |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_entropic_value`
+
+warning: unused variable: `learning_rate`
+   --> src\ml\jepa.rs:770:67
+    |
+770 |     pub fn train_step(&mut self, context: &[f32], target: &[f32], learning_rate: f32) -> f32 {
+    |                                                                   ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_learning_rate`
+
+warning: unused variable: `scenario_emb`
+   --> src\ml\neuro_symbolic.rs:682:13
+    |
+682 |         let scenario_emb = self.ltn.embed_predicate(scenario);
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_scenario_emb`
+
+warning: unused variable: `e`
+   --> src\ml\sacred_moe.rs:230:27
+    |
+230 |                     .map(|e| {
+    |                           ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `agent`
+   --> src\ml\sacred_swarm.rs:805:40
+    |
+805 |     fn agent_retrieve_knowledge(&self, agent: &SwarmAgent, query: &str) -> Vec<String> {
+    |                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_agent`
+
+warning: unused variable: `matched_pattern`
+   --> src\ml\generative_arch.rs:543:32
+    |
+543 |             let (detail_level, matched_pattern) = self.check_pattern_match(node_label, attr_key);
+    |                                ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_matched_pattern`
+
+warning: unused variable: `person_indicators`
+   --> src\ml\generative_arch.rs:837:13
+    |
+837 |         let person_indicators = ["went", "moved", "picked", "dropped", "is in", "travelled"];
+    |             ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_person_indicators`
+
+warning: variable does not need to be mutable
+    --> src\ml\generative_arch.rs:1041:17
+     |
+1041 |             let mut scores: Vec<f32> = k_projs.iter()
+     |                 ----^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> src\ml\generative_arch.rs:1239:13
+     |
+1239 |         let mut scores: Vec<(ExpertType, f32)> = ExpertType::all()
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `exp_sum`
+    --> src\ml\generative_arch.rs:1422:13
+     |
+1422 |         let exp_sum: f32 = indexed.iter().map(|(_, l)| (l - max_logit).exp()).sum();
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_exp_sum`
+
+warning: unused variable: `prompt_tokens`
+    --> src\ml\generative_arch.rs:1864:14
+     |
+1864 |         let (prompt_tokens, prompt_embedding) = self.encode_text(prompt);
+     |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_prompt_tokens`
+
+warning: unused variable: `total_steps`
+    --> src\ml\generative_arch.rs:2141:13
+     |
+2141 |         let total_steps = epochs * texts.len();
+     |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_total_steps`
+
+warning: unused variable: `re_pattern`
+    --> src\ml\generative_arch.rs:2416:13
+     |
+2416 |         let re_pattern = r"(\d+\.?\d*)\s*([+\-*/×÷])\s*(\d+\.?\d*)";
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_re_pattern`
+
+warning: unused variable: `context`
+   --> src\ml\transitive_flux.rs:724:32
+    |
+724 |     pub fn score_yes_no(&self, context: &str, question: &str, answer: &str) -> f32 {
+    |                                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `text_lower`
+    --> src\ml\transitive_flux.rs:1467:13
+     |
+1467 |         let text_lower = text.to_lowercase();
+     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_text_lower`
+
+warning: unused variable: `question`
+   --> src\ml\reasoning_engine.rs:797:55
+    |
+797 |     fn extract_definition_span(&self, sentence: &str, question: &str) -> Option<String> {
+    |                                                       ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_question`
+
+warning: unused variable: `giver`
+   --> src\ml\recursive_chains.rs:354:21
+    |
+354 |                 let giver = after_did.split_whitespace().next().unwrap_or("").to_string();
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_giver`
+
+warning: unused variable: `giver`
+   --> src\ml\recursive_chains.rs:379:21
+    |
+379 |                 let giver = after_did.split_whitespace().next().unwrap_or("").to_string();
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_giver`
+
+warning: unused variable: `concept_ids`
+   --> src\ml\conceptual_agglomeration.rs:815:75
+    |
+815 |     fn extract_relations_from_sentence_dynamic(&mut self, sentence: &str, concept_ids: &[Uuid]) {
+    |                                                                           ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_concept_ids`
+
+warning: unused variable: `predictor`
+    --> src\ml\geometric_world_model.rs:1169:67
+     |
+1169 |     fn compute_transitivity_loss(&self, world: &WorldStateTensor, predictor: &GeometricRelationPredictor) -> f32 {
+     |                                                                   ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_predictor`
+
+warning: unused variable: `subj_props`
+   --> src\ml\world_knowledge.rs:235:22
+    |
+235 |         if let (Some(subj_props), Some(obj_props)) = (
+    |                      ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_subj_props`
+
+warning: unused variable: `question`
+   --> src\ml\world_knowledge.rs:741:38
+    |
+741 |     fn answer_how_to_question(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+    |                                      ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_question`
+
+warning: unused variable: `attr`
+   --> src\ml\consciousness_learner.rs:844:18
+    |
+844 |             for (attr, attr_val) in &node.attributes {
+    |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_attr`
+
+warning: variable `pattern_used` is assigned to, but never used
+   --> src\ml\web_knowledge.rs:506:17
+    |
+506 |             let mut pattern_used = "";
+    |                 ^^^^^^^^^^^^^^^^
+    |
+    = note: consider using `_pattern_used` instead
+
+warning: value assigned to `pattern_used` is never read
+   --> src\ml\web_knowledge.rs:513:25
+    |
+513 |                         pattern_used = pattern;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `words`
+   --> src\ml\web_knowledge.rs:765:13
+    |
+765 |         let words: Vec<&str> = text.split_whitespace().collect();
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_words`
+
+warning: variable does not need to be mutable
+   --> src\ml\rag_search.rs:537:32
+    |
+537 |     fn apply_mmr_rerank(&self, mut candidates: Vec<RetrievedContext>) -> Vec<RetrievedContext> {
+    |                                ----^^^^^^^^^^
+    |                                |
+    |                                help: remove this `mut`
+
+warning: unused variable: `confidence`
+   --> src\ml\test_time_compute.rs:166:69
+    |
+166 |     fn sacred_checkpoint(&mut self, state: &[f32], position: usize, confidence: f64) -> Vec<f32> {
+    |                                                                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_confidence`
+
+warning: unused variable: `context_lower`
+  --> src\ml\sacred_attention.rs:80:13
+   |
+80 |         let context_lower = context.to_lowercase();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context_lower`
+
+warning: unused variable: `world_model`
+   --> src\ml\sacred_attention.rs:453:61
+    |
+453 |     fn verify_relation(&self, relation: &ExtractedRelation, world_model: &GeometricWorldModel) -> VerificationResult {
+    |                                                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_world_model`
+
+warning: unused variable: `current_values`
+   --> src\ml\structured_prediction.rs:283:9
+    |
+283 |         current_values: &HashMap<String, f64>,
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_current_values`
+
+warning: unused variable: `i`
+    --> src\ml\vortex_diffusion.rs:2292:14
+     |
+2292 |         for (i, &id) in sequence.iter().take(total_len).enumerate() {
+     |              ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `item_str`
+   --> src\ml\vortex_planner.rs:453:13
+    |
+453 |         let item_str = items.join(",");
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_item_str`
+
+warning: unused variable: `actions_taken`
+   --> src\ml\causal_model.rs:572:9
+    |
+572 |         actions_taken: &[String],
+    |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_actions_taken`
+
+warning: unused variable: `i`
+   --> src\ml\symbol_resolver.rs:446:13
+    |
+446 |         for i in 0..model.variable_count() {
+    |             ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `sacred_pos`
+   --> src\cognition\thinking.rs:554:22
+    |
+554 |                 for &sacred_pos in &sacred_positions {
+    |                      ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_sacred_pos`
+
+warning: unused variable: `query`
+   --> src\cognition\rag.rs:213:60
+    |
+213 |     fn apply_mmr(&self, candidates: Vec<RetrievedContext>, query: &[f32]) -> Vec<RetrievedContext> {
+    |                                                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `last_result`
+   --> src\cognition\vortex_runner.rs:905:25
+    |
+905 |             if let Some(last_result) = results.last() {
+    |                         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_last_result`
+
+warning: unused variable: `source_words`
+   --> src\cognition\reasoning.rs:633:13
+    |
+633 |         let source_words: Vec<&str> = source_pattern.split_whitespace().collect();
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_source_words`
+
+warning: unused variable: `beams`
+   --> src\serving\mcp_server.rs:298:21
+    |
+298 |                 let beams = self.text_to_beams(&input);
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_beams`
+
+warning: unused variable: `answer`
+   --> src\engine.rs:753:22
+    |
+753 |         if let Some((ref answer, conf)) = world_answer {
+    |                      ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_answer`
+
+warning: unused variable: `answer`
+   --> src\engine.rs:767:22
+    |
+767 |         if let Some((ref answer, conf)) = transitive_answer {
+    |                      ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_answer`
+
+warning: unused variable: `i`
+   --> src\engine.rs:785:14
+    |
+785 |         for (i, t) in thought_chain.thoughts.iter().enumerate() {
+    |              ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `question`
+    --> src\engine.rs:1815:41
+     |
+1815 |     fn compose_answer_from_facts(&self, question: &str, facts: &[&str]) -> String {
+     |                                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_question`
+
+warning: unused variable: `q`
+    --> src\engine.rs:1974:18
+     |
+1974 |             for (q, a) in &pairs {
+     |                  ^ help: if this is intentional, prefix it with an underscore: `_q`
+
+warning: field `label` is never read
+  --> src\data\real_benchmarks.rs:85:5
+   |
+84 | struct CommonsenseQAChoice {
+   |        ------------------- field in this struct
+85 |     label: String,
+   |     ^^^^^
+   |
+   = note: `CommonsenseQAChoice` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `theorem_prover`, `word_to_id`, `next_embed_id`, `web_scraper`, `web_extractor`, and `use_knowledge_pipeline` are never read
+    --> src\data\real_benchmarks.rs:1170:5
+     |
+1148 | pub struct RealBenchmarkEvaluator {
+     |            ---------------------- fields in this struct
+...
+1170 |     theorem_prover: NeuralTheoremProver,
+     |     ^^^^^^^^^^^^^^
+...
+1180 |     word_to_id: HashMap<String, u64>,
+     |     ^^^^^^^^^^
+1181 |     /// Next ID for EmbedVec insertions
+1182 |     next_embed_id: u64,
+     |     ^^^^^^^^^^^^^
+...
+1215 |     web_scraper: crate::ml::web_knowledge::DuckDuckGoScraper,
+     |     ^^^^^^^^^^^
+1216 |     /// Web knowledge extractor
+1217 |     web_extractor: crate::ml::web_knowledge::WebKnowledgeExtractor,
+     |     ^^^^^^^^^^^^^
+...
+1224 |     use_knowledge_pipeline: bool,
+     |     ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+    --> src\data\real_benchmarks.rs:1528:8
+     |
+1246 | impl RealBenchmarkEvaluator {
+     | --------------------------- methods in this implementation
+...
+1528 |     fn test_time_web_learning(&mut self, question: &RealBenchmarkQuestion) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+2529 |     fn search_similar_embeddings(&self, query: &[f32], k: usize) -> Vec<(String, f32)> {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2534 |     fn search_similar_brute_force(&self, query: &[f32], k: usize) -> Vec<(String, f32)> {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+3321 |     fn pretrain_generative_engine(&mut self) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+3334 |     fn check_knowledge_coverage(&self, question: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+3361 |     fn extract_search_query(&self, question: &str) -> String {
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+4601 |     fn build_generative_prompt(&self, question: &RealBenchmarkQuestion) -> String {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+4623 |     fn match_generated_to_choices(&self, generated: &str, choices: &[String]) -> (usize, f32) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+5816 |     fn score_vortex_keyword_overlap(&self, question: &str, choice: &str) -> f32 {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `generate_math_answer`, `map_answer_to_choice`, and `score_with_latent_reasoning` are never used
+    --> src\data\real_benchmarks.rs:6955:8
+     |
+6947 | impl RealBenchmarkEvaluator {
+     | --------------------------- associated items in this implementation
+...
+6955 |     fn generate_math_answer(&self, question: &str) -> Option<(f64, f32)> {
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+7040 |     fn map_answer_to_choice(generated: f64, choices: &[String]) -> Option<(usize, f32)> {
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+7686 |     fn score_with_latent_reasoning(&mut self, question_latent: &LatentState, choice_latent: &LatentState) -> f32 {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `position_features` is never used
+   --> src\core\sacred_geometry\geometric_inference.rs:271:8
+    |
+187 | impl GeometricInferenceEngine {
+    | ----------------------------- method in this implementation
+...
+271 |     fn position_features(&self, position: u8) -> Vec<f32> {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: method `e8_select` is never used
+   --> src\ml\pathway.rs:381:8
+    |
+128 | impl ExhaustivePathwayOptimizer {
+    | ------------------------------- method in this implementation
+...
+381 |     fn e8_select(&self, pathways: &[ScoredPathway]) -> usize {
+    |        ^^^^^^^^^
+
+warning: field `stats` is never read
+   --> src\ml\continuous_learning.rs:671:5
+    |
+659 | pub struct ContinuousTrainer {
+    |            ----------------- field in this struct
+...
+671 |     stats: TrainingStats,
+    |     ^^^^^
+
+warning: function `combined_jepa_loss` is never used
+   --> src\ml\jepa.rs:454:4
+    |
+454 | fn combined_jepa_loss(
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: method `find_agent_task` is never used
+   --> src\ml\sacred_swarm.rs:629:8
+    |
+464 | impl SacredSwarm {
+    | ---------------- method in this implementation
+...
+629 |     fn find_agent_task(&self, agent_idx: usize) -> Option<Uuid> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: field `resolved_cache` is never read
+  --> src\ml\conceptual_agglomeration.rs:84:5
+   |
+61 | pub struct ConceptNode {
+   |            ----------- field in this struct
+...
+84 |     resolved_cache: Option<ResolvedAttributes>,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `ConceptNode` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `calm_config` is never read
+   --> src\ml\conceptual_agglomeration.rs:250:5
+    |
+239 | pub struct ConceptGraph {
+    |            ------------ field in this struct
+...
+250 |     calm_config: CALMConfig,
+    |     ^^^^^^^^^^^
+
+warning: methods `extract_relations_from_sentence` and `ensure_concept` are never used
+    --> src\ml\conceptual_agglomeration.rs:953:8
+     |
+ 527 | impl ConceptualReasoner {
+     | ----------------------- methods in this implementation
+...
+ 953 |     fn extract_relations_from_sentence(&mut self, sentence: &str) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1000 |     fn ensure_concept(&mut self, form: &str) -> Uuid {
+     |        ^^^^^^^^^^^^^^
+
+warning: field `embed_dim` is never read
+   --> src\ml\geometric_world_model.rs:944:5
+    |
+936 | pub struct GeometricWorldModel {
+    |            ------------------- field in this struct
+...
+944 |     embed_dim: usize,
+    |     ^^^^^^^^^
+    |
+    = note: `GeometricWorldModel` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `answer_yes_no_question` is never used
+    --> src\ml\geometric_world_model.rs:1032:8
+     |
+ 947 | impl GeometricWorldModel {
+     | ------------------------ method in this implementation
+...
+1032 |     fn answer_yes_no_question(&mut self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `answer_by_relation_scan` is never used
+   --> src\ml\world_knowledge.rs:687:8
+    |
+111 | impl WorldKnowledgeGraph {
+    | ------------------------ method in this implementation
+...
+687 |     fn answer_by_relation_scan(&self, question: &str, choices: &[String]) -> Option<(usize, f32)> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `embed_dim` is never read
+   --> src\ml\consciousness_learner.rs:202:5
+    |
+194 | pub struct DynamicVortex {
+    |            ------------- field in this struct
+...
+202 |     embed_dim: usize,
+    |     ^^^^^^^^^
+    |
+    = note: `DynamicVortex` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `web_learner` is never read
+   --> src\ml\consciousness_learner.rs:456:5
+    |
+440 | pub struct ConsciousnessLearner {
+    |            -------------------- field in this struct
+...
+456 |     web_learner: crate::ml::web_knowledge::BatchWebLearner,
+    |     ^^^^^^^^^^^
+
+warning: method `integrate_web_knowledge` is never used
+    --> src\ml\consciousness_learner.rs:1303:8
+     |
+ 550 | impl ConsciousnessLearner {
+     | ------------------------- method in this implementation
+...
+1303 |     fn integrate_web_knowledge(&mut self, knowledge: &crate::ml::web_knowledge::WebKnowledge) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `embed_dim` is never read
+    --> src\ml\consciousness_learner.rs:1455:5
+     |
+1454 | struct SacredAttentionPipeline {
+     |        ----------------------- field in this struct
+1455 |     embed_dim: usize,
+     |     ^^^^^^^^^
+
+warning: fields `proxy_list` and `proxy_index` are never read
+  --> src\ml\web_knowledge.rs:78:5
+   |
+67 | pub struct DuckDuckGoScraper {
+   |            ----------------- fields in this struct
+...
+78 |     proxy_list: Arc<Mutex<Vec<String>>>,
+   |     ^^^^^^^^^^
+...
+81 |     proxy_index: Arc<Mutex<usize>>,
+   |     ^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\ml\web_knowledge.rs:140:8
+    |
+ 92 | impl DuckDuckGoScraper {
+    | ---------------------- associated items in this implementation
+...
+140 |     fn fetch_proxy_list() -> Vec<String> {
+    |        ^^^^^^^^^^^^^^^^
+...
+226 |     fn get_next_proxy(&self) -> Option<String> {
+    |        ^^^^^^^^^^^^^^
+...
+241 |     fn create_client_with_proxy(&self, proxy_url: &str) -> Option<reqwest::Client> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+456 |     async fn search_async_internal(&self, query: &str) -> Result<Vec<SearchResult>, String> {
+    |              ^^^^^^^^^^^^^^^^^^^^^
+...
+480 |     fn parse_html_results(&self, html: &str) -> Vec<SearchResult> {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+592 |     fn extract_link(&self, html: &str) -> Option<(String, String)> {
+    |        ^^^^^^^^^^^^
+...
+612 |     fn extract_text(&self, html: &str) -> String {
+    |        ^^^^^^^^^^^^
+...
+622 |     fn strip_html_tags(&self, html: &str) -> String {
+    |        ^^^^^^^^^^^^^^^
+
+warning: fields `min_keyword_len` and `stopwords` are never read
+   --> src\ml\web_knowledge.rs:685:5
+    |
+683 | pub struct WebKnowledgeExtractor {
+    |            --------------------- fields in this struct
+684 |     /// Minimum word length for keywords
+685 |     min_keyword_len: usize,
+    |     ^^^^^^^^^^^^^^^
+686 |     /// Stopwords to filter
+687 |     stopwords: HashSet<String>,
+    |     ^^^^^^^^^
+    |
+    = note: `WebKnowledgeExtractor` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `min_ngram_size` is never read
+   --> src\ml\web_quality_filter.rs:220:5
+    |
+218 | pub struct RepetitionFilter {
+    |            ---------------- field in this struct
+219 |     /// Minimum n-gram size for duplicate detection
+220 |     min_ngram_size: usize,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `RepetitionFilter` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `query`, `fact_indices`, and `was_correct` are never read
+   --> src\ml\calm_web_integration.rs:404:5
+    |
+403 | struct QueryFeedback {
+    |        ------------- fields in this struct
+404 |     query: String,
+    |     ^^^^^
+405 |     fact_indices: Vec<usize>,
+    |     ^^^^^^^^^^^^
+406 |     was_correct: bool,
+    |     ^^^^^^^^^^^
+    |
+    = note: `QueryFeedback` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `word_embeddings` is never read
+  --> src\ml\rag_search.rs:72:5
+   |
+65 | pub struct RAGSearchEngine {
+   |            --------------- field in this struct
+...
+72 |     word_embeddings: HashMap<String, Vec<f32>>,
+   |     ^^^^^^^^^^^^^^^
+
+warning: fields `embed_dim`, `encoder`, and `entity_patterns` are never read
+   --> src\ml\sacred_attention.rs:194:5
+    |
+192 | pub struct KeywordExtractionHeader {
+    |            ----------------------- fields in this struct
+193 |     /// Embedding dimension
+194 |     embed_dim: usize,
+    |     ^^^^^^^^^
+195 |     /// World encoder for embeddings
+196 |     encoder: WorldEncoder,
+    |     ^^^^^^^
+...
+200 |     entity_patterns: HashMap<String, EntityType>,
+    |     ^^^^^^^^^^^^^^^
+
+warning: field `embed_dim` is never read
+   --> src\ml\sacred_attention.rs:375:5
+    |
+373 | pub struct RelationVerificationHeader {
+    |            -------------------------- field in this struct
+374 |     /// Embedding dimension
+375 |     embed_dim: usize,
+    |     ^^^^^^^^^
+
+warning: field `embed_dim` is never read
+   --> src\ml\sacred_attention.rs:566:5
+    |
+564 | pub struct KnowledgeIntegrationHeader {
+    |            -------------------------- field in this struct
+565 |     /// Embedding dimension
+566 |     embed_dim: usize,
+    |     ^^^^^^^^^
+
+warning: constant `SACRED_POSITIONS` is never used
+  --> src\ml\vortex_diffusion.rs:58:7
+   |
+58 | const SACRED_POSITIONS: [u8; 3] = [3, 6, 9];
+   |       ^^^^^^^^^^^^^^^^
+
+warning: constant `FULL_TRAVERSAL` is never used
+  --> src\ml\vortex_diffusion.rs:61:7
+   |
+61 | const FULL_TRAVERSAL: [u8; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+   |       ^^^^^^^^^^^^^^
+
+warning: fields `vortex` and `source_memory` are never read
+   --> src\cognition\thinking.rs:176:5
+    |
+174 | pub struct ThinkingEngine {
+    |            -------------- fields in this struct
+175 |     pub config: ThinkingConfig,
+176 |     vortex: VortexPositioningEngine,
+    |     ^^^^^^
+...
+197 |     source_memory: Vec<(String, Vec<BeamTensor>, f32, u64)>, // (source, beams, relevance, cycle_learned)
+    |     ^^^^^^^^^^^^^
+
+warning: method `learn_concept` is never used
+   --> src\cognition\thinking.rs:392:8
+    |
+200 | impl ThinkingEngine {
+    | ------------------- method in this implementation
+...
+392 |     fn learn_concept(&mut self, concept: &str) {
+    |        ^^^^^^^^^^^^^
+
+warning: field `path` is never read
+   --> src\cognition\memory.rs:187:5
+    |
+178 | pub struct MemoryStore {
+    |            ----------- field in this struct
+...
+187 |     path: Option<String>,
+    |     ^^^^
+
+warning: method `load_all` is never used
+   --> src\cognition\memory.rs:382:8
+    |
+190 | impl MemoryStore {
+    | ---------------- method in this implementation
+...
+382 |     fn load_all(&mut self) -> anyhow::Result<()> {
+    |        ^^^^^^^^
+
+warning: field `assertive_phrases` is never read
+   --> src\cognition\constitution.rs:509:5
+    |
+503 | pub struct TruthChecker {
+    |            ------------ field in this struct
+...
+509 |     assertive_phrases: Vec<String>,
+    |     ^^^^^^^^^^^^^^^^^
+
+warning: field `term_index` is never read
+   --> src\cognition\atman.rs:121:5
+    |
+116 | pub struct Atman {
+    |            ----- field in this struct
+...
+121 |     term_index: HashMap<String, Vec<(PathBuf, usize)>>,
+    |     ^^^^^^^^^^
+
+warning: methods `wrap_knowledge_response` and `compose_answer_from_facts` are never used
+    --> src\engine.rs:1777:8
+     |
+ 283 | impl VortexEngine {
+     | ----------------- methods in this implementation
+...
+1777 |     fn wrap_knowledge_response(&self, question: &str, raw_answer: &str) -> String {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+1815 |     fn compose_answer_from_facts(&self, question: &str, facts: &[&str]) -> String {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&std::string::String` instead of cloning the inner type
+    --> src\data\real_benchmarks.rs:5236:64
+     |
+5236 |                     either_locs.iter().filter(|l| seen.insert(l.clone())).cloned().collect()
+     |                                                                ^^^^^^^^
+     |
+     = note: `#[warn(suspicious_double_ref_op)]` on by default
+
+warning: using `.clone()` on a double reference, which returns `&std::string::String` instead of cloning the inner type
+   --> src\data\inference_audit.rs:416:45
+    |
+416 |         sources.sort_by_key(|(name, _)| name.clone());
+    |                                             ^^^^^^^^
+
+warning: `vortex` (lib) generated 184 warnings (run `cargo fix --lib -p vortex` to apply 139 suggestions)
+warning: unused import: `EncodedGrid`
+  --> src\bin\arc_eval.rs:19:46
+   |
+19 |     ArcGrid, GridEncoder, GridEncoderConfig, EncodedGrid, TransformEncoding,
+   |                                              ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `solve as vortex_solve`
+  --> src\bin\arc_eval.rs:27:5
+   |
+27 |     solve as vortex_solve, CausalGraph, DSLOp,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `eustress_vortex_core::hypothesis_tree::SimulationBudget`
+  --> src\bin\arc_eval.rs:30:5
+   |
+30 | use eustress_vortex_core::hypothesis_tree::SimulationBudget;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `WorldState`
+  --> src\bin\arc_eval.rs:28:5
+   |
+28 |     WorldState as VortexWorldState,
+   |     ^^^^^^^^^^
+
+warning: variable `total_cells` is assigned to, but never used
+   --> src\bin\arc_eval.rs:821:17
+    |
+821 |             let mut total_cells = 0usize;
+    |                 ^^^^^^^^^^^^^^^
+    |
+    = note: consider using `_total_cells` instead
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `total_cells` is never read
+   --> src\bin\arc_eval.rs:837:25
+    |
+837 |                         total_cells += 1;
+    |                         ^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ex`
+    --> src\bin\arc_eval.rs:1125:13
+     |
+1125 |         let ex = &task.train[0];
+     |             ^^ help: if this is intentional, prefix it with an underscore: `_ex`
+
+warning: unused variable: `task`
+    --> src\bin\arc_eval.rs:1160:55
+     |
+1160 |         &self, input: &ArcGrid, rule: &TransformRule, task: &ArcTask,
+     |                                                       ^^^^ help: if this is intentional, prefix it with an underscore: `_task`
+
+warning: variable `has_unknown` is assigned to, but never used
+    --> src\bin\arc_eval.rs:1182:13
+     |
+1182 |         let mut has_unknown = false;
+     |             ^^^^^^^^^^^^^^^
+     |
+     = note: consider using `_has_unknown` instead
+
+warning: value assigned to `has_unknown` is never read
+    --> src\bin\arc_eval.rs:1199:21
+     |
+1199 |                     has_unknown = true;
+     |                     ^^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: fields `size_changes` and `relation_triples` are never read
+   --> src\bin\arc_eval.rs:91:5
+    |
+ 87 | struct TransformRule {
+    |        ------------- fields in this struct
+...
+ 91 |     size_changes: Vec<((usize, usize), (usize, usize))>,
+    |     ^^^^^^^^^^^^
+...
+105 |     relation_triples: Vec<(String, String, String)>,
+    |     ^^^^^^^^^^^^^^^^
+    |
+    = note: `TransformRule` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `ObjectManip` is never constructed
+   --> src\bin\arc_eval.rs:123:5
+    |
+111 | enum TransformType {
+    |      ------------- variant in this enum
+...
+123 |     ObjectManip,
+    |     ^^^^^^^^^^^
+    |
+    = note: `TransformType` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variant `Remap` is never constructed
+   --> src\bin\arc_eval.rs:143:5
+    |
+137 | enum CellSource {
+    |      ---------- variant in this enum
+...
+143 |     Remap(usize, usize),
+    |     ^^^^^
+    |
+    = note: `CellSource` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `symbol_resolver`, `solved`, and `vortex_graph` are never read
+   --> src\bin\arc_eval.rs:155:5
+    |
+152 | struct VortexArcSolver {
+    |        --------------- fields in this struct
+...
+155 |     symbol_resolver: SymbolResolver,
+    |     ^^^^^^^^^^^^^^^
+156 |     solved: usize,
+    |     ^^^^^^
+...
+159 |     vortex_graph: CausalGraph,
+    |     ^^^^^^^^^^^^
+
+warning: function `is_rotation_180` is never used
+    --> src\bin\arc_eval.rs:1426:4
+     |
+1426 | fn is_rotation_180(input: &Vec<Vec<u8>>, output: &Vec<Vec<u8>>) -> bool {
+     |    ^^^^^^^^^^^^^^^
+
+warning: function `is_rotation_270` is never used
+    --> src\bin\arc_eval.rs:1433:4
+     |
+1433 | fn is_rotation_270(input: &Vec<Vec<u8>>, output: &Vec<Vec<u8>>) -> bool {
+     |    ^^^^^^^^^^^^^^^
+
+warning: function `is_transpose` is never used
+    --> src\bin\arc_eval.rs:1454:4
+     |
+1454 | fn is_transpose(input: &Vec<Vec<u8>>, output: &Vec<Vec<u8>>) -> bool {
+     |    ^^^^^^^^^^^^
+
+warning: `vortex` (bin "arc-eval") generated 17 warnings (run `cargo fix --bin "arc-eval" -p vortex` to apply 5 suggestions)
+    Finished `release` profile [optimized] target(s) in 1.97s
+     Running `target\release\arc-eval.exe --data-dir ../benchmarks/data --output arc_eval_vortex.json`
++===============================================================+
+|         ARC-AGI VORTEX EVALUATION                             |
+|         GridEncoder + CausalModel + SymbolResolver            |
++===============================================================+
+| Data dir:  ../benchmarks/data
+| Split:     training
+| Limit:     all
++===============================================================+
+
+[DATA] Loading from: ../benchmarks/data/arc-agi-3/arc_agi_3_evaluation.json
+[LOADED] 400 tasks (400 available)
+
+[   1/ 400] FAIL 00576224 (0/1 tests, 212.0ms)
+[  51/ 400] FAIL 1da012fc (0/1 tests, 3973.6ms)
+[ 101/ 400] FAIL 42918530 (0/1 tests, 8303.2ms)
+[ 109/ 400] OK 48131b3c (1/1 tests, 371.6ms)
+[ 149/ 400] OK 60c09cac (1/1 tests, 330.5ms)
+[ 151/ 400] FAIL 62ab2642 (0/1 tests, 1647.2ms)
+[ 157/ 400] OK 66e6c45b (1/1 tests, 150.5ms)
+[ 200/ 400] OK 84f2aca1 (1/1 tests, 2388.2ms)
+[ 201/ 400] OK 8597cfd7 (1/1 tests, 1379.2ms)
+[ 251/ 400] FAIL a57f2f04 (0/1 tests, 6345.2ms)
+[ 301/ 400] FAIL c663677b (0/1 tests, 11724.6ms)
+[ 341/ 400] OK e1baa8a4 (1/1 tests, 2425.9ms)
+[ 351/ 400] FAIL e619ca6e (0/1 tests, 12178.1ms)
+
++===============================================================+
+|  ARC-AGI RESULTS                                              |
++===============================================================+
+| Tasks solved:  6/400 (1.5%)
+| Tests correct: 7/419 (1.7%)
+| Time:          1505.1s (3762.7ms/task)
++===============================================================+
+
+By transform type:
+  Complex              2/125 (1.6%)
+  Scale                2/26 (7.7%)
+  Fill                 2/249 (0.8%)
+
+[SAVED] Results to arc_eval_vortex.json

@@ -7,7 +7,9 @@
 pub mod grid;
 pub mod dsl;
 pub mod analysis;
+pub mod objects;
 
 pub use grid::Grid2D;
 pub use dsl::GridDSL;
 pub use analysis::GridAnalyzer;
+pub use objects::{ObjectExtractor, ObjectMap, GridObject, BBox, Connectivity};

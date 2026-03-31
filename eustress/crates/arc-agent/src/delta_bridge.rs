@@ -4,10 +4,10 @@
 //! SceneDelta uses rkyv zero-copy serialization for Iggy wire format.
 //! This module converts between them for Iggy publishing.
 
-#[cfg(feature = "iggy-streaming")]
+#[cfg(feature = "eustress-streaming")]
 pub mod iggy_bridge {
     use eustress_arc_policy::scene_mirror::{ArcDeltaKind, ArcSceneDelta};
-    use eustress_common::iggy_delta::{
+    use eustress_common::stream_delta::{
         DeltaKind, NamePayload, PartPayload, SceneDelta, TransformPayload,
     };
 

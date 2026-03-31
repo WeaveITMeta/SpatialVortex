@@ -80,3 +80,10 @@ checkpoints/
 # EustressEngine sparse checkout — build artefacts only, source is tracked
 eustress/target/
 eustress/.git/
+
+# Local state data
+local_data/
+
+# Embedded repo clones (not submodules)
+ARC-AGI-3-Agents/
+eustress_engine_tmp/

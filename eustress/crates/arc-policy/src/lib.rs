@@ -2,6 +2,11 @@ pub mod scene_mirror;
 pub mod space_writer;
 pub mod symbolic_decomposer;
 pub mod world_model;
+pub mod object_tracker;
+pub mod exploration;
+pub mod goal_inference;
+pub mod level_analysis;
+pub mod mcts;
 
 use eustress_arc_types::{ArcStep, PolicyDecision};
 
