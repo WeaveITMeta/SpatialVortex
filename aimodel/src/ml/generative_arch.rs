@@ -2415,6 +2415,105 @@ impl GenerativeVortexEngine {
         }
     }
 
+    /// Compute the mean per-token log-likelihood of `choice` as a continuation
+    /// of `context` under the trained CALM generation head (Phase 3).
+    ///
+    /// This is the standard language-model scoring used for multiple-choice
+    /// tasks like MMLU and HellaSwag: the choice with the highest log-likelihood
+    /// conditional on the question context is most plausible according to the
+    /// generative model.
+    ///
+    /// Algorithm:
+    ///   - Tokenize `context` and `choice` with the BPE tokenizer.
+    ///   - For each choice token at position t:
+    ///       1. Build the running token list = context ++ choice[..t].
+    ///       2. Average the token embeddings → context vector (same pooling as
+    ///          `pretrain_calm`, so the gen_head sees the distribution it was
+    ///          trained on).
+    ///       3. Encode via CALM → latent.
+    ///       4. Run `generation_head.forward` → logits over vocab.
+    ///       5. Accumulate log-softmax(logits)[choice_token].
+    ///   - Return the mean log-probability (≤ 0; 0 = perfect prediction).
+    ///
+    /// Returns `f32::NEG_INFINITY` if either tokenization is empty.
+    ///
+    /// Complexity: O(T² · D) where T = choice token count, D = latent_dim.
+    /// Choice tokens are capped at 32 to bound cost for long HellaSwag endings.
+    pub fn score_choice_loglikelihood(&self, context: &str, choice: &str) -> f32 {
+        let ctx_tokens = self.tokenizer.tokenize(context);
+        let choice_tokens = self.tokenizer.tokenize(choice);
+
+        if ctx_tokens.is_empty() || choice_tokens.is_empty() {
+            return f32::NEG_INFINITY;
+        }
+
+        // Cap choice token count so HellaSwag-style long endings don't dominate
+        // inference wall-time. Mean log-prob stays comparable across choices
+        // since we average at the end.
+        let max_choice_tokens = 32;
+        let choice_tokens: &[u32] =
+            &choice_tokens[..choice_tokens.len().min(max_choice_tokens)];
+
+        let latent_dim = self.config.latent_dim;
+        let vocab_size = self.generation_head.vocab_size;
+
+        // Running token list — grows by one choice token per step. Using a
+        // single Vec and `push` avoids re-allocating inside the loop.
+        let mut full_tokens: Vec<u32> = ctx_tokens;
+
+        let mut total_log_prob = 0.0f32;
+        let mut scored_positions: usize = 0;
+
+        for &target_token in choice_tokens.iter() {
+            // Pool embeddings of the running context (question + choice prefix).
+            let embeds = self.tokenizer.get_embeddings(&full_tokens);
+            if embeds.is_empty() {
+                full_tokens.push(target_token);
+                continue;
+            }
+            let mut pooled = vec![0.0f32; latent_dim];
+            for embed in &embeds {
+                for (i, &val) in embed.iter().enumerate() {
+                    if i < pooled.len() {
+                        pooled[i] += val;
+                    }
+                }
+            }
+            let n = embeds.len() as f32;
+            for val in &mut pooled {
+                *val /= n;
+            }
+
+            // CALM encode → latent → generation_head logits.
+            let beams = self.embedding_to_beams(&pooled);
+            let latent = self.calm.encode(&beams);
+            let logits = self.generation_head.forward(&latent.latent);
+
+            // log-softmax at the target token index.
+            let target_idx = target_token as usize;
+            if target_idx < vocab_size && target_idx < logits.len() {
+                let max_logit = logits
+                    .iter()
+                    .cloned()
+                    .fold(f32::NEG_INFINITY, f32::max);
+                // Numerically stable log-sum-exp.
+                let exp_sum: f32 = logits.iter().map(|&l| (l - max_logit).exp()).sum();
+                if exp_sum > 0.0 {
+                    let log_prob = logits[target_idx] - max_logit - exp_sum.ln();
+                    total_log_prob += log_prob;
+                    scored_positions += 1;
+                }
+            }
+
+            full_tokens.push(target_token);
+        }
+
+        if scored_positions == 0 {
+            return f32::NEG_INFINITY;
+        }
+        total_log_prob / scored_positions as f32
+    }
+
     /// Load and pretrain from HuggingFace-style dataset
     pub fn pretrain_from_dataset(&mut self, dataset_texts: Vec<String>, epochs: usize) {
         println!("Loading {} texts from dataset...", dataset_texts.len());

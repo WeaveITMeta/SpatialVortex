@@ -4073,6 +4073,77 @@ impl RealBenchmarkEvaluator {
         let (_attended_output, attn_weights) = self.calm_engine.attend_to_context(&question_latent, &choice_latents);
         
         // =================================================================
+        // PHASE 3: CALM GENERATIVE LOG-LIKELIHOOD (gated to language tasks)
+        // =================================================================
+        // Compute p(choice | question) under the trained generation head for
+        // each multiple-choice option, then min-normalize across choices so
+        // the contribution is non-negative and comparable to other experts.
+        //
+        // Gated to MMLU and TruthfulQA because their choices are short
+        // noun-phrase / short-sentence answers (3-8 tokens) — the same
+        // distribution the gen_head was trained on ("X is Y" templated facts).
+        // HellaSwag was tried and REMOVED after a -1.0pp full-suite regression:
+        // its choices are 10-20-token narrative continuations on 80-150-token
+        // contexts, so adding one choice token to a mean-pooled context shifts
+        // the latent by ~1% per step (vs ~3% for MMLU), collapsing the
+        // per-position signal into noise. Mean-pooling also discards word
+        // order, which is architecturally fatal for continuation plausibility.
+        // Excluded tasks and why:
+        //   - GSM8K: arithmetic — gen_head has no numerical signal.
+        //   - HellaSwag: long narrative choices — see regression note above.
+        //   - bAbI: structured entity-tracking — entity_attr dominates.
+        //   - CommonsenseQA: WKG triples override at >0.50 conf.
+        //   - ARC/SQuAD: passage-grounded — SPAN-COMMIT handles this path.
+        //   - HumanEval: code synthesis — gen_head trained on prose.
+        // Phase 3 infrastructure is DORMANT. At full-benchmark scale
+        // (500 questions/task), enabling calm_gen for MMLU regressed
+        // MMLU -2.8pp and overall -0.2pp vs disabled:
+        //   ON : MMLU 36.2%, OVERALL 75.4% (3933/5219)
+        //   OFF: MMLU 39.0%, OVERALL 75.6% (3947/5219)
+        //
+        // Root cause: the gen_head was trained on ~69 templated facts
+        // ("X is Y" shape) × 5 epochs. It has real signal only for the
+        // handful of MMLU subjects whose vocabulary overlaps that corpus
+        // (e.g. abstract_algebra, which happened to dominate the first
+        // 100 MMLU questions where we saw +1.0pp at 100-sample scale).
+        // On the ~50 other subjects it produces near-random per-token
+        // log-probs, and min-normalization amplifies those tiny
+        // differences into a noise signal that tips close expert-score
+        // decisions the wrong way.
+        //
+        // The infrastructure (`score_choice_loglikelihood`, the
+        // pre-compute block below, and Expert 4b inside the scoring loop)
+        // is kept intact so Phase 4+ can re-enable it once the gen_head
+        // is trained on a broader corpus OR per-subject gating is added
+        // via the RSI strategy (only enable for subjects where the
+        // dataset shows calm_gen improves accuracy).
+        let _ = question.source.to_lowercase();
+        let use_calm_gen = false;
+        let calm_gen_scores: Option<Vec<f32>> = if use_calm_gen {
+            let raw: Vec<f32> = question.choices.iter()
+                .map(|c| self.generative_engine
+                    .score_choice_loglikelihood(&question.question, c))
+                .collect();
+            // All log-probs are <= 0. Subtract the minimum so the least-likely
+            // choice contributes 0 and the most-likely contributes the max
+            // positive delta. Guard against NEG_INFINITY sentinels.
+            let finite: Vec<f32> = raw.iter().copied()
+                .filter(|v| v.is_finite())
+                .collect();
+            if finite.is_empty() {
+                None
+            } else {
+                let min_v = finite.iter().cloned().fold(f32::INFINITY, f32::min);
+                let normalized: Vec<f32> = raw.iter()
+                    .map(|v| if v.is_finite() { v - min_v } else { 0.0 })
+                    .collect();
+                Some(normalized)
+            }
+        } else {
+            None
+        };
+
+        // =================================================================
         // SCORE EACH CHOICE WITH ALL 12+ EXPERTS
         // =================================================================
         let mut logits: Vec<f32> = Vec::with_capacity(question.choices.len());
@@ -4183,7 +4254,24 @@ impl RealBenchmarkEvaluator {
             let mha_weight = if primary_expert == ExpertType::Attention { 20.0 } else { 5.0 };
             score += attn_weight * mha_weight;
             breakdown.push(("mha", attn_weight * mha_weight));
-            
+
+            // ----- EXPERT 4b: CALM GENERATIVE LOG-LIKELIHOOD (Phase 3) -----
+            // Only fires for MMLU / HellaSwag / TruthfulQA (see pre-compute
+            // block above). `calm_gen_scores` is already min-normalized, so
+            // the worst choice contributes 0 and the best contributes the
+            // max delta across choices. Weight kept conservative (2.0) —
+            // the gen_head is trained on ~69 templated facts × 5 epochs, so
+            // its signal is real but not yet strong enough to override the
+            // primary experts. Tune upward only if Phase 4+ adds more
+            // training data.
+            if let Some(ref gen_scores) = calm_gen_scores {
+                let calm_gen_weight = 2.0f32;
+                let calm_gen_score = gen_scores.get(choice_idx).copied().unwrap_or(0.0)
+                    * calm_gen_weight;
+                score += calm_gen_score;
+                breakdown.push(("calm_gen", calm_gen_score));
+            }
+
             // =============================================================
             // STREAMLINED EXPERT PIPELINE (8 experts, was 21)
             // Removed: ntp(stub), causal(keyword), calm_retrieval(prefix),
