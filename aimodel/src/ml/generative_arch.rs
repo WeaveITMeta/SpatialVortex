@@ -2415,6 +2415,158 @@ impl GenerativeVortexEngine {
         }
     }
 
+    /// Fine-tune ONLY the `generation_head` on a broader prose corpus (Phase 4).
+    ///
+    /// Unlike `pretrain_calm`, this method leaves contrastive projections,
+    /// encoder/decoder weights, and the tokenizer's BPE untouched. Only the
+    /// next-token cross-entropy gradient flows into
+    /// `generation_head.projection` and `generation_head.bias`.
+    ///
+    /// Purpose: after `pretrain_calm` has trained gen_head on the narrow
+    /// templated Q&A corpus (~69 facts), run this pass on a broad harvested
+    /// corpus so gen_head learns vocabulary coverage for out-of-domain
+    /// subjects (e.g. MMLU's 57 subjects). Without this step, the Phase 3
+    /// calm_gen scorer produces near-random log-probs on OOD subjects (see
+    /// the A/B comment in `generative_inference`).
+    ///
+    /// Invariants:
+    ///   - Must be called AFTER `pretrain_calm` — that call re-initializes
+    ///     `generation_head` with fresh weights, which would wipe any earlier
+    ///     fine-tuning done by this method.
+    ///   - Uses the existing tokenizer; does not re-learn BPE. If the
+    ///     tokenizer vocabulary drifts from the gen_head's `vocab_size`,
+    ///     out-of-range targets are silently skipped.
+    ///   - Contrastive / reconstruction losses are NEVER computed here, so
+    ///     CommonsenseQA / WinoGrande / PIQA accuracies stay stable.
+    ///
+    /// Complexity: O(epochs · texts · min(T, 16)² · (D + V)) where T is text
+    /// length, D is `latent_dim`, V is `vocab_size`. Each position recomputes
+    /// the mean-pooled context embedding, matching the distribution the
+    /// scorer at inference time will see.
+    pub fn pretrain_generation_only(
+        &mut self,
+        texts: &[String],
+        epochs: usize,
+        learning_rate: f32,
+    ) {
+        if texts.is_empty() || epochs == 0 {
+            return;
+        }
+        println!(
+            "  Gen-head fine-tune on {} texts for {} epochs (lr={:.4})...",
+            texts.len(), epochs, learning_rate,
+        );
+
+        let latent_dim = self.config.latent_dim;
+        let vocab_size = self.generation_head.vocab_size;
+
+        // Pre-tokenize every text once — BPE is already learned at this point.
+        let all_tokens: Vec<Vec<u32>> = texts
+            .iter()
+            .map(|t| self.tokenizer.tokenize(t))
+            .collect();
+
+        for epoch in 0..epochs {
+            let mut total_loss = 0.0f32;
+            let mut scored_positions: usize = 0;
+
+            // Cosine-annealed LR matches `pretrain_calm` for consistency.
+            let lr = learning_rate
+                * 0.5
+                * (1.0 + (std::f32::consts::PI * epoch as f32 / epochs as f32).cos());
+
+            for tokens in all_tokens.iter() {
+                if tokens.len() < 3 {
+                    continue;
+                }
+
+                // Cap at 16 positions/sample to match `pretrain_calm`'s budget
+                // and keep epoch wall-time predictable on 8 k-sentence corpora.
+                let max_positions = tokens.len().min(16);
+                for pos in 1..max_positions {
+                    let target_token = tokens[pos] as usize;
+                    if target_token >= vocab_size {
+                        continue;
+                    }
+
+                    // Pool context tokens 0..pos → latent (same pooling as
+                    // `pretrain_calm` and `score_choice_loglikelihood`, so
+                    // train-time and inference-time distributions match).
+                    let ctx_tokens = &tokens[..pos];
+                    let ctx_embeds = self.tokenizer.get_embeddings(ctx_tokens);
+                    if ctx_embeds.is_empty() {
+                        continue;
+                    }
+                    let mut ctx_embed = vec![0.0f32; latent_dim];
+                    for embed in &ctx_embeds {
+                        for (j, &val) in embed.iter().enumerate() {
+                            if j < ctx_embed.len() {
+                                ctx_embed[j] += val;
+                            }
+                        }
+                    }
+                    for val in &mut ctx_embed {
+                        *val /= ctx_embeds.len() as f32;
+                    }
+
+                    let ctx_beams = self.embedding_to_beams(&ctx_embed);
+                    let ctx_latent = self.calm.encode(&ctx_beams);
+                    let logits = self.generation_head.forward(&ctx_latent.latent);
+
+                    // Numerically stable cross-entropy on the real target.
+                    let max_logit = logits
+                        .iter()
+                        .cloned()
+                        .fold(f32::NEG_INFINITY, f32::max);
+                    let exp_sum: f32 =
+                        logits.iter().map(|&l| (l - max_logit).exp()).sum();
+                    if exp_sum <= 0.0 {
+                        continue;
+                    }
+                    let log_prob = logits
+                        .get(target_token)
+                        .copied()
+                        .unwrap_or(0.0)
+                        - max_logit
+                        - exp_sum.ln();
+                    total_loss += -log_prob;
+                    scored_positions += 1;
+
+                    // Gradient on projection + bias only — leave encoder,
+                    // decoder, and contrastive projection frozen.
+                    let probs: Vec<f32> = logits
+                        .iter()
+                        .map(|&l| (l - max_logit).exp() / exp_sum)
+                        .collect();
+                    let latent_slice = &ctx_latent.latent;
+                    let eff_dim = latent_dim.min(latent_slice.len());
+
+                    for v in 0..vocab_size.min(probs.len()) {
+                        let target_prob = if v == target_token { 1.0 } else { 0.0 };
+                        let grad = probs[v] - target_prob;
+                        let row_base = v * latent_dim;
+                        for l in 0..eff_dim {
+                            let idx = row_base + l;
+                            if idx < self.generation_head.projection.len() {
+                                self.generation_head.projection[idx] -=
+                                    lr * grad * latent_slice[l];
+                            }
+                        }
+                        if v < self.generation_head.bias.len() {
+                            self.generation_head.bias[v] -= lr * grad;
+                        }
+                    }
+                }
+            }
+
+            let n = scored_positions.max(1) as f32;
+            println!(
+                "    Gen-head fine-tune epoch {}/{}: gen_loss={:.4} (lr={:.6})",
+                epoch + 1, epochs, total_loss / n, lr
+            );
+        }
+    }
+
     /// Compute the mean per-token log-likelihood of `choice` as a continuation
     /// of `context` under the trained CALM generation head (Phase 3).
     ///

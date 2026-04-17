@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-17T18:19:54.989972800+00:00",
+  "timestamp": "2026-04-17T19:51:01.218197600+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -18,7 +18,7 @@
       "num_correct": 193,
       "total": 495,
       "avg_confidence": 0.45625746,
-      "time_secs": 40.7641025,
+      "time_secs": 40.3393605,
       "wrong_samples": []
     },
     {
@@ -27,7 +27,7 @@
       "num_correct": 467,
       "total": 495,
       "avg_confidence": 0.45228794,
-      "time_secs": 206.3658777,
+      "time_secs": 211.3843154,
       "wrong_samples": []
     },
     {
@@ -36,7 +36,7 @@
       "num_correct": 182,
       "total": 495,
       "avg_confidence": 0.57151717,
-      "time_secs": 300.3053579,
+      "time_secs": 312.3814899,
       "wrong_samples": []
     },
     {
@@ -45,7 +45,7 @@
       "num_correct": 240,
       "total": 495,
       "avg_confidence": 0.776689,
-      "time_secs": 144.3738716,
+      "time_secs": 151.4415513,
       "wrong_samples": []
     },
     {
@@ -54,7 +54,7 @@
       "num_correct": 159,
       "total": 159,
       "avg_confidence": 0.9981867,
-      "time_secs": 178.6814344,
+      "time_secs": 177.8573172,
       "wrong_samples": []
     },
     {
@@ -63,7 +63,7 @@
       "num_correct": 492,
       "total": 495,
       "avg_confidence": 0.759402,
-      "time_secs": 136.8610361,
+      "time_secs": 137.6030539,
       "wrong_samples": []
     },
     {
@@ -72,7 +72,7 @@
       "num_correct": 256,
       "total": 495,
       "avg_confidence": 0.80157435,
-      "time_secs": 179.4013229,
+      "time_secs": 180.7807271,
       "wrong_samples": []
     },
     {
@@ -81,7 +81,7 @@
       "num_correct": 94,
       "total": 95,
       "avg_confidence": 0.69621164,
-      "time_secs": 75.6319588,
+      "time_secs": 72.1703435,
       "wrong_samples": []
     },
     {
@@ -89,8 +89,8 @@
       "accuracy": 90.52631578947368,
       "num_correct": 86,
       "total": 95,
-      "avg_confidence": 0.5005285,
-      "time_secs": 201.3652979,
+      "avg_confidence": 0.5004775,
+      "time_secs": 191.4704371,
       "wrong_samples": []
     },
     {
@@ -99,7 +99,7 @@
       "num_correct": 71,
       "total": 95,
       "avg_confidence": 0.754333,
-      "time_secs": 46.4200603,
+      "time_secs": 43.6359793,
       "wrong_samples": []
     },
     {
@@ -108,7 +108,7 @@
       "num_correct": 71,
       "total": 95,
       "avg_confidence": 0.74475074,
-      "time_secs": 10.9049594,
+      "time_secs": 10.2352473,
       "wrong_samples": []
     },
     {
@@ -117,7 +117,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.8,
-      "time_secs": 0.0707256,
+      "time_secs": 0.0715671,
       "wrong_samples": []
     },
     {
@@ -125,8 +125,8 @@
       "accuracy": 89.47368421052632,
       "num_correct": 85,
       "total": 95,
-      "avg_confidence": 0.78270555,
-      "time_secs": 5.6020043,
+      "avg_confidence": 0.7827054,
+      "time_secs": 5.1174636,
       "wrong_samples": []
     },
     {
@@ -134,8 +134,8 @@
       "accuracy": 96.84210526315789,
       "num_correct": 92,
       "total": 95,
-      "avg_confidence": 0.5023088,
-      "time_secs": 7.9606144,
+      "avg_confidence": 0.5023093,
+      "time_secs": 7.5225755,
       "wrong_samples": []
     },
     {
@@ -144,7 +144,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.6899997,
-      "time_secs": 0.0459975,
+      "time_secs": 0.0391968,
       "wrong_samples": []
     },
     {
@@ -153,7 +153,7 @@
       "num_correct": 85,
       "total": 95,
       "avg_confidence": 0.80723035,
-      "time_secs": 9.2009142,
+      "time_secs": 8.163736,
       "wrong_samples": []
     },
     {
@@ -162,7 +162,7 @@
       "num_correct": 79,
       "total": 95,
       "avg_confidence": 0.81753284,
-      "time_secs": 16.1950843,
+      "time_secs": 14.2545683,
       "wrong_samples": []
     },
     {
@@ -171,7 +171,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.77563924,
-      "time_secs": 91.8819201,
+      "time_secs": 86.8567682,
       "wrong_samples": []
     },
     {
@@ -180,7 +180,7 @@
       "num_correct": 94,
       "total": 95,
       "avg_confidence": 0.72280043,
-      "time_secs": 117.0984877,
+      "time_secs": 111.3417826,
       "wrong_samples": []
     },
     {
@@ -189,7 +189,7 @@
       "num_correct": 75,
       "total": 95,
       "avg_confidence": 0.7401348,
-      "time_secs": 110.9375416,
+      "time_secs": 112.7083715,
       "wrong_samples": []
     },
     {
@@ -198,7 +198,7 @@
       "num_correct": 88,
       "total": 95,
       "avg_confidence": 0.7954315,
-      "time_secs": 33.103858,
+      "time_secs": 36.5509784,
       "wrong_samples": []
     },
     {
@@ -207,7 +207,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.9977109,
-      "time_secs": 1.2816579,
+      "time_secs": 1.333885,
       "wrong_samples": []
     },
     {
@@ -216,7 +216,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.9977174,
-      "time_secs": 1.1967231,
+      "time_secs": 1.3373152,
       "wrong_samples": []
     },
     {
@@ -225,7 +225,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.9499995,
-      "time_secs": 0.0397994,
+      "time_secs": 0.0444126,
       "wrong_samples": []
     },
     {
@@ -234,7 +234,7 @@
       "num_correct": 92,
       "total": 95,
       "avg_confidence": 0.92105305,
-      "time_secs": 0.0519543,
+      "time_secs": 0.0531777,
       "wrong_samples": []
     },
     {
@@ -243,7 +243,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.81000006,
-      "time_secs": 0.0476525,
+      "time_secs": 0.0500548,
       "wrong_samples": []
     },
     {
@@ -252,7 +252,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.8536556,
-      "time_secs": 8.9303142,
+      "time_secs": 9.2901713,
       "wrong_samples": []
     },
     {
@@ -261,7 +261,7 @@
       "num_correct": 93,
       "total": 95,
       "avg_confidence": 0.7387835,
-      "time_secs": 39.38144,
+      "time_secs": 41.7058369,
       "wrong_samples": []
     },
     {
@@ -270,7 +270,7 @@
       "num_correct": 93,
       "total": 95,
       "avg_confidence": 0.7387764,
-      "time_secs": 41.6165469,
+      "time_secs": 40.1494958,
       "wrong_samples": []
     }
   ],
@@ -278,6 +278,6 @@
     "total_correct": 3947,
     "total_questions": 5219,
     "overall_accuracy": 75.62751484958804,
-    "total_time_secs": 2010.1310561
+    "total_time_secs": 2010.2617351
   }
 }

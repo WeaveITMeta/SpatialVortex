@@ -1672,6 +1672,10 @@ impl RealBenchmarkEvaluator {
         // power downstream benchmarks — which was the Phase-1 regression source.
         // Runs BEFORE the templated pretraining so templated contrastive + gen
         // heads overlay on top of the broader encoder/decoder representation.
+        //
+        // Cap stays at 800 sentences: Phase 4 tested raising to 2000 for
+        // gen-head fine-tuning and saw MMLU regress -5.1pp (see commented-out
+        // Phase 4 block at the bottom of this method for the full finding).
         let harvested = self.bootstrap_corpus_from_benchmarks(800);
         if !harvested.is_empty() {
             println!(
@@ -1740,7 +1744,35 @@ impl RealBenchmarkEvaluator {
         
         // Also train the standalone CALM engine
         self.train_calm_on_texts(&training_texts, epochs, learning_rate);
-        
+
+        // ─── Phase 4 (REVERTED) — gen-head fine-tune on harvested corpus ───
+        // Attempted to cure Phase 3's MMLU -2.8pp regression by fine-tuning
+        // gen_head on 2 000 harvested sentences (3 epochs, lr=0.003) AFTER
+        // pretrain_calm and leaving contrastive / encoder / decoder frozen.
+        // Full-benchmark A/B result at default 500/task limits:
+        //   Phase 2 baseline (no fine-tune, calm_gen off):   MMLU 39.0%, OVERALL 75.6%
+        //   Phase 3 dormant test (calm_gen on, no fine-tune): MMLU 36.2%, OVERALL 75.4%
+        //   Phase 4 (fine-tune + calm_gen on):                MMLU 33.9%, OVERALL 75.1%
+        // Gen-loss only moved 4.31 → 4.24 across 3 epochs (perplexity ≈ 69
+        // on a ~1 000-vocab head, near-random). More data did not help.
+        //
+        // Architectural root cause — the full gen pipeline is unable to do
+        // useful next-token prediction regardless of training data because:
+        //   1. Mean-pooling the context discards word order ("cat sat mat"
+        //      and its shuffle share identical embeddings).
+        //   2. 64-dim latent bottleneck cannot preserve enough signal from
+        //      100-token MMLU contexts to pick the right 1-of-1000 token.
+        //   3. Linear gen_head (projection·latent + bias) cannot capture
+        //      the non-linear combinatorial patterns of real language.
+        //
+        // Fixing any of these requires a Phase 5+ architectural change
+        // (positional encoding, larger latent, MLP gen_head, or switching
+        // to last-token pooling instead of mean-pool). Until one of those
+        // ships the `pretrain_generation_only` method stays dormant.
+        //
+        // The method itself lives in `generative_arch.rs` and is kept for
+        // reuse once the architecture supports it.
+
         println!("[CALM] Pretraining complete in {:.2}s on {} texts", 
                  start.elapsed().as_secs_f32(), training_texts.len());
     }
@@ -4095,28 +4127,26 @@ impl RealBenchmarkEvaluator {
         //   - CommonsenseQA: WKG triples override at >0.50 conf.
         //   - ARC/SQuAD: passage-grounded — SPAN-COMMIT handles this path.
         //   - HumanEval: code synthesis — gen_head trained on prose.
-        // Phase 3 infrastructure is DORMANT. At full-benchmark scale
-        // (500 questions/task), enabling calm_gen for MMLU regressed
-        // MMLU -2.8pp and overall -0.2pp vs disabled:
-        //   ON : MMLU 36.2%, OVERALL 75.4% (3933/5219)
-        //   OFF: MMLU 39.0%, OVERALL 75.6% (3947/5219)
+        // Phase 3 + Phase 4 are both DORMANT. Full-benchmark A/B results
+        // (500 questions/task, 5 219 total) on the MMLU+TruthfulQA gate:
+        //   Phase 2 baseline (OFF):     MMLU 39.0%, OVERALL 75.6%
+        //   Phase 3 ON only:            MMLU 36.2%, OVERALL 75.4% (-0.2pp)
+        //   Phase 4 (ON + fine-tune):   MMLU 33.9%, OVERALL 75.1% (-0.5pp)
+        // Phase 4's gen-head fine-tune on a 2 000-sentence harvested corpus
+        // made things WORSE, not better. Gen-loss barely moved across 3
+        // epochs, confirming an architectural capacity limit, not a data
+        // limit: mean-pooling drops word order, a 64-dim latent is too tight,
+        // and a linear gen_head can't capture real-language patterns. No
+        // amount of extra training data fixes those three things.
         //
-        // Root cause: the gen_head was trained on ~69 templated facts
-        // ("X is Y" shape) × 5 epochs. It has real signal only for the
-        // handful of MMLU subjects whose vocabulary overlaps that corpus
-        // (e.g. abstract_algebra, which happened to dominate the first
-        // 100 MMLU questions where we saw +1.0pp at 100-sample scale).
-        // On the ~50 other subjects it produces near-random per-token
-        // log-probs, and min-normalization amplifies those tiny
-        // differences into a noise signal that tips close expert-score
-        // decisions the wrong way.
-        //
-        // The infrastructure (`score_choice_loglikelihood`, the
-        // pre-compute block below, and Expert 4b inside the scoring loop)
-        // is kept intact so Phase 4+ can re-enable it once the gen_head
-        // is trained on a broader corpus OR per-subject gating is added
-        // via the RSI strategy (only enable for subjects where the
-        // dataset shows calm_gen improves accuracy).
+        // Re-enable only after a Phase 5+ architectural change lands AND an
+        // A/B at full scale shows a positive delta. Gate candidates kept
+        // documented below for that future work:
+        //   - MMLU: short noun-phrase choices, would benefit from real LM.
+        //   - TruthfulQA: wash today (truth_checker overrides), safe to
+        //     include once MMLU is clean.
+        //   - HellaSwag: excluded — long narrative choices + mean-pool make
+        //     the per-position signal collapse. Needs architectural fix.
         let _ = question.source.to_lowercase();
         let use_calm_gen = false;
         let calm_gen_scores: Option<Vec<f32>> = if use_calm_gen {
