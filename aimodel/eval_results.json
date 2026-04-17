@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-17T19:51:01.218197600+00:00",
+  "timestamp": "2026-04-17T20:33:54.197666600+00:00",
   "model_config": {
     "name": "spatialvortex-7b-dev",
     "training_epochs": 0,
@@ -14,11 +14,11 @@
   "task_results": [
     {
       "task": "mmlu",
-      "accuracy": 38.98989898989899,
-      "num_correct": 193,
+      "accuracy": 27.878787878787882,
+      "num_correct": 138,
       "total": 495,
-      "avg_confidence": 0.45625746,
-      "time_secs": 40.3393605,
+      "avg_confidence": 0.37069204,
+      "time_secs": 41.5785956,
       "wrong_samples": []
     },
     {
@@ -26,8 +26,8 @@
       "accuracy": 94.34343434343434,
       "num_correct": 467,
       "total": 495,
-      "avg_confidence": 0.45228794,
-      "time_secs": 211.3843154,
+      "avg_confidence": 0.4522725,
+      "time_secs": 210.235758,
       "wrong_samples": []
     },
     {
@@ -35,8 +35,8 @@
       "accuracy": 36.76767676767677,
       "num_correct": 182,
       "total": 495,
-      "avg_confidence": 0.57151717,
-      "time_secs": 312.3814899,
+      "avg_confidence": 0.57151014,
+      "time_secs": 326.3301436,
       "wrong_samples": []
     },
     {
@@ -44,8 +44,8 @@
       "accuracy": 48.484848484848484,
       "num_correct": 240,
       "total": 495,
-      "avg_confidence": 0.776689,
-      "time_secs": 151.4415513,
+      "avg_confidence": 0.7766769,
+      "time_secs": 148.8498703,
       "wrong_samples": []
     },
     {
@@ -54,7 +54,7 @@
       "num_correct": 159,
       "total": 159,
       "avg_confidence": 0.9981867,
-      "time_secs": 177.8573172,
+      "time_secs": 176.7661493,
       "wrong_samples": []
     },
     {
@@ -62,8 +62,8 @@
       "accuracy": 99.39393939393939,
       "num_correct": 492,
       "total": 495,
-      "avg_confidence": 0.759402,
-      "time_secs": 137.6030539,
+      "avg_confidence": 0.7594013,
+      "time_secs": 134.0119848,
       "wrong_samples": []
     },
     {
@@ -71,8 +71,8 @@
       "accuracy": 51.717171717171716,
       "num_correct": 256,
       "total": 495,
-      "avg_confidence": 0.80157435,
-      "time_secs": 180.7807271,
+      "avg_confidence": 0.8016188,
+      "time_secs": 173.2179988,
       "wrong_samples": []
     },
     {
@@ -80,8 +80,8 @@
       "accuracy": 98.94736842105263,
       "num_correct": 94,
       "total": 95,
-      "avg_confidence": 0.69621164,
-      "time_secs": 72.1703435,
+      "avg_confidence": 0.6962116,
+      "time_secs": 70.9168371,
       "wrong_samples": []
     },
     {
@@ -89,8 +89,8 @@
       "accuracy": 90.52631578947368,
       "num_correct": 86,
       "total": 95,
-      "avg_confidence": 0.5004775,
-      "time_secs": 191.4704371,
+      "avg_confidence": 0.50047064,
+      "time_secs": 196.1674625,
       "wrong_samples": []
     },
     {
@@ -99,7 +99,7 @@
       "num_correct": 71,
       "total": 95,
       "avg_confidence": 0.754333,
-      "time_secs": 43.6359793,
+      "time_secs": 44.5618202,
       "wrong_samples": []
     },
     {
@@ -108,7 +108,7 @@
       "num_correct": 71,
       "total": 95,
       "avg_confidence": 0.74475074,
-      "time_secs": 10.2352473,
+      "time_secs": 10.1558277,
       "wrong_samples": []
     },
     {
@@ -117,7 +117,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.8,
-      "time_secs": 0.0715671,
+      "time_secs": 0.0811044,
       "wrong_samples": []
     },
     {
@@ -125,8 +125,8 @@
       "accuracy": 89.47368421052632,
       "num_correct": 85,
       "total": 95,
-      "avg_confidence": 0.7827054,
-      "time_secs": 5.1174636,
+      "avg_confidence": 0.7826787,
+      "time_secs": 5.1413898,
       "wrong_samples": []
     },
     {
@@ -134,8 +134,8 @@
       "accuracy": 96.84210526315789,
       "num_correct": 92,
       "total": 95,
-      "avg_confidence": 0.5023093,
-      "time_secs": 7.5225755,
+      "avg_confidence": 0.50230825,
+      "time_secs": 7.473578,
       "wrong_samples": []
     },
     {
@@ -144,7 +144,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.6899997,
-      "time_secs": 0.0391968,
+      "time_secs": 0.0465566,
       "wrong_samples": []
     },
     {
@@ -152,8 +152,8 @@
       "accuracy": 89.47368421052632,
       "num_correct": 85,
       "total": 95,
-      "avg_confidence": 0.80723035,
-      "time_secs": 8.163736,
+      "avg_confidence": 0.8072336,
+      "time_secs": 8.420456,
       "wrong_samples": []
     },
     {
@@ -161,8 +161,8 @@
       "accuracy": 83.15789473684211,
       "num_correct": 79,
       "total": 95,
-      "avg_confidence": 0.81753284,
-      "time_secs": 14.2545683,
+      "avg_confidence": 0.81753266,
+      "time_secs": 14.5614082,
       "wrong_samples": []
     },
     {
@@ -171,7 +171,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.77563924,
-      "time_secs": 86.8567682,
+      "time_secs": 88.0219209,
       "wrong_samples": []
     },
     {
@@ -180,7 +180,7 @@
       "num_correct": 94,
       "total": 95,
       "avg_confidence": 0.72280043,
-      "time_secs": 111.3417826,
+      "time_secs": 108.5925376,
       "wrong_samples": []
     },
     {
@@ -188,8 +188,8 @@
       "accuracy": 78.94736842105263,
       "num_correct": 75,
       "total": 95,
-      "avg_confidence": 0.7401348,
-      "time_secs": 112.7083715,
+      "avg_confidence": 0.7401347,
+      "time_secs": 111.588757,
       "wrong_samples": []
     },
     {
@@ -197,8 +197,8 @@
       "accuracy": 92.63157894736842,
       "num_correct": 88,
       "total": 95,
-      "avg_confidence": 0.7954315,
-      "time_secs": 36.5509784,
+      "avg_confidence": 0.7954399,
+      "time_secs": 34.3204063,
       "wrong_samples": []
     },
     {
@@ -207,7 +207,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.9977109,
-      "time_secs": 1.333885,
+      "time_secs": 1.1683754,
       "wrong_samples": []
     },
     {
@@ -216,7 +216,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.9977174,
-      "time_secs": 1.3373152,
+      "time_secs": 1.1487837,
       "wrong_samples": []
     },
     {
@@ -225,7 +225,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.9499995,
-      "time_secs": 0.0444126,
+      "time_secs": 0.0504417,
       "wrong_samples": []
     },
     {
@@ -234,7 +234,7 @@
       "num_correct": 92,
       "total": 95,
       "avg_confidence": 0.92105305,
-      "time_secs": 0.0531777,
+      "time_secs": 0.0583438,
       "wrong_samples": []
     },
     {
@@ -243,7 +243,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.81000006,
-      "time_secs": 0.0500548,
+      "time_secs": 0.050996,
       "wrong_samples": []
     },
     {
@@ -252,7 +252,7 @@
       "num_correct": 95,
       "total": 95,
       "avg_confidence": 0.8536556,
-      "time_secs": 9.2901713,
+      "time_secs": 8.7545562,
       "wrong_samples": []
     },
     {
@@ -260,8 +260,8 @@
       "accuracy": 97.89473684210527,
       "num_correct": 93,
       "total": 95,
-      "avg_confidence": 0.7387835,
-      "time_secs": 41.7058369,
+      "avg_confidence": 0.73913556,
+      "time_secs": 39.6700669,
       "wrong_samples": []
     },
     {
@@ -269,15 +269,15 @@
       "accuracy": 97.89473684210527,
       "num_correct": 93,
       "total": 95,
-      "avg_confidence": 0.7387764,
-      "time_secs": 40.1494958,
+      "avg_confidence": 0.73877925,
+      "time_secs": 38.812891,
       "wrong_samples": []
     }
   ],
   "overall": {
-    "total_correct": 3947,
+    "total_correct": 3892,
     "total_questions": 5219,
-    "overall_accuracy": 75.62751484958804,
-    "total_time_secs": 2010.2617351
+    "overall_accuracy": 74.57367311745546,
+    "total_time_secs": 2005.1172146
   }
 }

@@ -323,34 +323,59 @@ pub fn load_mmlu(data_dir: &str, subject: Option<&str>) -> Result<Vec<RealBenchm
                 }
             }
             
-            if let Ok(content) = fs::read_to_string(entry.path()) {
-                for (i, line) in content.lines().enumerate() {
-                    let parts: Vec<&str> = line.split(',').collect();
-                    if parts.len() >= 5 {
-                        let q = parts[0].to_string();
-                        let choices = vec![
-                            parts[1].to_string(),
-                            parts[2].to_string(),
-                            parts[3].to_string(),
-                            parts[4].to_string(),
-                        ];
-                        let answer_letter = parts.get(5).unwrap_or(&"A");
-                        let correct = match *answer_letter {
-                            "A" => 0, "B" => 1, "C" => 2, "D" => 3, _ => 0
-                        };
-                        
-                        questions.push(RealBenchmarkQuestion {
-                            id: format!("mmlu_{}_{}", subj, i),
-                            question: q,
-                            choices,
-                            correct_answer: correct,
-                            category: subj.to_string(),
-                            source: "MMLU".to_string(),
-                            difficulty: None,
-                            fewshot_context: String::new(),
-                        });
-                    }
+            // MMLU CSVs use quoted fields with embedded commas (e.g.
+            //   "Find degree for Q(sqrt(2), sqrt(3))", "0", "4", "2", "6", "B"
+            // and rows where choices themselves contain commas:
+            //   ..., "0,1", "0,4", D
+            // The previous loader used `line.split(',')` which fragmented
+            // every quoted field on its internal commas, producing mangled
+            // questions and nonsense choices on ~half of MMLU rows. A proper
+            // CSV parser (respects quoting and `""` escaping) is mandatory.
+            let mut rdr = match csv::ReaderBuilder::new()
+                .has_headers(false)
+                .flexible(true)
+                .from_path(entry.path())
+            {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            for (i, record_res) in rdr.records().enumerate() {
+                let record = match record_res {
+                    Ok(r) => r,
+                    Err(_) => continue, // skip malformed rows
+                };
+                // MMLU row schema: question, A, B, C, D, answer_letter → 6 fields.
+                if record.len() != 6 {
+                    continue;
                 }
+
+                let q = record.get(0).unwrap_or("").to_string();
+                if q.is_empty() {
+                    continue;
+                }
+                let choices = vec![
+                    record.get(1).unwrap_or("").to_string(),
+                    record.get(2).unwrap_or("").to_string(),
+                    record.get(3).unwrap_or("").to_string(),
+                    record.get(4).unwrap_or("").to_string(),
+                ];
+                let answer_letter = record.get(5).unwrap_or("A").trim();
+                let correct = match answer_letter {
+                    "A" => 0, "B" => 1, "C" => 2, "D" => 3,
+                    _ => continue, // reject rows with invalid answer labels
+                };
+
+                questions.push(RealBenchmarkQuestion {
+                    id: format!("mmlu_{}_{}", subj, i),
+                    question: q,
+                    choices,
+                    correct_answer: correct,
+                    category: subj.to_string(),
+                    source: "MMLU".to_string(),
+                    difficulty: None,
+                    fewshot_context: String::new(),
+                });
             }
         }
     }
