@@ -2288,7 +2288,133 @@ impl GenerativeVortexEngine {
         
         println!("CALM pre-training complete. {} total steps.", self.training_steps);
     }
-    
+
+    /// Masked reconstruction pretraining on diverse prose (Phase 2).
+    ///
+    /// Unlike `pretrain_calm`, this method trains ONLY the CALM encoder/decoder
+    /// on a masked-autoencoder objective (BERT/MDLM-style):
+    ///   - Mask ~`mask_prob` of beam positions (zero their digits)
+    ///   - Encode the masked sequence → latent
+    ///   - Decode → reconstruction
+    ///   - Loss = MSE(decoded, ORIGINAL beams)
+    ///
+    /// Crucially, this method does NOT update:
+    ///   - `generation_head` (task-specific next-token distribution)
+    ///   - `calm.contrastive_projection` (task-specific positive/negative margins)
+    ///
+    /// Call this BEFORE `pretrain_calm` so that:
+    ///   1. The encoder/decoder first see diverse real-world prose (breadth),
+    ///   2. Then `pretrain_calm` overlays task-specific contrastive / generation
+    ///      heads on top of the broader representation.
+    ///
+    /// This avoids the Phase-1 regression where joint training on harvested
+    /// corpus shifted the contrastive/gen distributions away from Q&A patterns
+    /// and hurt semantic-similarity benchmarks (CommonsenseQA/WinoGrande/PIQA).
+    pub fn pretrain_masked_reconstruction(
+        &mut self,
+        texts: &[String],
+        epochs: usize,
+        learning_rate: f32,
+        mask_prob: f32,
+    ) {
+        if texts.is_empty() {
+            return;
+        }
+        println!(
+            "  Masked reconstruction on {} texts for {} epochs (mask_prob={:.2})...",
+            texts.len(), epochs, mask_prob
+        );
+
+        // Ensure the tokenizer has some vocabulary — only learn BPE if fresh.
+        // If the tokenizer was already trained (e.g. by a prior call), reuse it
+        // so beam encoding stays consistent with downstream stages.
+        if self.tokenizer.vocab_size() < 50 {
+            self.tokenizer.learn_bpe(texts, 500);
+        }
+
+        // Pre-compute beams once — reconstruction pass doesn't need tokens/embeds.
+        let mut all_beams: Vec<Vec<BeamTensor>> = Vec::with_capacity(texts.len());
+        for text in texts.iter() {
+            let tokens = self.tokenizer.tokenize(text);
+            if tokens.len() < 3 {
+                all_beams.push(Vec::new());
+                continue;
+            }
+            let embeddings = self.tokenizer.get_embeddings(&tokens);
+            let mut text_embed = vec![0.0f32; self.config.latent_dim];
+            for embed in &embeddings {
+                for (i, &val) in embed.iter().enumerate() {
+                    if i < text_embed.len() {
+                        text_embed[i] += val;
+                    }
+                }
+            }
+            if !embeddings.is_empty() {
+                for val in &mut text_embed {
+                    *val /= embeddings.len() as f32;
+                }
+            }
+            let beams = self.embedding_to_beams(&text_embed);
+            all_beams.push(beams);
+        }
+
+        // Masked-autoencoder loop. Cosine-annealed LR like `pretrain_calm`.
+        for epoch in 0..epochs {
+            let lr = learning_rate
+                * 0.5
+                * (1.0 + (std::f32::consts::PI * epoch as f32 / epochs as f32).cos());
+            let mut recon_loss = 0.0f32;
+            let mut count: usize = 0;
+
+            for (idx, beams) in all_beams.iter().enumerate() {
+                if beams.is_empty() {
+                    continue;
+                }
+
+                // Build a masked copy: zero ~mask_prob fraction of beams'
+                // digits. Deterministic pseudo-random via Knuth multiplicative
+                // hash keyed on (epoch, idx, position) so the same corpus
+                // yields the same masking pattern across runs.
+                let mut masked: Vec<BeamTensor> = beams.clone();
+                let seed = ((epoch as u64) << 32) | (idx as u64);
+                let mask_threshold = (mask_prob.clamp(0.0, 1.0) * 1000.0) as u32;
+                for (k, beam) in masked.iter_mut().enumerate() {
+                    let mixed = seed
+                        .wrapping_mul(2654435761)
+                        .wrapping_add(k as u64)
+                        .wrapping_mul(2246822519);
+                    let r = (mixed >> 32) as u32 % 1000;
+                    if r < mask_threshold {
+                        beam.digits = [0.0; 9];
+                    }
+                }
+
+                // Gradient step: encoder/decoder learn to reconstruct ORIGINAL
+                // beams from the masked view. No contrastive / gen-head updates.
+                self.calm.train_step(&masked, beams, lr);
+
+                // Measure reconstruction quality on the masked input.
+                let latent = self.calm.encode(&masked);
+                let decoded = self.calm.decode(&latent);
+                let mut loss = 0.0f32;
+                for (orig, dec) in beams.iter().zip(decoded.iter()) {
+                    for i in 0..9 {
+                        let diff = orig.digits[i] - dec.digits[i];
+                        loss += diff * diff;
+                    }
+                }
+                recon_loss += loss / beams.len().max(1) as f32;
+                count += 1;
+            }
+
+            let n = count.max(1) as f32;
+            println!(
+                "    Masked-recon epoch {}/{}: recon_loss={:.4} (lr={:.6})",
+                epoch + 1, epochs, recon_loss / n, lr
+            );
+        }
+    }
+
     /// Load and pretrain from HuggingFace-style dataset
     pub fn pretrain_from_dataset(&mut self, dataset_texts: Vec<String>, epochs: usize) {
         println!("Loading {} texts from dataset...", dataset_texts.len());
