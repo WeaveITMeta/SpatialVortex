@@ -1,0 +1,32 @@
+# Vortex API — developer-facing deployment
+#
+# From the repo root:
+#   docker compose -f aimodel/docker-compose.yml up -d --build
+#
+# Set VORTEX_ADMIN_KEY in your environment (or .env next to this file)
+# before first boot; otherwise one is auto-generated and printed in the logs
+# and persisted to the key store volume.
+
+services:
+  vortex-api:
+    build:
+      context: ..
+      dockerfile: aimodel/Dockerfile
+    ports:
+      - "7000:7000"
+    environment:
+      VORTEX_HOST: 0.0.0.0
+      VORTEX_PORT: 7000
+      VORTEX_REQUIRE_AUTH: "true"
+      VORTEX_ADMIN_KEY: ${VORTEX_ADMIN_KEY:-}
+      VORTEX_KEYS_PATH: /app/data/vortex_keys.json
+      # USD per 1M tokens — tune to your hosting cost; CPU-only inference is cheap
+      VORTEX_PRICE_INPUT_PER_M: ${VORTEX_PRICE_INPUT_PER_M:-0.10}
+      VORTEX_PRICE_OUTPUT_PER_M: ${VORTEX_PRICE_OUTPUT_PER_M:-0.40}
+      RUST_LOG: info
+    volumes:
+      - vortex-keys:/app/data
+    restart: unless-stopped
+
+volumes:
+  vortex-keys:
