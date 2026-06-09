@@ -1,1 +1,33 @@
 /target
+test_cache/
+
+# Eval/debug artifacts — keep canonical results in eval_results*.json only
+arc_*.txt
+arc_eval_*.json
+arc_eval_*output.txt
+benchmark_*.json
+benchmark_*.log
+benchmark_output*
+eval_*output.txt
+eval_babi*.json
+eval_v*.json
+eval_mmlu_debug.json
+eval_fix_check.json
+eval_final*.json
+eval_full_results.json
+gsm8k_debug*.txt
+mmlu_debug*.txt
+span_*.log
+phase*_results.log
+phase1_*.log
+full_run_output.txt
+debug_run.log
+stderr.tmp
+ab_*.log
+honest_*.log
+eval_ab_*.json
+eval_baseline_review.json
+eval_results_honest_v1.json
+
+# Local API server state — contains live keys
+vortex_keys.json

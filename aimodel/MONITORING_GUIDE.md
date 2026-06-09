@@ -1,5 +1,23 @@
 # SpatialVortex Benchmark Monitoring & Improvement Guide
 
+## Phase 0: Integrity Invariants (check before trusting ANY number)
+
+1. **No fixed answer positions** — every synthetic-MCQ loader must route
+   through `finalize_choices()` (seeded shuffle + dedupe). A new loader that
+   sets `correct_answer: 0` directly is a bug.
+2. **No answer-key access in inference** — `question.correct_answer` may only
+   be read for grading/logging, never to pick or bias an answer. Grep for it
+   when touching the decision path.
+3. **Distractors must be plausible** — stubs (`pass`, `return None`) and
+   trivial transforms are not acceptable distractors; use material from the
+   dataset itself (other problems' solutions, real incorrect answers, the
+   task's answer vocabulary).
+4. **A/B at 500/task** — small `--limit` runs skew easy (50-limit ran 82%
+   when the true 500-limit number was 33%). Never compare runs at different
+   limits, and never compare across loader changes.
+5. **Report as MC4** — these are 4-choice variants; free-form leaderboard
+   numbers are context, not competition.
+
 ## Phase 1: Live Monitoring (During Benchmark Run)
 
 ### What to Watch

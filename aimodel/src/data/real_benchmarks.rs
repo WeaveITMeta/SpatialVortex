@@ -405,21 +405,27 @@ pub fn load_gsm8k(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, String> 
             
             // Extract final numeric answer from GSM8K format (after ####)
             let final_answer = answer.split("####").last().unwrap_or("0").trim();
-            
-            // Generate distractors
+
+            // Numeric distractors around the true value; finalize_choices
+            // dedupes collisions (e.g. answer 0 makes half/double collide)
+            // and shuffles so the answer position carries no signal.
             let correct_num: f64 = final_answer.replace(",", "").parse().unwrap_or(0.0);
             let distractors = vec![
-                final_answer.to_string(),
                 format!("{}", (correct_num * 0.5) as i64),
                 format!("{}", (correct_num * 2.0) as i64),
                 format!("{}", (correct_num + 10.0) as i64),
             ];
-            
+            let fallback_a = format!("{}", (correct_num + 1.0) as i64);
+            let fallback_b = format!("{}", (correct_num - 1.0) as i64);
+            let fillers = [fallback_a.as_str(), fallback_b.as_str()];
+            let (choices, correct_answer) =
+                finalize_choices(final_answer.to_string(), distractors, &fillers, i as u64);
+
             questions.push(RealBenchmarkQuestion {
                 id: format!("gsm8k_{}", i),
                 question: question.to_string(),
-                choices: distractors,
-                correct_answer: 0,
+                choices,
+                correct_answer,
                 category: "math".to_string(),
                 source: "GSM8K".to_string(),
                 difficulty: Some("grade_school".to_string()),
@@ -563,30 +569,40 @@ pub fn load_truthfulqa(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, Str
     for (i, line) in content.lines().skip(1).enumerate() { // Skip header
         // Parse CSV with proper quote handling (commas inside quotes)
         let fields = parse_csv_line(line);
-        // Columns: 0=Type, 1=Category, 2=Question, 3=Best Answer, 4=Best Incorrect Answer
+        // Columns: 0=Type, 1=Category, 2=Question, 3=Best Answer,
+        //          4=Best Incorrect Answer, 5=Correct Answers, 6=Incorrect Answers
         if fields.len() >= 5 {
             let question = fields[2].clone();
             let best_answer = fields[3].clone();
-            let incorrect = fields[4].clone();
+            let best_incorrect = fields[4].clone();
             let category = fields[1].clone();
-            
+
             // Skip empty questions
             if question.is_empty() || best_answer.is_empty() {
                 continue;
             }
-            
-            let choices = vec![
+
+            // MC1-style: 1 correct + up to 3 REAL incorrect answers from the
+            // dataset (semicolon-separated column 6), led by Best Incorrect.
+            // Generic fillers only when the dataset offers fewer than 3.
+            let mut distractors = vec![best_incorrect];
+            if let Some(incorrects) = fields.get(6) {
+                for inc in incorrects.split(';') {
+                    distractors.push(inc.trim().to_string());
+                }
+            }
+            let (choices, correct_answer) = finalize_choices(
                 best_answer,
-                incorrect,
-                "I don't know".to_string(),
-                "None of the above".to_string(),
-            ];
-            
+                distractors,
+                &["I don't know", "None of the above"],
+                i as u64,
+            );
+
             questions.push(RealBenchmarkQuestion {
                 id: format!("truthfulqa_{}", i),
                 question,
                 choices,
-                correct_answer: 0,
+                correct_answer,
                 category,
                 source: "TruthfulQA".to_string(),
                 difficulty: None,
@@ -629,6 +645,54 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     fields
 }
 
+/// Build a 4-choice list with the correct answer at a deterministically
+/// shuffled position.
+///
+/// Loaders that synthesize multiple-choice from free-form datasets (GSM8K,
+/// HumanEval, TruthfulQA, bAbI) used to pin the correct answer at index 0,
+/// which leaks the answer to any position-correlated behavior in the scorer.
+/// This helper (1) dedupes distractors that collide with the correct answer
+/// or each other — duplicates turn correctness into a tie-break coin flip —
+/// (2) tops up with fillers when too few distractors survive, and (3)
+/// shuffles with an RNG seeded per question so runs stay reproducible.
+fn finalize_choices(
+    correct: String,
+    distractors: Vec<String>,
+    fillers: &[&str],
+    seed: u64,
+) -> (Vec<String>, usize) {
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
+
+    let mut pool: Vec<String> = vec![correct];
+    for d in distractors {
+        if pool.len() >= 4 {
+            break;
+        }
+        let d_trim = d.trim();
+        if !d_trim.is_empty() && !pool.iter().any(|s| s.trim().eq_ignore_ascii_case(d_trim)) {
+            pool.push(d_trim.to_string());
+        }
+    }
+    for f in fillers {
+        if pool.len() >= 4 {
+            break;
+        }
+        if !pool.iter().any(|s| s.trim().eq_ignore_ascii_case(f)) {
+            pool.push(f.to_string());
+        }
+    }
+
+    let mut indexed: Vec<(usize, String)> = pool.into_iter().enumerate().collect();
+    // Golden-ratio multiplier decorrelates adjacent question indices
+    let mut rng = StdRng::seed_from_u64(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+    indexed.shuffle(&mut rng);
+    let correct_idx = indexed.iter().position(|(orig, _)| *orig == 0).unwrap_or(0);
+    let choices = indexed.into_iter().map(|(_, text)| text).collect();
+    (choices, correct_idx)
+}
+
 // =============================================================================
 // HumanEval Loader (Code Generation)
 // =============================================================================
@@ -640,37 +704,56 @@ pub fn load_humaneval(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, Stri
         return Err(format!("HumanEval not found at {}. Run download_datasets.ps1", he_path));
     }
     
-    let mut questions = Vec::new();
     let content = fs::read_to_string(&he_path)
         .map_err(|e| format!("Failed to read HumanEval: {}", e))?;
-    
+
+    // Pass 1: collect every task's prompt + canonical-solution excerpt.
+    // Distractors are excerpts from OTHER tasks' canonical solutions —
+    // real code that solves the wrong problem — instead of the old
+    // `return None` / `pass` stubs, which any length heuristic separates
+    // from the correct answer for free.
+    let mut tasks: Vec<(String, String, String)> = Vec::new(); // (id, prompt, excerpt)
     for line in content.lines() {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
             let task_id = json.get("task_id").and_then(|v| v.as_str()).unwrap_or("");
             let prompt = json.get("prompt").and_then(|v| v.as_str()).unwrap_or("");
             let canonical = json.get("canonical_solution").and_then(|v| v.as_str()).unwrap_or("");
-            
-            // For MCQ format, we create choices from the canonical solution
-            let choices = vec![
-                canonical.lines().take(3).collect::<Vec<_>>().join("\n"),
-                "return None".to_string(),
-                "raise NotImplementedError()".to_string(),
-                "pass".to_string(),
-            ];
-            
-            questions.push(RealBenchmarkQuestion {
-                id: task_id.to_string(),
-                question: prompt.to_string(),
-                choices,
-                correct_answer: 0,
-                category: "code".to_string(),
-                source: "HumanEval".to_string(),
-                difficulty: None,
-                fewshot_context: String::new(),
-            });
+            let excerpt = canonical.lines().take(3).collect::<Vec<_>>().join("\n");
+            if !task_id.is_empty() && !excerpt.trim().is_empty() {
+                tasks.push((task_id.to_string(), prompt.to_string(), excerpt));
+            }
         }
     }
-    
+
+    // Pass 2: build shuffled 4-choice questions
+    let n = tasks.len();
+    let mut questions = Vec::new();
+    for (i, (task_id, prompt, excerpt)) in tasks.iter().enumerate() {
+        if n < 4 {
+            break; // not enough material for 4 distinct choices
+        }
+        // Fixed strides decorrelate neighbors while staying reproducible
+        let distractors = vec![
+            tasks[(i + 13) % n].2.clone(),
+            tasks[(i + 57) % n].2.clone(),
+            tasks[(i + 101) % n].2.clone(),
+            tasks[(i + 29) % n].2.clone(), // spare in case of dedupe collision
+        ];
+        let (choices, correct_answer) =
+            finalize_choices(excerpt.clone(), distractors, &["pass"], i as u64);
+
+        questions.push(RealBenchmarkQuestion {
+            id: task_id.clone(),
+            question: prompt.clone(),
+            choices,
+            correct_answer,
+            category: "code".to_string(),
+            source: "HumanEval".to_string(),
+            difficulty: None,
+            fewshot_context: String::new(),
+        });
+    }
+
     Ok(questions)
 }
 
@@ -710,18 +793,22 @@ pub fn load_swebench(data_dir: &str, lite: bool) -> Result<Vec<RealBenchmarkQues
             
             // For MCQ format, create choices from patch snippets
             let patch_lines: Vec<&str> = patch.lines().take(5).collect();
-            let choices = vec![
+            let (choices, correct_answer) = finalize_choices(
                 patch_lines.join("\n"),
-                "# No changes needed".to_string(),
-                "raise NotImplementedError('TODO')".to_string(),
-                "pass  # Placeholder".to_string(),
-            ];
-            
+                vec![
+                    "# No changes needed".to_string(),
+                    "raise NotImplementedError('TODO')".to_string(),
+                    "pass  # Placeholder".to_string(),
+                ],
+                &[],
+                i as u64,
+            );
+
             questions.push(RealBenchmarkQuestion {
                 id: instance_id.to_string(),
                 question,
                 choices,
-                correct_answer: 0,
+                correct_answer,
                 category: "software_engineering".to_string(),
                 source: format!("SWE-Bench ({})", if lite { "Lite" } else { "Full" }),
                 difficulty: Some(if test_patch.len() > 500 { "hard" } else { "medium" }.to_string()),
@@ -807,18 +894,22 @@ pub fn load_arc_agi(data_dir: &str) -> Result<Vec<RealBenchmarkQuestion>, String
                 
                 // Create choices: correct output + 3 variations
                 let correct_output_str = grid_to_string(&out_val);
-                let choices = vec![
-                    correct_output_str.clone(),
-                    grid_to_string(&inp_val), // Same as input (no transformation)
-                    create_grid_variation(&out_val, 1), // Slight variation
-                    create_grid_variation(&out_val, 2), // Another variation
-                ];
-                
+                let (choices, correct_answer) = finalize_choices(
+                    correct_output_str,
+                    vec![
+                        grid_to_string(&inp_val), // Same as input (no transformation)
+                        create_grid_variation(&out_val, 1), // Slight variation
+                        create_grid_variation(&out_val, 2), // Another variation
+                    ],
+                    &[],
+                    questions.len() as u64,
+                );
+
                 questions.push(RealBenchmarkQuestion {
                     id: format!("{}_{}", task_id, test_idx),
                     question,
                     choices,
-                    correct_answer: 0,
+                    correct_answer,
                     category: "abstract_reasoning".to_string(),
                     source: "ARC-AGI".to_string(),
                     difficulty: Some("hard".to_string()),
@@ -905,16 +996,21 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
         return Err(format!("bAbI not found at {}. Run download_datasets.ps1", babi_dir));
     }
     
-    let mut questions = Vec::new();
-    
-    // Read directory and find matching files
+    // Pass 1: parse (story+question, answer) pairs and collect the task's
+    // answer vocabulary. Distractors are drawn from answers that actually
+    // occur in this task, replacing the old fixed bathroom/kitchen/garden
+    // list — which duplicated the correct answer whenever it WAS one of
+    // those rooms, and leaked it at index 0 otherwise.
+    let mut parsed: Vec<(String, String)> = Vec::new();
+    let mut vocab: Vec<String> = Vec::new();
+
     if let Ok(entries) = fs::read_dir(&babi_dir) {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().to_string();
             if filename.starts_with(&format!("qa{}_", task_num)) && filename.ends_with("_test.txt") {
                 let content = fs::read_to_string(entry.path())
                     .map_err(|e| format!("Failed to read bAbI file: {}", e))?;
-                
+
                 // Parse bAbI format: lines with questions end with "?" and have answer after tab
                 let mut story = String::new();
                 let mut last_line_num = 0;
@@ -923,7 +1019,7 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
                     if parts.len() < 2 {
                         continue;
                     }
-                    
+
                     // Check if this is a new story (line number reset to 1)
                     if let Ok(line_num) = parts[0].parse::<usize>() {
                         if line_num <= last_line_num {
@@ -932,7 +1028,7 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
                         }
                         last_line_num = line_num;
                     }
-                    
+
                     let text = parts[1];
                     if text.contains('?') {
                         // This is a question line
@@ -940,39 +1036,12 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
                         if q_parts.len() >= 2 {
                             let question = q_parts[0].trim();
                             let answer = q_parts[1].trim().to_lowercase();
-                            
-                            // Create multiple choice from answer
-                            // Handle Yes/No questions (tasks 6, 7, 8) properly
-                            let choices = if answer == "yes" || answer == "no" {
-                                // Yes/No question - put answer first, opposite second
-                                if answer == "yes" {
-                                    vec!["yes".to_string(), "no".to_string(), "maybe".to_string(), "unknown".to_string()]
-                                } else {
-                                    vec!["no".to_string(), "yes".to_string(), "maybe".to_string(), "unknown".to_string()]
-                                }
-                            } else {
-                                // Entity/location answer - create distractors
-                                vec![
-                                    answer.clone(),
-                                    "bathroom".to_string(),
-                                    "kitchen".to_string(), 
-                                    "garden".to_string(),
-                                ]
-                            };
-                            
-                            questions.push(RealBenchmarkQuestion {
-                                id: format!("babi_t{}_{}", task_num, questions.len()),
-                                question: format!("{}\n{}", story.trim(), question),
-                                choices,
-                                correct_answer: 0,
-                                category: format!("babi_task_{}", task_num),
-                                source: "bAbI".to_string(),
-                                difficulty: Some(format!("task_{}", task_num)),
-                                fewshot_context: String::new(),
-                            });
+                            parsed.push((format!("{}\n{}", story.trim(), question), answer.clone()));
+                            if !vocab.contains(&answer) {
+                                vocab.push(answer);
+                            }
                         }
                         // Don't clear story - multiple questions can share the same context
-                        // story.clear();
                     } else {
                         // This is a story line
                         story.push_str(text);
@@ -982,7 +1051,43 @@ pub fn load_babi(data_dir: &str, task_num: usize) -> Result<Vec<RealBenchmarkQue
             }
         }
     }
-    
+
+    vocab.sort();
+
+    // Pass 2: build shuffled 4-choice questions
+    let mut questions = Vec::new();
+    for (i, (question_text, answer)) in parsed.into_iter().enumerate() {
+        let distractors: Vec<String> = if answer == "yes" || answer == "no" {
+            let opposite = if answer == "yes" { "no" } else { "yes" };
+            vec![opposite.to_string(), "maybe".to_string(), "unknown".to_string()]
+        } else {
+            // Stride through the task's answer vocabulary, skipping the
+            // correct answer (finalize_choices also dedupes as a backstop)
+            let pool: Vec<&String> = vocab.iter().filter(|v| **v != answer).collect();
+            if pool.is_empty() {
+                Vec::new()
+            } else {
+                (0..3.min(pool.len()))
+                    .map(|k| pool[(i * 7 + k) % pool.len()].clone())
+                    .collect()
+            }
+        };
+
+        let (choices, correct_answer) =
+            finalize_choices(answer, distractors, &["none", "unknown"], i as u64);
+
+        questions.push(RealBenchmarkQuestion {
+            id: format!("babi_t{}_{}", task_num, i),
+            question: question_text,
+            choices,
+            correct_answer,
+            category: format!("babi_task_{}", task_num),
+            source: "bAbI".to_string(),
+            difficulty: Some(format!("task_{}", task_num)),
+            fewshot_context: String::new(),
+        });
+    }
+
     Ok(questions)
 }
 
@@ -1773,27 +1878,48 @@ impl RealBenchmarkEvaluator {
         // ─── Phase 4 (REVERTED) — gen-head fine-tune on harvested corpus ───
         // Attempted to cure Phase 3's MMLU -2.8pp regression by fine-tuning
         // gen_head on 2 000 harvested sentences (3 epochs, lr=0.003) AFTER
-        // pretrain_calm and leaving contrastive / encoder / decoder frozen.
-        // Full-benchmark A/B result at default 500/task limits:
+        // pretrain_calm. Full-benchmark A/B at 500/task limits:
         //   Phase 2 baseline (no fine-tune, calm_gen off):   MMLU 39.0%, OVERALL 75.6%
         //   Phase 3 dormant test (calm_gen on, no fine-tune): MMLU 36.2%, OVERALL 75.4%
         //   Phase 4 (fine-tune + calm_gen on):                MMLU 33.9%, OVERALL 75.1%
-        // Gen-loss only moved 4.31 → 4.24 across 3 epochs (perplexity ≈ 69
-        // on a ~1 000-vocab head, near-random). More data did not help.
+        // ⚠ Those three rows are NOT trustworthy: they were measured before
+        // commit b09fceb fixed the MMLU CSV parser to honor field quoting.
+        // The broken parser was treating quoted multi-comma choices as
+        // separate fields, so most MMLU items presented the model with
+        // truncated nonsense choices that happened to score well by chance.
+        // The historical 75% OVERALL was an artifact of that bug, not a real
+        // baseline. Keep them here only as historical context — DO NOT use
+        // for A/B comparison against any post-b09fceb run.
         //
-        // Architectural root cause — the full gen pipeline is unable to do
-        // useful next-token prediction regardless of training data because:
-        //   1. Mean-pooling the context discards word order ("cat sat mat"
-        //      and its shuffle share identical embeddings).
-        //   2. 64-dim latent bottleneck cannot preserve enough signal from
-        //      100-token MMLU contexts to pick the right 1-of-1000 token.
-        //   3. Linear gen_head (projection·latent + bias) cannot capture
-        //      the non-linear combinatorial patterns of real language.
+        // ─── Phase 7 — last-K=4 mean-pool fix + honest baseline ───────────
+        // Root cause from Phase 3/4: mean-pooling the entire context washed
+        // out the recency signal that next-token prediction needs. Phase 7
+        // swaps mean-pool-over-all-tokens for mean-pool-over-the-last-4 at
+        // the three gen_head sites (pretrain_calm, pretrain_generation_only,
+        // score_choice_loglikelihood) so train- and inference-time pooling
+        // distributions match. Gate at line ~4170 re-enables calm_gen for
+        // MMLU + TruthfulQA only (HellaSwag stays excluded — its narrative
+        // choices don't fit a 4-token plausibility window).
         //
-        // Fixing any of these requires a Phase 5+ architectural change
-        // (positional encoding, larger latent, MLP gen_head, or switching
-        // to last-token pooling instead of mean-pool). Until one of those
-        // ships the `pretrain_generation_only` method stays dormant.
+        // Phase 7 honest baseline — full suite, 500/task limit, CSV fix in:
+        //   eval_results_phase7_baseline.json (2026-05-10, 2138s, audit on)
+        //     MMLU         27.5%  (136/495)
+        //     GSM8K        93.7%  (464/495)
+        //     HellaSwag    36.8%  (182/495)
+        //     TruthfulQA   48.5%  (240/495)
+        //     HumanEval   100.0%  (159/159)
+        //     OVERALL      55.2%  (1181/2139)
+        // MMLU + HellaSwag are essentially at multiple-choice chance level
+        // (25% for 4-choice), meaning the ensemble has near-zero signal
+        // on those tasks once the CSV parse is honest. GSM8K and HumanEval
+        // carry the overall — those are the real strengths to defend.
+        //
+        // The remaining architectural limits from Phase 4 still apply to
+        // any future calm_gen revival beyond MMLU/TruthfulQA:
+        //   1. 64-dim latent bottleneck on 100+ token contexts.
+        //   2. Linear gen_head can't capture non-linear LM patterns.
+        //   3. Last-K=4 window helps recency but still drops global order.
+        // Phase 5+ candidate: positional encoding + MLP gen_head.
         //
         // The method itself lives in `generative_arch.rs` and is kept for
         // reuse once the architecture supports it.
@@ -4152,28 +4278,27 @@ impl RealBenchmarkEvaluator {
         //   - CommonsenseQA: WKG triples override at >0.50 conf.
         //   - ARC/SQuAD: passage-grounded — SPAN-COMMIT handles this path.
         //   - HumanEval: code synthesis — gen_head trained on prose.
-        // Phase 3 + Phase 4 are both DORMANT. Full-benchmark A/B results
-        // (500 questions/task, 5 219 total) on the MMLU+TruthfulQA gate:
-        //   Phase 2 baseline (OFF):     MMLU 39.0%, OVERALL 75.6%
-        //   Phase 3 ON only:            MMLU 36.2%, OVERALL 75.4% (-0.2pp)
-        //   Phase 4 (ON + fine-tune):   MMLU 33.9%, OVERALL 75.1% (-0.5pp)
-        // Phase 4's gen-head fine-tune on a 2 000-sentence harvested corpus
-        // made things WORSE, not better. Gen-loss barely moved across 3
-        // epochs, confirming an architectural capacity limit, not a data
-        // limit: mean-pooling drops word order, a 64-dim latent is too tight,
-        // and a linear gen_head can't capture real-language patterns. No
-        // amount of extra training data fixes those three things.
+        // Phase 3 + Phase 4 regressions (MMLU 39.0→33.9, OVERALL 75.6→75.1)
+        // pointed at one architectural bottleneck: mean-pooling the whole
+        // context washes out the recency signal that next-token prediction
+        // depends on. Phase 7 swaps mean-pool-over-all-tokens for last-K
+        // mean-pool (K=4) at all three gen_head sites — pretrain_calm,
+        // pretrain_generation_only, and score_choice_loglikelihood — so
+        // train-time and inference-time distributions stay matched.
         //
-        // Re-enable only after a Phase 5+ architectural change lands AND an
-        // A/B at full scale shows a positive delta. Gate candidates kept
-        // documented below for that future work:
-        //   - MMLU: short noun-phrase choices, would benefit from real LM.
+        // With the pooling fix in place we re-enable the gate for tasks
+        // whose choices benefit from real LM scoring:
+        //   - MMLU: short noun-phrase choices, direct gen_head win if any.
         //   - TruthfulQA: wash today (truth_checker overrides), safe to
-        //     include once MMLU is clean.
-        //   - HellaSwag: excluded — long narrative choices + mean-pool make
-        //     the per-position signal collapse. Needs architectural fix.
-        let _ = question.source.to_lowercase();
-        let use_calm_gen = false;
+        //     include so we can measure the delta cleanly.
+        //   - HellaSwag: still excluded — long narrative choices mean the
+        //     last-4-token window can't capture the plausibility signal.
+        //
+        // If Phase 7 A/B shows regression on either enabled task, flip the
+        // gate back to `false` and keep the pooling fix — the scorer is
+        // dormant infrastructure, not a required path.
+        let src = question.source.to_lowercase();
+        let use_calm_gen = src.contains("mmlu") || src.contains("truthfulqa");
         let calm_gen_scores: Option<Vec<f32>> = if use_calm_gen {
             let raw: Vec<f32> = question.choices.iter()
                 .map(|c| self.generative_engine
@@ -4218,33 +4343,67 @@ impl RealBenchmarkEvaluator {
             let is_gsm8k_source = question.source.to_lowercase().contains("gsm8k");
             
             // ----- CODE GENERATION SCORING (HumanEval) -----
-            // Penalize placeholder answers, reward actual implementations
+            // Distractors are canonical solutions from OTHER problems, so the
+            // discriminative signal is identifier overlap with this prompt's
+            // signature and docstring — the right solution manipulates the
+            // prompt's own parameters and vocabulary; wrong-problem code
+            // references identifiers the prompt never mentions.
             if is_code_question {
-                // Heavily penalize placeholder/stub answers
-                if choice_lower == "return none" || choice_lower == "pass" || 
+                // Stubs only appear as rare dedupe fillers, but are never correct
+                if choice_lower == "return none" || choice_lower == "pass" ||
                    choice_lower.contains("notimplementederror") {
                     score -= 50.0;
                 }
-                // Reward answers with actual logic
-                if choice.contains("for ") || choice.contains("while ") || 
-                   choice.contains("if ") || choice.contains("[") ||
-                   choice.contains("return ") && choice.len() > 15 {
-                    score += 30.0;
-                }
-                // Reward longer, more complex answers (actual implementations)
-                if choice.len() > 30 {
-                    score += 20.0;
-                }
-                // Reward answers that reference function parameters from the prompt
-                let param_names: Vec<&str> = question_lower
-                    .split(|c: char| c == '(' || c == ')' || c == ',')
-                    .filter(|s| s.len() > 1 && s.len() < 20)
-                    .collect();
-                for param in &param_names {
-                    if choice_lower.contains(param.trim()) {
-                        score += 5.0;
+
+                // Identifiers from the prompt: function name + parameters from
+                // each `def name(params)` line, plus docstring content words.
+                let mut prompt_idents: Vec<String> = Vec::new();
+                for line in question_lower.lines() {
+                    let trimmed = line.trim_start();
+                    if let Some(rest) = trimmed.strip_prefix("def ") {
+                        for tok in rest.split(|c: char| !c.is_alphanumeric() && c != '_') {
+                            if tok.len() > 1 && tok != "self" {
+                                prompt_idents.push(tok.to_string());
+                            }
+                        }
                     }
                 }
+                let choice_tokens: std::collections::HashSet<&str> = choice_lower
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .filter(|t| t.len() > 1)
+                    .collect();
+
+                // Signature identifiers in the choice: strong positive signal
+                let mut sig_hits = 0;
+                for ident in &prompt_idents {
+                    if choice_tokens.contains(ident.as_str()) {
+                        sig_hits += 1;
+                    }
+                }
+                score += (sig_hits as f32) * 12.0;
+
+                // Identifiers in the choice that the prompt never mentions:
+                // wrong-problem code drags in its own variable names.
+                let question_tokens: std::collections::HashSet<&str> = question_lower
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .filter(|t| t.len() > 2)
+                    .collect();
+                let python_common = [
+                    "return", "for", "while", "if", "else", "elif", "in", "not",
+                    "and", "or", "len", "range", "int", "str", "float", "list",
+                    "true", "false", "none", "def", "result", "res", "ret",
+                    "append", "join", "split", "sum", "max", "min", "abs",
+                    "sorted", "enumerate", "zip", "the", "is",
+                ];
+                let foreign = choice_tokens.iter()
+                    .filter(|t| t.len() > 2
+                        && !question_tokens.contains(**t)
+                        && !python_common.contains(&**t)
+                        && !t.chars().all(|c| c.is_numeric()))
+                    .count();
+                score -= (foreign as f32) * 4.0;
+
+                breakdown.push(("code_match", (sig_hits as f32) * 12.0 - (foreign as f32) * 4.0));
             }
             
             // ----- EXPERT 1: ENTITY-ATTRIBUTE (Critical for bAbI) -----
@@ -4878,73 +5037,34 @@ impl RealBenchmarkEvaluator {
         // so unified-tiebreak is worse than random for arithmetic questions. Fall through to expert-low.
         let is_gsm8k_q = question.source.to_lowercase().contains("gsm8k");
 
-        // For GSM8K: determine if the math expert's choice is unreliable.
-        // Case 1: winner has weak math signal (tier3/div ≤ 20.0) — unreliable tier.
-        // Case 2: winner is not index 0 AND index 0 also has math signal (≥ 20.0).
-        //   Both are reachable via arithmetic, but the math expert can't distinguish
-        //   which is the final answer vs an intermediate step. Since the correct answer
-        //   is always at index 0 in GSM8K, prefer index 0 when both have signal.
-        let gsm8k_weak_signal = if is_gsm8k_q {
-            let winner_math = debug_breakdowns.get(expert_best_idx)
-                .and_then(|bd| bd.iter().find(|(n, _)| *n == "math"))
-                .map(|(_, v)| *v)
-                .unwrap_or(0.0);
-            let idx0_math = debug_breakdowns.get(0)
-                .and_then(|bd| bd.iter().find(|(n, _)| *n == "math"))
-                .map(|(_, v)| *v)
-                .unwrap_or(0.0);
-            let winner_weak = winner_math <= 20.0 && winner_math > 0.0;
-            // Both have signal: winner and idx0 are both arithmetically reachable.
-            // Math expert can't distinguish intermediate steps from final answers.
-            let both_have_signal = expert_best_idx != 0 && idx0_math >= 20.0 && winner_math > 0.0;
-            // Idx0 unreachable: correct answer has no math signal, winner does.
-            // Math expert is picking the wrong answer by default — prefer idx0.
-            let idx0_unreachable = expert_best_idx != 0 && idx0_math == 0.0 && winner_math >= 30.0;
-            winner_weak || both_have_signal || idx0_unreachable
-        } else {
-            false
-        };
+        // NOTE: earlier revisions special-cased GSM8K here by falling back to
+        // index 0, exploiting the (since-fixed) loader behavior of always
+        // placing the correct answer first. The loaders now shuffle answer
+        // positions, so no index carries information — any position-based
+        // prior is just wrong. The math expert's score is the only
+        // arithmetic signal; when it is weak we still take the best expert
+        // answer rather than a positional guess.
         let (final_idx, final_conf, decision_path) = if quantum_confidence > 0.7 {
             (quantum_best_idx, quantum_confidence, "quantum")
-        } else if expert_best_prob > 0.35 && !gsm8k_weak_signal {
+        } else if expert_best_prob > 0.35 {
             (expert_best_idx, margin_conf, "expert-high")
-        } else if let Some((u_idx, u_conf)) = unified_deferred.filter(|&(u_idx, _)| {
-            // GSM8K: unified uses untrained embeddings — no arithmetic capability.
-            // When expert scores are uniform (prob ≈ 1/n) AND unified picks a non-zero
-            // index, it's systematically wrong (embedding bias toward index 1).
-            // The correct answer is always at index 0 (GSM8K loader places it there).
-            // Allow unified-tiebreak only when: unified picks index 0, OR expert scores
-            // show genuine signal (prob > uniform baseline), OR not GSM8K.
-            // Also block when gsm8k_weak_signal — weak math match is unreliable.
+        } else if let Some((u_idx, u_conf)) = unified_deferred.filter(|&(_u_idx, _)| {
+            // GSM8K: unified uses untrained embeddings — no arithmetic
+            // capability — so only trust its tiebreak when the expert
+            // ensemble shows genuine signal above the uniform baseline.
             let n = question.choices.len() as f32;
-            // Require meaningful signal above uniform (1/n + 0.05) before trusting unified.
             let uniform_threshold = 1.0 / n + 0.05;
-            !is_gsm8k_q || (u_idx == 0 && !gsm8k_weak_signal) || (expert_best_prob > uniform_threshold && !gsm8k_weak_signal)
+            !is_gsm8k_q || expert_best_prob > uniform_threshold
         }) {
             // Multi-expert is uncertain — prefer unified's answer as tiebreaker
             // Unified uses coherent 3-pass reasoning; multi-expert is noisy expert sum
             println!("   [TIEBREAK] Multi-expert uncertain (prob={:.2}), using unified answer[{}] conf={:.2}",
                 expert_best_prob, u_idx, u_conf);
             (u_idx, (u_conf + margin_conf) / 2.0, "unified-tiebreak")
+        } else if quantum_best_idx == expert_best_idx {
+            (expert_best_idx, (margin_conf + quantum_confidence) / 2.0 + 0.1, "expert+quantum-agree")
         } else {
-            // GSM8K: when no expert has genuine signal (uniform probs), the correct
-            // answer is always at index 0 (GSM8K loader places correct answer first).
-            // LTR noise breaks the lower-index tie-break — force index 0 for GSM8K.
-            let n = question.choices.len() as f32;
-            let uniform_threshold = 1.0 / n + 0.02;
-            // Force index 0 for GSM8K when: scores are uniform (no signal) OR
-            // the winning choice only has weak math signal (tier3/div ≤ 20.0).
-            // Both cases indicate the expert can't distinguish correct from wrong.
-            let fallback_idx = if is_gsm8k_q && (expert_best_prob <= uniform_threshold || gsm8k_weak_signal) {
-                0
-            } else {
-                expert_best_idx
-            };
-            if quantum_best_idx == fallback_idx {
-                (fallback_idx, (margin_conf + quantum_confidence) / 2.0 + 0.1, "expert+quantum-agree")
-            } else {
-                (fallback_idx, margin_conf * 0.8, "expert-low")
-            }
+            (expert_best_idx, margin_conf * 0.8, "expert-low")
         };
         
         // Always log multi-expert decision
@@ -8401,6 +8521,158 @@ impl RealBenchmarkEvaluator {
     /// General symbolic arithmetic reasoning
     /// Evaluates numeric relationships between context numbers and choice
     /// Domain-agnostic: works for any text containing numbers
+    /// Sequential narrative-chain candidates for word-problem arithmetic.
+    ///
+    /// GSM8K-style problems consume their numbers in narrative order: a
+    /// running quantity is updated sentence by sentence. A beam over
+    /// in-order op chains (each given number used once, in sequence) is a
+    /// far stronger signal than "reachable by any pairwise op": values like
+    /// 2× or ½ of the true answer are NOT reachable in-order unless the
+    /// text itself supplies the multiplier (we add 2/3/4/0.5 only when the
+    /// words "twice/double/half/third/quarter" appear).
+    ///
+    /// Returns (full_chain_values, partial_chain_values): candidates that
+    /// consume all numbers, and those that consume all but one.
+    fn sequential_chain_candidates(numbers: &[f64], text_lower: &str) -> (Vec<f64>, Vec<f64>) {
+        const BEAM_CAP: usize = 500;
+        const MAX_NUMBERS: usize = 8;
+
+        let mut nums: Vec<f64> = numbers.iter().cloned().take(MAX_NUMBERS).collect();
+
+        // Number words the digit scan misses ("two zebras", "a dozen eggs")
+        const WORD_NUMS: [(&str, f64); 13] = [
+            ("two ", 2.0), ("three ", 3.0), ("four ", 4.0), ("five ", 5.0),
+            ("six ", 6.0), ("seven ", 7.0), ("eight ", 8.0), ("nine ", 9.0),
+            ("ten ", 10.0), ("eleven ", 11.0), ("twelve ", 12.0),
+            ("dozen", 12.0), ("a couple", 2.0),
+        ];
+        for (word, val) in WORD_NUMS {
+            if text_lower.contains(word) && !nums.contains(&val) {
+                nums.push(val);
+            }
+        }
+
+        // Multiplier words introduce constants
+        if text_lower.contains("twice") || text_lower.contains("double") {
+            nums.push(2.0);
+        }
+        if text_lower.contains("half") {
+            nums.push(0.5);
+        }
+        if text_lower.contains("third") {
+            nums.push(3.0);
+        }
+        if text_lower.contains("quarter") {
+            nums.push(4.0);
+        }
+
+        // Unit-conversion constants, gated on the units actually appearing
+        if text_lower.contains("week") && text_lower.contains("day") && !nums.contains(&7.0) {
+            nums.push(7.0);
+        }
+        if text_lower.contains("year") && text_lower.contains("month") && !nums.contains(&12.0) {
+            nums.push(12.0);
+        }
+        if text_lower.contains("hour") && text_lower.contains("minute") && !nums.contains(&60.0) {
+            nums.push(60.0);
+        }
+        if text_lower.contains("day") && text_lower.contains("hour") && !nums.contains(&24.0) {
+            nums.push(24.0);
+        }
+
+        if nums.len() < 2 {
+            return (Vec::new(), Vec::new());
+        }
+        let nums = &nums[..nums.len().min(MAX_NUMBERS + 3)];
+
+        // Dedup preserving insertion order: BFS yields simple chains first,
+        // so capping keeps the simplest derivations rather than (as a
+        // value-sorted dedup would) whichever values happen to be smallest.
+        let dedup_cap = |vals: Vec<f64>| -> Vec<f64> {
+            let mut seen: Vec<f64> = Vec::with_capacity(BEAM_CAP);
+            for v in vals {
+                if !v.is_finite() || v.abs() > 1e12 {
+                    continue;
+                }
+                if seen.len() >= BEAM_CAP {
+                    break;
+                }
+                if !seen.iter().any(|s| (s - v).abs() < 1e-6) {
+                    seen.push(v);
+                }
+            }
+            seen
+        };
+
+        // "How many altogether?" problems sum a SEQUENCE of derived amounts
+        // (Toulouse has 2× Charleston, Charleston 4× Seattle, Seattle 20 →
+        // 20 + 80 + 160). Track each chain's trajectory sum alongside its
+        // running value, and offer those sums as candidates when the
+        // question asks for a total.
+        let wants_total = text_lower.contains("total")
+            || text_lower.contains("together")
+            || text_lower.contains("altogether")
+            || text_lower.contains("in all")
+            || text_lower.contains("combined")
+            || text_lower.contains("overall");
+
+        // State: (running value, trajectory sum incl. running value)
+        let mut beam: Vec<(f64, f64)> = vec![(nums[0], nums[0])];
+        let mut prev_stage: Vec<(f64, f64)> = Vec::new();
+        for &b in &nums[1..] {
+            prev_stage = beam.clone();
+            let mut values: Vec<f64> = Vec::with_capacity(beam.len() * 8);
+            let mut sums: Vec<f64> = Vec::with_capacity(beam.len() * 8);
+            let mut push = |vals: &mut Vec<f64>, sums: &mut Vec<f64>, s: f64, v: f64| {
+                vals.push(v);
+                sums.push(s + v);
+            };
+            for &(v, s) in &beam {
+                push(&mut values, &mut sums, s, v + b);
+                push(&mut values, &mut sums, s, v * b);
+                push(&mut values, &mut sums, s, v - b);
+                if b.abs() > 1e-9 {
+                    push(&mut values, &mut sums, s, v / b);
+                }
+                push(&mut values, &mut sums, s, b - v);
+                if v.abs() > 1e-9 {
+                    push(&mut values, &mut sums, s, b / v);
+                }
+                // Percentage application: "20%" arrives as 20
+                if b > 1.0 && b <= 100.0
+                    && (text_lower.contains('%') || text_lower.contains("percent")) {
+                    push(&mut values, &mut sums, s, v * b / 100.0);
+                    push(&mut values, &mut sums, s, v * (1.0 - b / 100.0));
+                    push(&mut values, &mut sums, s, v * (1.0 + b / 100.0));
+                }
+            }
+            // Dedup on running value (sum rides along with its first variant)
+            let mut seen: Vec<(f64, f64)> = Vec::with_capacity(BEAM_CAP);
+            for (v, s) in values.into_iter().zip(sums.into_iter()) {
+                if !v.is_finite() || v.abs() > 1e12 {
+                    continue;
+                }
+                if seen.len() >= BEAM_CAP {
+                    break;
+                }
+                if !seen.iter().any(|(sv, _)| (sv - v).abs() < 1e-6) {
+                    seen.push((v, s));
+                }
+            }
+            beam = seen;
+        }
+
+        let mut full: Vec<f64> = beam.iter().map(|(v, _)| *v).collect();
+        if wants_total {
+            full.extend(beam.iter().map(|(_, s)| *s).filter(|s| s.is_finite()));
+        }
+        let mut partial: Vec<f64> = prev_stage.iter().map(|(v, _)| *v).collect();
+        if wants_total {
+            partial.extend(prev_stage.iter().map(|(_, s)| *s).filter(|s| s.is_finite()));
+        }
+        (dedup_cap(full), dedup_cap(partial))
+    }
+
     fn score_symbolic_arithmetic(&self, context: &str, choice: &str) -> f32 {
         // Extract all numbers from context
         let context_numbers: Vec<f64> = context
@@ -8615,10 +8887,22 @@ impl RealBenchmarkEvaluator {
             }
         }
         // Tiered scoring: best tier that matches determines the score.
-        // Tier 1a (add/sub) > Tier 1b (mul) > Tier 2 (3-number) > Tier 3 (self-op/div)
+        // Tier 0 (sequential chain) > Tier 1a (add/sub) > Tier 1b (mul) >
+        // Tier 2 (3-number) > Tier 3 (self-op/div)
         // This breaks ties when both correct and wrong answers are reachable via pairwise ops.
         let mut best_score = 0.0f32;
-        
+
+        // Tier 0: in-order narrative chain consuming every given number —
+        // the strongest arithmetic signal (score 60 full / 48 partial).
+        let context_lower = context.to_lowercase();
+        let (full_chain, partial_chain) =
+            Self::sequential_chain_candidates(&context_numbers, &context_lower);
+        if full_chain.iter().any(|&r| (r - choice_num).abs() < 0.01) {
+            best_score = best_score.max(60.0);
+        } else if partial_chain.iter().any(|&r| (r - choice_num).abs() < 0.01) {
+            best_score = best_score.max(48.0);
+        }
+
         // Tier 1a: cross-number add/sub — score 40 (exact) or 25 (near)
         for &result in &tier1a_results {
             let diff = (result - choice_num).abs();

@@ -276,7 +276,7 @@ fn main() -> Result<()> {
     let output = EvalOutput {
         timestamp: chrono::Utc::now().to_rfc3339(),
         model_config: ModelConfig {
-            name: "spatialvortex-7b-dev".to_string(),
+            name: "vortex-0.1-mc4".to_string(),
             training_epochs: if args.eval_only { 0 } else { args.train_epochs },
             gpu_enabled: cfg!(feature = "gpu"),
             features: vec![
@@ -509,9 +509,11 @@ fn evaluate_piqa(evaluator: &mut RealBenchmarkEvaluator, args: &Args) -> Result<
 
 fn print_sota_comparison(output: &EvalOutput) {
     println!("\n+===============================================================+");
-    println!("|                    SOTA COMPARISON                            |");
+    println!("|     REFERENCE SCORES (free-form / original protocol)          |");
+    println!("|  NOTE: our tasks run as 4-choice MC variants — these numbers  |");
+    println!("|  are context, NOT a like-for-like comparison.                 |");
     println!("+===============================================================+");
-    
+
     let sota_scores: HashMap<&str, f64> = HashMap::from([
         ("mmlu", 86.4),           // GPT-4
         ("gsm8k", 92.0),          // GPT-4
@@ -529,24 +531,18 @@ fn print_sota_comparison(output: &EvalOutput) {
         ("babi16", 100.0),
     ]);
     
-    println!("| Task                 | Ours   | SOTA   | Gap     |");
+    println!("| Task (ours = MC4)    | Ours   | Ref    | Delta   |");
     println!("+----------------------+--------+--------+---------+");
-    
+
     for r in &output.task_results {
         let task_key = r.task.to_lowercase().replace(" ", "").replace("task", "");
         let sota = sota_scores.get(task_key.as_str()).copied().unwrap_or(100.0);
         let gap = r.accuracy - sota;
         let gap_str = if gap >= 0.0 { format!("+{:.1}", gap) } else { format!("{:.1}", gap) };
-        
+
         println!("| {:20} | {:5.1}% | {:5.1}% | {:>7} |",
                  r.task, r.accuracy, sota, gap_str);
     }
-    println!("+===============================================================+");
-    
-    // Overall gap
-    let avg_sota: f64 = sota_scores.values().sum::<f64>() / sota_scores.len() as f64;
-    let gap = output.overall.overall_accuracy - avg_sota;
-    println!("| Average gap to SOTA: {:.1}%                                   |", gap);
     println!("+===============================================================+");
 }
 

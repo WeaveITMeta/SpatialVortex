@@ -1,0 +1,67 @@
+{
+  "timestamp": "2026-06-09T23:13:50.052140200+00:00",
+  "model_config": {
+    "name": "vortex-0.1-mc4",
+    "training_epochs": 0,
+    "gpu_enabled": false,
+    "features": [
+      "sacred_geometry",
+      "vortex_cycles",
+      "elp_attributes",
+      "moe_routing"
+    ]
+  },
+  "task_results": [
+    {
+      "task": "mmlu",
+      "accuracy": 26.666666666666668,
+      "num_correct": 132,
+      "total": 495,
+      "avg_confidence": 0.39988768,
+      "time_secs": 345.2034189,
+      "wrong_samples": []
+    },
+    {
+      "task": "gsm8k",
+      "accuracy": 35.55555555555556,
+      "num_correct": 176,
+      "total": 495,
+      "avg_confidence": 0.6069856,
+      "time_secs": 761.7716372,
+      "wrong_samples": []
+    },
+    {
+      "task": "hellaswag",
+      "accuracy": 36.76767676767677,
+      "num_correct": 182,
+      "total": 495,
+      "avg_confidence": 0.5715102,
+      "time_secs": 564.165346,
+      "wrong_samples": []
+    },
+    {
+      "task": "truthfulqa",
+      "accuracy": 38.98989898989899,
+      "num_correct": 193,
+      "total": 495,
+      "avg_confidence": 0.6472469,
+      "time_secs": 268.5722072,
+      "wrong_samples": []
+    },
+    {
+      "task": "humaneval",
+      "accuracy": 55.34591194968554,
+      "num_correct": 88,
+      "total": 159,
+      "avg_confidence": 0.8390903,
+      "time_secs": 135.1816696,
+      "wrong_samples": []
+    }
+  ],
+  "overall": {
+    "total_correct": 771,
+    "total_questions": 2139,
+    "overall_accuracy": 36.044880785413746,
+    "total_time_secs": 2079.2508542
+  }
+}

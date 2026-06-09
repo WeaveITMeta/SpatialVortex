@@ -2228,20 +2228,28 @@ impl GenerativeVortexEngine {
                             continue;
                         }
                         
-                        // Get context embedding up to this position
+                        // Get context embedding up to this position (Phase 7: last-K pool).
+                        // Mean-pool over ALL tokens washes out the recency signal that
+                        // next-token prediction depends on — that's why gen_loss flat-lined
+                        // at 4.24 across 3 epochs in the Phase 4 fine-tune. Pooling only
+                        // the last K tokens keeps the distribution sharp around the most
+                        // recent context, which is the dominant predictor of the next word.
                         let ctx_tokens = &tokens[..pos];
                         let ctx_embeds = self.tokenizer.get_embeddings(ctx_tokens);
                         let mut ctx_embed = vec![0.0f32; self.config.latent_dim];
-                        for embed in &ctx_embeds {
+                        const LAST_K: usize = 4;
+                        let start = ctx_embeds.len().saturating_sub(LAST_K);
+                        let window = &ctx_embeds[start..];
+                        for embed in window {
                             for (j, &val) in embed.iter().enumerate() {
                                 if j < ctx_embed.len() {
                                     ctx_embed[j] += val;
                                 }
                             }
                         }
-                        if !ctx_embeds.is_empty() {
+                        if !window.is_empty() {
                             for val in &mut ctx_embed {
-                                *val /= ctx_embeds.len() as f32;
+                                *val /= window.len() as f32;
                             }
                         }
                         
@@ -2489,8 +2497,8 @@ impl GenerativeVortexEngine {
                         continue;
                     }
 
-                    // Pool context tokens 0..pos → latent (same pooling as
-                    // `pretrain_calm` and `score_choice_loglikelihood`, so
+                    // Pool context tokens 0..pos → latent (Phase 7: last-K pool to match
+                    // `pretrain_calm` gen-head and `score_choice_loglikelihood`, so
                     // train-time and inference-time distributions match).
                     let ctx_tokens = &tokens[..pos];
                     let ctx_embeds = self.tokenizer.get_embeddings(ctx_tokens);
@@ -2498,7 +2506,10 @@ impl GenerativeVortexEngine {
                         continue;
                     }
                     let mut ctx_embed = vec![0.0f32; latent_dim];
-                    for embed in &ctx_embeds {
+                    const LAST_K: usize = 4;
+                    let start = ctx_embeds.len().saturating_sub(LAST_K);
+                    let window = &ctx_embeds[start..];
+                    for embed in window {
                         for (j, &val) in embed.iter().enumerate() {
                             if j < ctx_embed.len() {
                                 ctx_embed[j] += val;
@@ -2506,7 +2517,7 @@ impl GenerativeVortexEngine {
                         }
                     }
                     for val in &mut ctx_embed {
-                        *val /= ctx_embeds.len() as f32;
+                        *val /= window.len() as f32;
                     }
 
                     let ctx_beams = self.embedding_to_beams(&ctx_embed);
@@ -2617,21 +2628,28 @@ impl GenerativeVortexEngine {
         let mut scored_positions: usize = 0;
 
         for &target_token in choice_tokens.iter() {
-            // Pool embeddings of the running context (question + choice prefix).
+            // Pool embeddings of the running context (Phase 7: last-K pool).
+            // Mean-pool over all tokens gave per-position log-probs that were
+            // nearly indistinguishable across MMLU / TruthfulQA choices (regression
+            // in Phase 3 + 4). Pooling only the last K tokens preserves the
+            // recency signal the gen_head was trained to consume.
             let embeds = self.tokenizer.get_embeddings(&full_tokens);
             if embeds.is_empty() {
                 full_tokens.push(target_token);
                 continue;
             }
             let mut pooled = vec![0.0f32; latent_dim];
-            for embed in &embeds {
+            const LAST_K: usize = 4;
+            let start = embeds.len().saturating_sub(LAST_K);
+            let window = &embeds[start..];
+            for embed in window {
                 for (i, &val) in embed.iter().enumerate() {
                     if i < pooled.len() {
                         pooled[i] += val;
                     }
                 }
             }
-            let n = embeds.len() as f32;
+            let n = window.len() as f32;
             for val in &mut pooled {
                 *val /= n;
             }
