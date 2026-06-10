@@ -368,6 +368,33 @@ impl ObjectTracker {
             .filter(|t| t.classification.role == ObjectRole::Goal)
             .map(|t| t.stable_id)
             .collect();
+
+        // Salience-prior fallback: behavioral Goal evidence only exists
+        // AFTER a level has been completed, so first attempts had no goal
+        // candidates and goal-directed planning never engaged. Nominate
+        // visually salient objects instead — rarest color first, small
+        // distinct shapes next. A weak prior is enough: approaching it is
+        // cheap under IRA-gated stepping, and an actual completion turns
+        // the prior into behavioral truth for the persisted profile.
+        if frame.goal_candidates.is_empty() {
+            let mut color_counts: HashMap<u8, u32> = HashMap::new();
+            for t in &self.tracked {
+                *color_counts.entry(t.current.color).or_insert(0) += 1;
+            }
+            let mut scored: Vec<(StableObjectId, f32)> = self.tracked.iter()
+                .filter(|t| Some(t.stable_id) != frame.agent_id)
+                .filter(|t| t.classification.role != ObjectRole::StaticBarrier)
+                .filter(|t| t.current.area >= 1)
+                .map(|t| {
+                    let rarity = 1.0 / *color_counts.get(&t.current.color).unwrap_or(&1) as f32;
+                    let smallness = 1.0 / (t.current.area as f32).sqrt();
+                    (t.stable_id, rarity * 2.0 + smallness)
+                })
+                .collect();
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            frame.goal_candidates = scored.into_iter().take(3).map(|(id, _)| id).collect();
+        }
+
         frame
     }
 
