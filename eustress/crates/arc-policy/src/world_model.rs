@@ -591,6 +591,13 @@ pub struct VortexWorldModel {
     /// keeping the per-step scan incremental — recreating it each step
     /// made unification O(rules²) per step and minted duplicate laws.
     symbol_resolver: SymbolResolver,
+    /// Cells whose clicks changed nothing this level — never re-clicked.
+    dead_clicks: std::collections::HashSet<(u32, u32)>,
+    /// Cells whose clicks visibly changed the frame this level.
+    responsive_clicks: std::collections::HashSet<(u32, u32)>,
+    /// Cells already clicked this level (responsive or not) — exploration
+    /// prefers cells it has never tried.
+    clicked_this_level: std::collections::HashSet<(u32, u32)>,
 }
 
 impl VortexWorldModel {
@@ -645,6 +652,9 @@ impl VortexWorldModel {
             // MCTS
             mcts_budget: MctsBudget::default(),
             symbol_resolver: SymbolResolver::new(),
+            dead_clicks: std::collections::HashSet::new(),
+            responsive_clicks: std::collections::HashSet::new(),
+            clicked_this_level: std::collections::HashSet::new(),
         }
     }
 
@@ -680,6 +690,10 @@ impl VortexWorldModel {
         self.replay_cursor = None;
         self.plan_buffer.clear();
         self.recent_action_effects.clear();
+        // Click memory is per-level state
+        self.dead_clicks.clear();
+        self.responsive_clicks.clear();
+        self.clicked_this_level.clear();
         // Object perception reset
         self.object_tracker.reset();
         self.object_frame = ObjectFrame::default();
@@ -904,6 +918,8 @@ impl VortexWorldModel {
                             cx, cy, changes.len(),
                             changes.iter().take(3).collect::<Vec<_>>()
                         );
+                        // A responsive cell — remember it as live
+                        self.responsive_clicks.insert((cx, cy));
                         self.click_observations.push(ClickObservation {
                             _click_x: cx, _click_y: cy, changes,
                         });
@@ -913,6 +929,17 @@ impl VortexWorldModel {
                             if let Some(ref mech) = self.click_mechanic {
                                 info!("  CLICK MECHANIC learned: {:?}", mech);
                             }
+                        }
+                    } else {
+                        // Real-time adaptation: a click that changed nothing is a
+                        // dead cell for this level — never spend another action
+                        // on it. (Cleared on level advance / new game.)
+                        self.dead_clicks.insert((cx, cy));
+                        if self.dead_clicks.len() % 25 == 0 {
+                            info!(
+                                "  CLICK LEARN: {} dead cells excluded, {} responsive",
+                                self.dead_clicks.len(), self.responsive_clicks.len()
+                            );
                         }
                     }
                     // Invalidate static click targets so they're rebuilt with new knowledge
@@ -1082,6 +1109,11 @@ impl VortexWorldModel {
             // Detect level advance → capture win recipe
             if level_advanced {
                 info!("  LEVEL ADVANCE: {} → {}", self.prev_levels, levels);
+
+                // New level, new board: click responsiveness doesn't carry over
+                self.dead_clicks.clear();
+                self.responsive_clicks.clear();
+                self.clicked_this_level.clear();
 
                 // Capture the action sequence that produced this level advance
                 if !self.current_level_actions.is_empty() {
@@ -1985,13 +2017,32 @@ impl VortexWorldModel {
             self.build_smart_click_targets(grid);
         }
 
+        // Real-time adaptation: drop cells already proven dead this level,
+        // and explore never-clicked cells before re-trying clicked ones.
+        // Responsive cells stay eligible (re-clicking them is how toggle /
+        // cycle mechanics make progress).
+        self.click_targets.retain(|t| !self.dead_clicks.contains(t));
+        self.click_targets.sort_by_key(|t| {
+            if !self.clicked_this_level.contains(t) {
+                0 // never tried — highest priority
+            } else if self.responsive_clicks.contains(t) {
+                1 // known responsive — worth re-trying
+            } else {
+                2
+            }
+        });
+
         if self.click_targets.is_empty() {
             return (grid.width as u32 / 2, grid.height as u32 / 2);
         }
 
-        let idx = self.click_count % self.click_targets.len();
+        // Head of the priority order: clicking marks the cell as tried, so
+        // the next rebuild naturally advances to the next-best target —
+        // unclicked cells first, then known-responsive ones.
         self.click_count += 1;
-        self.click_targets[idx]
+        let target = self.click_targets[0];
+        self.clicked_this_level.insert(target);
+        target
     }
 
     /// Build click targets using IRA-informed simulation.
@@ -2114,8 +2165,29 @@ impl VortexWorldModel {
             self.build_fallback_click_targets(grid, &mut targets, &mut seen);
         }
 
-        // Cap targets to prevent infinite cycling
-        targets.truncate(64);
+        // ── Coverage extension ───────────────────────────────────────────
+        // The strategies above propose a fixed head of candidates; once
+        // those are all clicked (and possibly dead), exploration must move
+        // on to the rest of the board. Append every untried non-background
+        // cell so the level's clickable surface is eventually covered.
+        let bg = grid.background_color();
+        for r in 0..grid.height {
+            for c in 0..grid.width {
+                if grid.cells[r][c] == bg {
+                    continue;
+                }
+                let pt = (c as u32, r as u32);
+                if !self.clicked_this_level.contains(&pt)
+                    && !self.dead_clicks.contains(&pt)
+                    && seen.insert(pt)
+                {
+                    targets.push(pt);
+                }
+            }
+        }
+
+        // Cap targets to bound per-step sorting work
+        targets.truncate(512);
         self.click_targets = targets;
     }
 
