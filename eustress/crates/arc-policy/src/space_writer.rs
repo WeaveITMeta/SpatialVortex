@@ -15,7 +15,9 @@
 //!         ├── space.toml                  ← Game metadata
 //!         ├── Workspace/
 //!         │   ├── _service.toml
-//!         │   └── Grid.part.toml          ← Grid state as colored quads
+//!         │   └── ARC_Grid/               ← Model container for grid cells
+//!         │       ├── _instance.toml      ← class_name = "Model"
+//!         │       └── grid_data.toml      ← Grid cells + metadata
 //!         ├── ServerStorage/
 //!         │   ├── _service.toml
 //!         │   ├── causal_graph.toml       ← CausalGraph nodes + edges
@@ -101,7 +103,7 @@ pub fn write_game_space(
     write_project_manifest(&space_dir, game_id)?;
     write_space_metadata(&space_dir, game_id, grid)?;
     write_workspace_service(&space_dir)?;
-    write_grid_part(&space_dir, grid)?;
+    write_grid_model(&space_dir, grid)?;
     write_server_storage_service(&space_dir)?;
     write_causal_graph_toml(&space_dir, &model.causal_graph)?;
     write_action_models_toml(&space_dir, &model.action_models)?;
@@ -211,8 +213,27 @@ fallen_parts_destroy_height = -500.0
     write_file(&space_dir.join("Workspace/_service.toml"), content)
 }
 
-fn write_grid_part(space_dir: &Path, grid: &Grid2D) -> Result<(), String> {
-    // Serialize grid as a single part with cells data in [Extra.grid]
+fn write_grid_model(space_dir: &Path, grid: &Grid2D) -> Result<(), String> {
+    let model_dir = space_dir.join("Workspace/ARC_Grid");
+    std::fs::create_dir_all(&model_dir)
+        .map_err(|e| format!("Failed to create ARC_Grid dir: {}", e))?;
+
+    // Write _instance.toml — marks folder as a Model container
+    let instance_content = format!(
+        r#"[metadata]
+class_name = "Model"
+archivable = true
+created = "{now}"
+
+[properties]
+name = "ARC Grid"
+anchored = true
+"#,
+        now = chrono_now(),
+    );
+    write_file(&model_dir.join("_instance.toml"), &instance_content)?;
+
+    // Write grid_data.toml — compact cells array read by GridSceneLoaderPlugin
     let mut cells_str = String::from("[\n");
     for row in &grid.cells {
         cells_str.push_str("  [");
@@ -223,13 +244,12 @@ fn write_grid_part(space_dir: &Path, grid: &Grid2D) -> Result<(), String> {
     }
     cells_str.push(']');
 
-    // Map ARC color indices to approximate RGBA
     let bg = grid.background_color();
     let bg_rgba = arc_color_to_rgba(bg);
 
-    let content = format!(
+    let data_content = format!(
         r#"[metadata]
-class_name = "Part"
+class_name = "Grid"
 archivable = true
 created = "{now}"
 last_modified = "{now}"
@@ -258,7 +278,15 @@ cells = {cells}
         r = bg_rgba.0, g = bg_rgba.1, b = bg_rgba.2,
         cells = cells_str,
     );
-    write_file(&space_dir.join("Workspace/Grid.part.toml"), &content)
+    write_file(&model_dir.join("grid_data.toml"), &data_content)?;
+
+    // Remove legacy Grid.part.toml if it exists
+    let legacy = space_dir.join("Workspace/Grid.part.toml");
+    if legacy.exists() {
+        let _ = std::fs::remove_file(&legacy);
+    }
+
+    Ok(())
 }
 
 fn write_server_storage_service(space_dir: &Path) -> Result<(), String> {

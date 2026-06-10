@@ -170,7 +170,7 @@ impl SymbolResolver {
             confidence: (z1_confidence + z2_confidence) / 2.0,
         });
 
-        info!(
+        debug!(
             "Unified rules {} + {} into law (structural_sim={:.2})",
             z1_name, z2_name, structural_sim
         );
@@ -342,6 +342,14 @@ impl SymbolResolver {
             for j in (i + 1)..rules.len() {
                 let (ref n1, ref c1, ref p1, conf1) = rules[i];
                 let (ref n2, ref c2, ref p2, conf2) = rules[j];
+
+                // Incremental scan: a persistent resolver remembers every
+                // attempted pair, so repeated calls only pay for NEW rules.
+                // Without this the per-step cost is O(rules²) and the same
+                // pairs mint duplicate laws forever.
+                if self.cache.was_attempted(n1, n2) {
+                    continue;
+                }
 
                 if let Some(law) = self.try_unify(n1, c1, p1, conf1, n2, c2, p2, conf2) {
                     let law_name = law.name().to_string();

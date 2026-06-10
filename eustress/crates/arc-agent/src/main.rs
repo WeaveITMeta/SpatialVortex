@@ -18,12 +18,16 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    // Default: EustressStream mode — in-process pub/sub, no external server
-    // "standalone" mode: stdin/stdout JSON protocol (used by Python bridge)
+    // EustressStream mode — in-process pub/sub, no external server.
+    // The primary path is the ArcBenchmarkPlugin in EustressEngine (Bevy ECS).
+    // This standalone binary is kept for EustressStream integration testing.
     let mode = std::env::var("ARC_AGENT_MODE").unwrap_or_else(|_| "stream".into());
 
     match mode.as_str() {
-        "standalone" => run_standalone_mode().await,
+        "standalone" => {
+            eprintln!("[DEPRECATED] Standalone mode is deprecated. Use the ArcBenchmarkPlugin in EustressEngine instead.");
+            run_standalone_mode().await
+        }
         // Accept "iggy" for backward compat
         "stream" | "iggy" | _ => run_stream_mode().await,
     }

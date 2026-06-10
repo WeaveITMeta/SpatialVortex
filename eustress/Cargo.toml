@@ -37,6 +37,19 @@ resolver = "2"
 # Core Bevy 0.18 (uses wgpu 28 for Slint GPU renderer compatibility)
 bevy = { version = "0.18", default-features = false }
 
+# Synced from EustressEngine/eustress/Cargo.toml workspace.dependencies —
+# engine crates inherit these and this outer workspace must define them too
+# (June 2026 submodule update).
+fjall = "2"
+inferno = "0.11"
+truck-base      = "0.5"
+truck-geometry  = "0.5"
+truck-topology  = "0.6"
+truck-modeling  = "0.6"
+truck-meshalgo  = "0.4"
+truck-shapeops  = "0.4"
+truck-stepio    = "0.3"
+
 # UI - Slint from git with software renderer + FemtoVG GPU renderer (OpenGL)
 # NOTE: renderer-femtovg-wgpu would share Bevy's wgpu device, but Slint master targets wgpu 28
 # while Bevy 0.18 uses wgpu 27. Switch to renderer-femtovg-wgpu when Bevy upgrades to wgpu 28.

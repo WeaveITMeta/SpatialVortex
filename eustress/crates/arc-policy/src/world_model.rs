@@ -587,6 +587,10 @@ pub struct VortexWorldModel {
     // ─── MCTS (Pillar 4) ────────────────────────────────────────────
     /// MCTS search budget.
     mcts_budget: MctsBudget,
+    /// Persistent rule→law unifier. Its cache remembers attempted pairs,
+    /// keeping the per-step scan incremental — recreating it each step
+    /// made unification O(rules²) per step and minted duplicate laws.
+    symbol_resolver: SymbolResolver,
 }
 
 impl VortexWorldModel {
@@ -640,6 +644,7 @@ impl VortexWorldModel {
             level_analyzer: LevelCompletionAnalyzer::new(),
             // MCTS
             mcts_budget: MctsBudget::default(),
+            symbol_resolver: SymbolResolver::new(),
         }
     }
 
@@ -1026,9 +1031,10 @@ impl VortexWorldModel {
                 };
                 self.causal_graph.integrate_episode(&episode);
 
-                // Run SymbolResolver to generalize Rules into Laws
-                let mut resolver = SymbolResolver::new();
-                let new_laws = resolver.scan_and_unify(&mut self.causal_graph);
+                // Run SymbolResolver to generalize Rules into Laws.
+                // The resolver lives on the model so its attempted-pair
+                // cache persists — each call only unifies NEW rule pairs.
+                let new_laws = self.symbol_resolver.scan_and_unify(&mut self.causal_graph);
                 if new_laws > 0 {
                     info!("  SymbolResolver unified {} new Laws", new_laws);
                 }
@@ -1206,6 +1212,15 @@ impl VortexWorldModel {
     }
 
     /// Normal decision chain (after undo exploration phase is done).
+    /// Detect if agent is stuck repeating the same ineffective action.
+    fn is_stuck(&self) -> bool {
+        if self.recent_action_effects.len() < 4 { return false; }
+        let last: Vec<_> = self.recent_action_effects.iter().rev().take(4).collect();
+        let same_action = last.iter().all(|(a, _)| *a == last[0].0);
+        let no_effect = last.iter().all(|(_, had_effect)| !had_effect);
+        same_action && no_effect
+    }
+
     fn decide_normal(
         &mut self,
         available: &[u32],
@@ -1236,6 +1251,25 @@ impl VortexWorldModel {
             return d;
         }
 
+        // STUCK ESCAPE: if repeating same no-effect action, force rotation
+        if self.is_stuck() {
+            let stuck_action = self.recent_action_effects.back().map(|(a, _)| *a).unwrap_or(0);
+            let alternatives: Vec<u32> = available.iter()
+                .filter(|&&a| a != stuck_action && a != 7) // exclude submit + stuck action
+                .copied()
+                .collect();
+            if !alternatives.is_empty() {
+                let idx = self.diversity_index % alternatives.len();
+                self.diversity_index += 1;
+                let action = alternatives[idx];
+                info!("STUCK ESCAPE: was repeating action_{}, trying action_{}", stuck_action, action);
+                let d = self.make_decision(action, 0.25, grid,
+                    format!("stuck_escape: breaking action_{} loop, trying action_{}", stuck_action, action));
+                self.current_level_actions.push(d.action.clone());
+                return d;
+            }
+        }
+
         if let Some(d) = self.try_recipe_replay(available, grid) {
             return d;
         }
@@ -1244,8 +1278,9 @@ impl VortexWorldModel {
             return d;
         }
 
-        // MCTS: try when we have exploration data and no strong plan
-        if self.undo_explorer.finished && self.undo_explorer.graph.state_count() > 2 {
+        // MCTS: try when we have any exploration data
+        let mcts_ready = self.undo_explorer.graph.state_count() > 0;
+        if mcts_ready {
             if let Some(d) = self.try_mcts(available, grid) {
                 self.current_level_actions.push(d.action.clone());
                 return d;
@@ -1300,7 +1335,7 @@ impl VortexWorldModel {
         )?;
 
         // Only use MCTS result if it's confident enough
-        if result.confidence < 0.2 || result.visit_count < 3 {
+        if result.confidence < 0.1 || result.visit_count < 2 {
             return None;
         }
 
@@ -1557,6 +1592,14 @@ impl VortexWorldModel {
             }
         }
 
+        // ── MCTS FALLBACK: try MCTS before blind fallback ────────────────
+        if self.undo_explorer.graph.state_count() > 0 {
+            if let Some(d) = self.try_mcts(available, grid) {
+                info!("MCTS FALLBACK: action={} (after solve failed)", d.action);
+                return d;
+            }
+        }
+
         // ── ARCHETYPE FALLBACK: use lower-confidence archetype if available
         if let Some((action_id, conf, effect)) = archetype_suggestion {
             info!("ARCHETYPE FALLBACK: action_{} for '{}' (conf={:.2})", action_id, effect, conf);
@@ -1682,18 +1725,23 @@ impl VortexWorldModel {
         if scores.len() >= 2 {
             let top = scores[0].1;
             let second = scores[1].1;
-            if (top - second).abs() < 0.5 && self.steps_since_level_advance > 15 {
-                // Round-robin through effective actions to break stagnation
-                let effective: Vec<u32> = non_submit.iter().copied()
-                    .filter(|&a| self.action_models.get(&a).map_or(true, |m| m.has_effect))
+            if (top - second).abs() < 0.5 && self.steps_since_level_advance > 10 {
+                // Round-robin through ALL non-submit actions (not just known-effective)
+                // Exclude only actions proven 3+ times to have no effect
+                let candidates: Vec<u32> = non_submit.iter().copied()
+                    .filter(|&a| {
+                        self.action_models.get(&a).map_or(true, |m| {
+                            m.has_effect || m.observed_patches.len() < 3
+                        })
+                    })
                     .collect();
-                if !effective.is_empty() {
-                    let idx = self.diversity_index % effective.len();
+                if !candidates.is_empty() {
+                    let idx = self.diversity_index % candidates.len();
                     self.diversity_index += 1;
-                    let action = effective[idx];
+                    let action = candidates[idx];
                     info!(
-                        "DIVERSITY: round-robin action_{} (idx={}, stagnant {} steps)",
-                        action, idx, self.steps_since_level_advance
+                        "DIVERSITY: round-robin action_{} (idx={}/{}, stagnant {} steps)",
+                        action, idx, candidates.len(), self.steps_since_level_advance
                     );
                     return action;
                 }
