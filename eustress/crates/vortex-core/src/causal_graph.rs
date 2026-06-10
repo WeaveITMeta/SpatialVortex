@@ -304,6 +304,12 @@ impl CausalGraph {
                 if e.to == effect_name {
                     if let CausalEdge::Causes { ref mut strength, ref mut delta_distribution, ref mut evidence_episodes, .. } = e.edge {
                         delta_distribution.update(delta_value);
+                        // Provenance ring: keep recent evidence only — these
+                        // ids are serialized into the knowledge snapshot and
+                        // previously grew without bound (one per step, forever).
+                        if evidence_episodes.len() >= 32 {
+                            evidence_episodes.remove(0);
+                        }
                         evidence_episodes.push(episode_id.to_string());
                         // Bayesian update: strength moves toward 1.0 with more evidence
                         *strength = 1.0 - (1.0 - *strength) * 0.9;
@@ -484,6 +490,10 @@ impl CausalGraph {
                 if relevant {
                     if episode.success {
                         *confidence = (*confidence * 0.9 + 0.1).min(1.0);
+                        // Provenance ring (see strengthen_or_create_cause)
+                        if evidence_rules.len() >= 32 {
+                            evidence_rules.remove(0);
+                        }
                         evidence_rules.push(episode.episode_id.clone());
                     } else {
                         *confidence = (*confidence * 0.95).max(0.01);

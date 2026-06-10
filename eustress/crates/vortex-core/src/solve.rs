@@ -54,11 +54,13 @@ pub fn solve<W: WorldState>(
     );
 
     // ── 2. HYPOTHESIZE ───────────────────────────────────────────────
+    let t_observe = start.elapsed();
     let hypotheses = causal_graph.suggest_hypotheses(
         &properties,
         &GoalPredicate::ExactMatch,
         budget.max_active_branches,
     );
+    let t_hypothesize = start.elapsed();
 
     debug!("CausalGraph suggested {} hypotheses", hypotheses.len());
 
@@ -99,8 +101,15 @@ pub fn solve<W: WorldState>(
     }
 
     // ── 4. EVALUATE ──────────────────────────────────────────────────
+    let t_simulate = start.elapsed();
     let stats = tree.stats();
-    info!("Solve complete: {}", stats);
+    info!(
+        "Solve complete: {} (observe={}ms hypothesize={}ms simulate={}ms)",
+        stats,
+        t_observe.as_millis(),
+        (t_hypothesize - t_observe).as_millis(),
+        (t_simulate - t_hypothesize).as_millis(),
+    );
 
     let (program, score, solved) = if let Some(best) = tree.best_completed_branch() {
         (best.trajectory.clone(), best.score.clone(), best.success)
@@ -132,12 +141,9 @@ pub fn solve<W: WorldState>(
     // ── 5. INTERNALIZE ───────────────────────────────────────────────
     causal_graph.integrate_episode(&episode);
 
-    // Run SymbolResolver to check for new law unifications
-    let mut resolver = SymbolResolver::new();
-    let new_laws = resolver.scan_and_unify(causal_graph);
-    if new_laws > 0 {
-        info!("SymbolResolver created {} new laws after episode", new_laws);
-    }
+    // NOTE: rule→law unification is the caller's job (it owns a persistent
+    // SymbolResolver whose attempted-pair cache makes the scan incremental).
+    // A fresh resolver here re-attempted every pair on every solve call.
 
     SolveResult {
         program,

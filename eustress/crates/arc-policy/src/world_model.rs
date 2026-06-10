@@ -711,8 +711,33 @@ impl VortexWorldModel {
 
     /// Import cross-game knowledge from a previous session.
     pub fn import_knowledge(&mut self, json: &str) -> Result<(), String> {
+        // Self-healing: knowledge files written before the June 2026
+        // dedupe fixes can carry millions of duplicate laws/edges (one
+        // poisoned file reached 2GB / 11M edges and made every decision
+        // take 9+ seconds). A healthy graph is a few thousand nodes; if
+        // the snapshot is implausibly large, start clean instead of
+        // inheriting the bloat.
+        const MAX_SANE_BYTES: usize = 50 * 1024 * 1024;
+        if json.len() > MAX_SANE_BYTES {
+            return Err(format!(
+                "knowledge snapshot is {:.1}MB (> {}MB sanity bound) — \
+                 refusing to import bloated pre-dedupe state, starting clean",
+                json.len() as f64 / 1e6,
+                MAX_SANE_BYTES / 1024 / 1024,
+            ));
+        }
+
         let snapshot: KnowledgeSnapshot = serde_json::from_str(json)
             .map_err(|e| format!("Failed to deserialize knowledge: {}", e))?;
+
+        const MAX_SANE_EDGES: usize = 100_000;
+        if snapshot.causal_graph.edge_count() > MAX_SANE_EDGES {
+            return Err(format!(
+                "knowledge snapshot has {} edges (> {} sanity bound) — \
+                 refusing to import bloated pre-dedupe state, starting clean",
+                snapshot.causal_graph.edge_count(), MAX_SANE_EDGES,
+            ));
+        }
 
         self.causal_graph = snapshot.causal_graph;
         self.decomposer = snapshot.decomposer;
@@ -935,11 +960,17 @@ impl VortexWorldModel {
             // Feed structural decomposition ops into CausalGraph as richer Rules.
             // Each symbolic op becomes a Rule with the formula as its symbolic_form,
             // which the SymbolResolver can then unify into Laws across games.
+            //
+            // Rule identity is (category, action, game) — NOT the step. The
+            // old step-suffixed names minted a structurally identical node
+            // every step, which fed the SymbolResolver a quadratically
+            // growing pair set (the 6s/decision, 3GB-RSS regression).
+            // Re-observing the same behavior strengthens the one rule.
             for (op, coverage) in &decomp.ops {
                 if op.is_structural() && *coverage > 0.5 {
                     let rule_name = format!(
-                        "symbolic_{}_a{}_{}_s{}",
-                        op.category(), action_id, game_id, self.step_in_game
+                        "symbolic_{}_a{}_{}",
+                        op.category(), action_id, game_id
                     );
                     let conditions: Vec<String> = props.iter()
                         .filter(|p| p.value.as_bool())
@@ -947,12 +978,20 @@ impl VortexWorldModel {
                         .take(5)
                         .collect();
 
+                    let (merged_confidence, merged_evidence) = match self.causal_graph.get_node(&rule_name) {
+                        Some(CausalNode::Rule { confidence, evidence_count, .. }) => (
+                            (confidence * 0.8 + *coverage as f32 * 0.2).clamp(0.0, 1.0),
+                            evidence_count + 1,
+                        ),
+                        _ => (*coverage as f32, 1),
+                    };
+
                     self.causal_graph.add_node(CausalNode::Rule {
                         name: rule_name.clone(),
                         conditions: conditions.clone(),
                         program: vec![ArcGameState::action_to_dsl(action_id)],
-                        confidence: *coverage,
-                        evidence_count: 1,
+                        confidence: merged_confidence,
+                        evidence_count: merged_evidence,
                     });
 
                     // Also create a StateVariable for the symbolic effect type
