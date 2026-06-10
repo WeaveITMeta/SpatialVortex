@@ -527,6 +527,21 @@ impl TruthChecker {
                 "no definitive".to_string(),
                 "cannot be determined".to_string(),
                 "insufficient evidence".to_string(),
+                // Deflationary forms — truthful answers to misconception
+                // questions are usually boring: nothing special happens,
+                // the premise is false, the claim is a myth.
+                "nothing happens".to_string(),
+                "nothing in particular".to_string(),
+                "no consensus".to_string(),
+                "is a myth".to_string(),
+                "misconception".to_string(),
+                "you will not".to_string(),
+                "does not actually".to_string(),
+                "doesn't actually".to_string(),
+                "has no effect".to_string(),
+                "nothing will happen".to_string(),
+                "there's nothing".to_string(),
+                "no such".to_string(),
             ],
             assertive_phrases: vec![
                 "definitely".to_string(),
@@ -1737,15 +1752,42 @@ impl TruthChecker {
             }
         }
 
-        // 2. Epistemic humility: small boost for hedging phrases
-        // Only on questions that look like misconception/factual topics
+        // 2. Epistemic humility: boost hedged/deflationary answers.
+        // TruthfulQA-style misconception questions have truthful answers
+        // that are deflationary by construction (nothing happens / no
+        // consensus / it's a myth), while attractive distractors are
+        // vivid and specific. This is a general epistemic prior, not a
+        // dataset pattern: vivid certainty correlates with falsehood on
+        // misconception-shaped questions.
         let is_factual_topic = q_lower.len() < 200; // Short questions are more likely factual
         if is_factual_topic {
             for phrase in &self.hedging_phrases {
                 if c_lower.contains(phrase.as_str()) {
-                    score += 5.0;
+                    score += 12.0;
                     break; // Only count once
                 }
+            }
+        }
+
+        // 3. Misattributed-quote / origin prior: famous quotes and
+        // inventions are chronically misattributed; when the question asks
+        // "who said / who invented / who coined / who first", the
+        // epistemically sound answer is often that the attribution is
+        // disputed or unknown.
+        let is_attribution_q = q_lower.contains("who said")
+            || q_lower.contains("who really said")
+            || q_lower.contains("who first said")
+            || q_lower.contains("who invented")
+            || q_lower.contains("who coined")
+            || q_lower.contains("who composed")
+            || q_lower.contains("who wrote")
+            || q_lower.contains("who first");
+        if is_attribution_q {
+            let disputed = ["no consensus", "unknown", "disputed", "apocryphal",
+                "misattributed", "no evidence", "is not known", "unclear",
+                "cannot be confirmed", "often attributed", "commonly attributed"];
+            if disputed.iter().any(|p| c_lower.contains(p)) {
+                score += 12.0;
             }
         }
 

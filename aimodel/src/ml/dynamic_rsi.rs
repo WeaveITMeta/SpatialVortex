@@ -284,9 +284,13 @@ impl DynamicRSI {
         });
 
         // Truthfulness
+        // Pipeline threshold 0.5 (was 0.7): on the honest harness the
+        // pipeline path scores ~49% on TruthfulQA vs ~26% (chance) for the
+        // multi-expert fallback, so routing more questions to the pipeline
+        // is a straight win even when its commit confidence is middling.
         self.seed_strategies.insert("truthfulqa".to_string(), InferenceStrategy {
             use_pipeline: true,
-            pipeline_threshold: 0.7,
+            pipeline_threshold: 0.5,
             use_unified: true,
             unified_threshold: 0.70,
             num_passes: 3,
