@@ -36,6 +36,8 @@ web-learning = ["dep:reqwest", "dep:urlencoding", "dep:scraper", "dep:html2md", 
 linfa-ml = ["dep:linfa", "dep:linfa-clustering", "dep:linfa-reduction", "dep:linfa-linear", "dep:ndarray"]
 # Diffusion LM expert with pathway-guided unmasking
 diffusion-expert = []
+# Forge orchestration: distributed eval fan-out (forge-eval binary)
+forge = ["dep:forge-orchestration"]
 
 [dependencies]
 # Core
@@ -121,6 +123,9 @@ url = "2.5"
 # Uses path for local dev; publish rsi_macros to crates.io first, then switch to version
 rsi_macros = { path = "rsi_macros", version = "0.1.0" }
 
+# Forge orchestration (our crate) — control plane for distributed eval
+forge-orchestration = { version = "0.4.2", optional = true }
+
 [dev-dependencies]
 tokio-test = "0.4"
 
@@ -148,6 +153,11 @@ path = "src/bin/arc_agent_iggy.rs"
 name = "vortex-api"
 path = "src/bin/vortex_api.rs"
 required-features = ["web"]
+
+[[bin]]
+name = "forge-eval"
+path = "src/bin/forge_eval.rs"
+required-features = ["forge"]
 
 # Patch iggy_common 0.9.0: fix cfg guard on posix_fadvise to exclude Windows.
 # Same patch used in eustress workspace.
