@@ -2058,6 +2058,42 @@ impl VortexWorldModel {
         let mut targets: Vec<(u32, u32)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
+        // ── Strategy 0: object-first targeting ──────────────────────────
+        // Click games are about objects, not pixels: try one representative
+        // cell per tracked object before any cell-level heuristic. Smaller
+        // objects first — buttons and toggles are small; backdrops are big.
+        // Combined with dead-click learning this sweeps the interactive
+        // surface in ~object-count actions instead of ~cell-count.
+        {
+            let mut objs: Vec<(usize, (u32, u32))> = self
+                .object_tracker
+                .tracked_objects()
+                .iter()
+                .filter(|t| t.current.area >= 1 && t.current.area < (grid.width * grid.height) / 4)
+                .filter_map(|t| {
+                    // Representative cell: the member cell nearest the centroid
+                    // (a centroid of an L-shape can fall outside the object).
+                    let (cy, cx) = t.current.centroid;
+                    t.current.cells.iter()
+                        .min_by_key(|(r, c)| {
+                            let dr = *r as f32 - cy;
+                            let dc = *c as f32 - cx;
+                            ((dr * dr + dc * dc) * 100.0) as i64
+                        })
+                        .map(|(r, c)| (t.current.area, (*c as u32, *r as u32)))
+                })
+                .collect();
+            objs.sort_by_key(|(area, _)| *area);
+            for (_, pt) in objs {
+                if !self.dead_clicks.contains(&pt) && seen.insert(pt) {
+                    targets.push(pt);
+                }
+            }
+            if !targets.is_empty() {
+                info!("  CLICK STRATEGY: object-first → {} object targets", targets.len());
+            }
+        }
+
         // ── Strategy 1: IRA-simulated click scoring ─────────────────────
         // If we know the click mechanic (toggle/paint), simulate clicking each
         // candidate cell and rank by structural improvement.

@@ -10,7 +10,7 @@
 
 use crate::causal_graph::CausalGraph;
 use crate::hypothesis_tree::{HypothesisTree, SimulationBudget};
-use crate::symbol_resolver::SymbolResolver;
+
 use crate::types::*;
 use crate::world_state::WorldState;
 use tracing::{debug, info};
