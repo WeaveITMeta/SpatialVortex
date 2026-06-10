@@ -458,6 +458,10 @@ pub struct KnowledgeSnapshot {
     /// Cross-game recipe library — action sequences that solved levels.
     #[serde(default)]
     pub recipe_library: Vec<WinRecipe>,
+    /// Per-game learned mechanics (control maps + IRA) — revisits skip the
+    /// probe phase, so knowledge genuinely persists across sessions.
+    #[serde(default)]
+    pub game_profiles: HashMap<String, crate::forward_model::GameProfile>,
 }
 
 // ─── Click Mechanic Learning ─────────────────────────────────────────────────
@@ -598,6 +602,12 @@ pub struct VortexWorldModel {
     /// Cells already clicked this level (responsive or not) — exploration
     /// prefers cells it has never tried.
     clicked_this_level: std::collections::HashSet<(u32, u32)>,
+    /// Online object-level forward model: control mapping, per-action IRA,
+    /// and goal-directed stepping for keyboard games.
+    forward_model: crate::forward_model::ObjectForwardModel,
+    /// Per-game learned-mechanics profiles (persisted in the knowledge
+    /// snapshot) — a revisited game skips the probe phase entirely.
+    game_profiles: HashMap<String, crate::forward_model::GameProfile>,
 }
 
 impl VortexWorldModel {
@@ -655,12 +665,34 @@ impl VortexWorldModel {
             dead_clicks: std::collections::HashSet::new(),
             responsive_clicks: std::collections::HashSet::new(),
             clicked_this_level: std::collections::HashSet::new(),
+            forward_model: crate::forward_model::ObjectForwardModel::new(),
+            game_profiles: HashMap::new(),
         }
     }
 
     /// Reset state for a new game episode.
     /// Preserves cross-game knowledge: CausalGraph, decomposer archetypes.
     pub fn new_episode(&mut self, game_id: &str) {
+        // Bank what the forward model learned in the previous game, then
+        // reset it — adopting a stored profile if we've played this game
+        // before (probe phase skipped on revisits).
+        if !self.current_game.is_empty() {
+            if let Some(profile) = self.forward_model.to_profile() {
+                info!(
+                    "  PROFILE saved for {}: {} controls mapped, ira={:.2}",
+                    self.current_game, profile.control_map.len(), profile.ira
+                );
+                self.game_profiles.insert(self.current_game.clone(), profile);
+            }
+        }
+        self.forward_model.reset();
+        if let Some(profile) = self.game_profiles.get(game_id) {
+            info!(
+                "  PROFILE adopted for {}: {} controls known, probing skipped",
+                game_id, profile.control_map.len()
+            );
+            self.forward_model.adopt_profile(&profile.clone());
+        }
         self.prev_grid = None;
         self.last_action_id = None;
         self.pending_prediction = None;
@@ -713,12 +745,20 @@ impl VortexWorldModel {
 
     /// Export cross-game knowledge for persistence.
     pub fn export_knowledge(&self) -> String {
+        // Include the live game's profile even before its episode ends
+        let mut game_profiles = self.game_profiles.clone();
+        if !self.current_game.is_empty() {
+            if let Some(profile) = self.forward_model.to_profile() {
+                game_profiles.insert(self.current_game.clone(), profile);
+            }
+        }
         let snapshot = KnowledgeSnapshot {
             causal_graph: self.causal_graph.clone(),
             decomposer: self.decomposer.clone(),
             global_ira: self.global_ira,
             games_played: self.decomposer.action_history.len() as u32,
             recipe_library: self.recipe_library.clone(),
+            game_profiles,
         };
         serde_json::to_string_pretty(&snapshot).unwrap_or_default()
     }
@@ -757,6 +797,7 @@ impl VortexWorldModel {
         self.decomposer = snapshot.decomposer;
         self.global_ira = snapshot.global_ira;
         self.recipe_library = snapshot.recipe_library;
+        self.game_profiles = snapshot.game_profiles;
 
         info!(
             "Imported knowledge: {} nodes, {} edges, {} archetypes, {} recipes, global_ira={:.3}",
@@ -824,6 +865,22 @@ impl VortexWorldModel {
             grid.height, grid.width, grid.distinct_colors(),
             object_map.object_count(), object_events.len(), self.step_in_game,
         );
+
+        // ── FORWARD MODEL: fold the last action's outcome in ──────────────
+        // Updates the per-action displacement stats and scores the pending
+        // avatar-position forecast (per-action Representation Accuracy).
+        if let Some(last_action) = self.last_action_id {
+            let avatar_now = self
+                .object_tracker
+                .agent()
+                .map(|a| a.current.centroid);
+            self.forward_model.observe(
+                last_action,
+                &object_events,
+                self.agent_object_id,
+                avatar_now,
+            );
+        }
 
         // Save level start grid on first observation of a new level
         if self.level_start_grid.is_none() {
@@ -1114,6 +1171,9 @@ impl VortexWorldModel {
                 self.dead_clicks.clear();
                 self.responsive_clicks.clear();
                 self.clicked_this_level.clear();
+                // Control physics usually persist across levels — keep the
+                // map, drop only the outstanding forecast.
+                self.forward_model.on_level_advance();
 
                 // Capture the action sequence that produced this level advance
                 if !self.current_level_actions.is_empty() {
@@ -1349,6 +1409,12 @@ impl VortexWorldModel {
             return d;
         }
 
+        // FORWARD MODEL: probe controls, then walk toward goals (keyboard games)
+        if let Some(d) = self.try_forward_model_move(available, grid) {
+            self.current_level_actions.push(d.action.clone());
+            return d;
+        }
+
         // MCTS: try when we have any exploration data
         let mcts_ready = self.undo_explorer.graph.state_count() > 0;
         if mcts_ready {
@@ -1370,6 +1436,71 @@ impl VortexWorldModel {
     }
 
     /// Try MCTS search using the exploration graph and IRA priors.
+    /// The Representation Accuracy loop for keyboard games.
+    ///
+    /// Phase 1 (PROBE): while the control map is unknown, spend actions
+    /// measuring what each control does to the avatar — the most valuable
+    /// action under uncertainty is the one that reduces it fastest.
+    /// Phase 2 (PLAN): with a confident control map, a tracked avatar, and a
+    /// goal candidate, take the IRA-weighted step that closes the distance.
+    /// Every emitted action registers a position forecast, so the model's
+    /// trust level is continuously re-measured against reality.
+    fn try_forward_model_move(
+        &mut self,
+        available: &[u32],
+        grid: &Grid2D,
+    ) -> Option<PolicyDecision> {
+        // Keyboard games only: at least one movement action available
+        let has_movement = crate::forward_model::MOVEMENT_ACTIONS
+            .iter()
+            .any(|a| available.contains(a));
+        if !has_movement {
+            return None;
+        }
+
+        self.forward_model.seed_probes(available);
+
+        let avatar = self.object_tracker.agent().map(|a| a.current.centroid);
+
+        // Phase 1: control probing
+        if self.forward_model.probing() {
+            if let Some(action) = self.forward_model.next_probe() {
+                if available.contains(&action) {
+                    if let Some(av) = avatar {
+                        self.forward_model.predict(action, av);
+                    }
+                    let d = self.make_decision(
+                        action,
+                        0.4,
+                        grid,
+                        format!("fm_probe: measuring action_{} effect on avatar", action),
+                    );
+                    return Some(d);
+                }
+            }
+        }
+
+        // Phase 2: goal-directed stepping (IRA-gated)
+        let avatar = avatar?;
+        let goal_id = self.object_frame.goal_candidates.first().copied()?;
+        let goal = self.object_tracker.get(goal_id).map(|g| g.current.centroid)?;
+        let (action, progress, ira) = self.forward_model.step_toward(avatar, goal)?;
+        if !available.contains(&action) || ira < 0.35 {
+            return None;
+        }
+        self.forward_model.predict(action, avatar);
+        let d = self.make_decision(
+            action,
+            (0.5 + ira * 0.4).min(0.9),
+            grid,
+            format!(
+                "fm_goal_step: action_{} toward goal obj_{} (progress={:.2}, ira={:.2})",
+                action, goal_id, progress, ira
+            ),
+        );
+        Some(d)
+    }
+
     fn try_mcts(&self, available: &[u32], grid: &Grid2D) -> Option<PolicyDecision> {
         let current_hash = GridHash::from_grid(grid);
 
