@@ -30,16 +30,16 @@ GSM8K is free-form generation; ours is selection among 4 candidates).
 | Task (MC4 variant) | Vortex | 4-choice chance | Free-form reference* |
 |--------------------|:------:|:---------------:|:--------------------:|
 | **HumanEval-MC4** (match solution to spec) | 55.3% | 25% | 67.0% (GPT-4, pass@1) |
-| **TruthfulQA-MC4** (1 correct + 3 real incorrect) | 39.0% | 25% | 59.0% (GPT-4, MC1) |
-| **GSM8K-MC4** (numeric answer + 3 derived distractors) | 35.6% | 25% | 92.0% (GPT-4, free-form) |
+| **TruthfulQA-MC4** (1 correct + 3 real incorrect) | 43.2% | 25% | 59.0% (GPT-4, MC1) |
+| **GSM8K-MC4** (numeric answer + 3 derived distractors) | 35.4% | 25% | 92.0% (GPT-4, free-form) |
 | **HellaSwag** (original 4-way) | 36.8% | 25% | 95.3% (GPT-4) |
-| **MMLU** (original 4-way) | 26.7% | 25% | 86.4% (GPT-4) |
-| **Overall** | **36.0%** | 25% | — |
+| **MMLU** (original 4-way) | 26.5% | 25% | 86.4% (GPT-4) |
+| **Overall** | **36.9%** | 25% | — |
 
 \* Reference scores use different (harder) protocols and pretrained models —
 context, not competition.
 
-- **2,139 questions** evaluated in **2,079 s** (~1 s/question), 500/task cap
+- **2,139 questions** evaluated in **1,844 s** (~1 s/question), 500/task cap
 - **Zero GPU hours. Zero pretrained weights. Zero gradient updates.**
 - Reproduce: see [Run Benchmarks](#run-benchmarks); answer positions are
   shuffled with a per-question seed, so runs are deterministic.
@@ -162,6 +162,24 @@ mutate the data stream, and the golden ratio is used for threshold weighting.
 These constants are an organizing aesthetic for the pipeline's control flow —
 the measurable work happens in the experts above.
 
+### Distributed Eval via Forge
+
+`forge-eval` (feature `forge`) shards the suite across CPU cores using
+[forge-orchestration](https://crates.io/crates/forge-orchestration) as the
+control plane (job definition, tracking, metrics) with a local exec layer
+spawning one `spatialvortex-eval --offset N --limit M` process per shard and
+merging the JSON results. Measured: full suite in ~118 s wall vs ~2,079 s
+sequential (**17.6× end-to-end**) at `--concurrency 16` on a 36-core machine.
+
+Protocol notes for comparability:
+- Each shard reserves its first 5 questions as few-shot exemplars (same
+  rule as the sequential run, applied per shard), so a sharded run grades
+  ~450/task instead of 495.
+- Dynamic RSI adapts per process; shards adapt independently.
+- Published headline numbers come from the **sequential** protocol;
+  forge-eval is the development A/B loop. A/B both sides under the same
+  runner, always.
+
 ### Dynamic Recursive Self-Improvement (RSI)
 
 Vortex adapts its inference strategy per dataset at runtime without gradient
@@ -178,7 +196,11 @@ from observed accuracy.
 ```bash
 cd aimodel
 
-# Full honest suite (500/task, ~30 min single CPU core)
+# Distributed suite via Forge orchestration (~2 min on a many-core box)
+cargo run --release --bin forge-eval --features "diffusion-expert,forge" -- \
+  --tasks mmlu,gsm8k,hellaswag,truthfulqa,humaneval --concurrency 16
+
+# Full honest suite, sequential canonical protocol (500/task, ~30 min single core)
 cargo run --bin spatialvortex-eval --release --features diffusion-expert -- \
   --tasks mmlu,gsm8k,hellaswag,truthfulqa,humaneval --eval-only --skip-hf --audit
 

@@ -28,6 +28,9 @@ honest_*.log
 eval_ab_*.json
 eval_baseline_review.json
 eval_results_honest_v1.json
+eval_results_honest_v2.json
+eval_results_forge_v*.json
+eval_results_forge.json
 
 # Local API server state — contains live keys
 vortex_keys.json
