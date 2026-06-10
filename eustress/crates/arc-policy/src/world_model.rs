@@ -893,6 +893,37 @@ impl VortexWorldModel {
         self.scene_mirror.properties.global_ira = self.global_ira;
         self.scene_mirror.properties.total_actions = self.step_in_game;
 
+        // Project behavioral object roles onto the EEP tag/attribute system:
+        // every cell of a tracked object carries role_* and object_* tags in
+        // the 3D scene (avatar/goal/barrier/... — queryable, visible).
+        {
+            use crate::object_tracker::ObjectRole;
+            let mut cell_roles: HashMap<(usize, usize), (u32, &'static str)> = HashMap::new();
+            for t in self.object_tracker.tracked_objects() {
+                let role: &'static str = if Some(t.stable_id) == self.agent_object_id {
+                    "avatar"
+                } else if self.object_frame.goal_candidates.contains(&t.stable_id) {
+                    "goal"
+                } else {
+                    match t.classification.role {
+                        ObjectRole::Agent => "avatar",
+                        ObjectRole::StaticBarrier => "barrier",
+                        ObjectRole::Movable => "movable",
+                        ObjectRole::Collectible => "collectible",
+                        ObjectRole::Goal => "goal",
+                        ObjectRole::Decoration => "decoration",
+                        ObjectRole::Unknown => continue,
+                    }
+                };
+                for &(r, c) in &t.current.cells {
+                    cell_roles.insert((r, c), (t.stable_id, role));
+                }
+            }
+            if !cell_roles.is_empty() {
+                self.scene_mirror.apply_object_roles(grid.width, &cell_roles);
+            }
+        }
+
         // Update symmetry property from grid analysis
         let h_sym = props.iter().any(|p| p.name == "symmetric_horizontal" && p.value.as_bool());
         let v_sym = props.iter().any(|p| p.name == "symmetric_vertical" && p.value.as_bool());

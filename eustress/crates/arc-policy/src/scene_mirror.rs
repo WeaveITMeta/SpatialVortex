@@ -163,6 +163,34 @@ impl ArcSceneMirror {
         }
     }
 
+    /// Attach semantic role tags + object identity to the cell entities of
+    /// tracked objects. Roles come from the world model's behavioral
+    /// classification (avatar = moves under control, goal = candidate
+    /// target) — the policy's understanding made visible and queryable
+    /// through the EEP tag/attribute system.
+    pub fn apply_object_roles(
+        &mut self,
+        grid_width: usize,
+        cell_roles: &HashMap<(usize, usize), (u32, &'static str)>,
+    ) {
+        for (&(r, c), &(object_id, role)) in cell_roles {
+            let entity_id = (r * grid_width + c + 1) as u64;
+            if let Some(e) = self.entities.get_mut(&entity_id) {
+                e.tags.retain(|t| !t.starts_with("role_") && !t.starts_with("object_"));
+                e.tags.push(format!("role_{}", role));
+                e.tags.push(format!("object_{}", object_id));
+                e.attributes.insert(
+                    "object_id".into(),
+                    AttributeValue::Int(object_id as i64),
+                );
+                e.attributes.insert(
+                    "role".into(),
+                    AttributeValue::String(role.to_string()),
+                );
+            }
+        }
+    }
+
     /// Apply a new ARC game frame. Returns the deltas generated.
     ///
     /// On first call: generates PartAdded for every cell.
