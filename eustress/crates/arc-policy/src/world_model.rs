@@ -602,6 +602,11 @@ pub struct VortexWorldModel {
     /// Cells already clicked this level (responsive or not) — exploration
     /// prefers cells it has never tried.
     clicked_this_level: std::collections::HashSet<(u32, u32)>,
+    /// Per-cell change counts across ALL actions — cells changing on most
+    /// steps are ambient dynamics (timers, counters), not action effects.
+    ambient_change_counts: HashMap<(usize, usize), u32>,
+    /// Total observations contributing to ambient_change_counts.
+    ambient_observations: u32,
     /// Online object-level forward model: control mapping, per-action IRA,
     /// and goal-directed stepping for keyboard games.
     forward_model: crate::forward_model::ObjectForwardModel,
@@ -665,9 +670,21 @@ impl VortexWorldModel {
             dead_clicks: std::collections::HashSet::new(),
             responsive_clicks: std::collections::HashSet::new(),
             clicked_this_level: std::collections::HashSet::new(),
+            ambient_change_counts: HashMap::new(),
+            ambient_observations: 0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
         }
+    }
+
+    /// A cell is ambient when it changed on >40% of observed steps (with at
+    /// least 5 observations) — environment dynamics, not action effects.
+    fn is_ambient_cell(&self, r: usize, c: usize) -> bool {
+        if self.ambient_observations < 5 {
+            return false;
+        }
+        let count = self.ambient_change_counts.get(&(r, c)).copied().unwrap_or(0);
+        (count as f32) / (self.ambient_observations as f32) > 0.4
     }
 
     /// Reset state for a new game episode.
@@ -726,6 +743,8 @@ impl VortexWorldModel {
         self.dead_clicks.clear();
         self.responsive_clicks.clear();
         self.clicked_this_level.clear();
+        self.ambient_change_counts.clear();
+        self.ambient_observations = 0;
         // Object perception reset
         self.object_tracker.reset();
         self.object_frame = ObjectFrame::default();
@@ -985,17 +1004,50 @@ impl VortexWorldModel {
             self.steps_since_level_advance += 1;
             self.actions_since_submit += 1;
 
+            // ── AMBIENT DYNAMICS TRACKING ────────────────────────────────
+            // Cells that change on (nearly) every action regardless of what
+            // we did are environment state — move counters, timers,
+            // animations — not consequences of our action. vc33's energy
+            // bar drains one cell per click, which made EVERY click look
+            // "responsive" and defeated dead-click learning entirely.
+            {
+                let rows = prev.height.min(grid.height);
+                let cols = prev.width.min(grid.width);
+                self.ambient_observations += 1;
+                for r in 0..rows {
+                    for c in 0..cols {
+                        if prev.cells[r][c] != grid.cells[r][c] {
+                            *self.ambient_change_counts.entry((r, c)).or_insert(0) += 1;
+                        }
+                    }
+                }
+            }
+
             // ── CLICK MECHANIC LEARNING ──────────────────────────────────
             if action_id == 6 {
                 if let Some((cx, cy)) = self.last_click_pos.take() {
                     let mut changes = Vec::new();
                     let rows = prev.height.min(grid.height);
                     let cols = prev.width.min(grid.width);
+                    // Field-precise ambient check (a method call here would
+                    // conflict with the live &mut into action_models)
+                    let ambient_obs = self.ambient_observations;
                     for r in 0..rows {
                         for c in 0..cols {
                             let old = prev.cells[r][c];
                             let new_val = grid.cells[r][c];
-                            if old != new_val {
+                            if old == new_val {
+                                continue;
+                            }
+                            let is_ambient = ambient_obs >= 5 && {
+                                let count = self
+                                    .ambient_change_counts
+                                    .get(&(r, c))
+                                    .copied()
+                                    .unwrap_or(0);
+                                (count as f32) / (ambient_obs as f32) > 0.4
+                            };
+                            if !is_ambient {
                                 changes.push((r, c, old, new_val));
                             }
                         }
@@ -1202,6 +1254,8 @@ impl VortexWorldModel {
                 self.dead_clicks.clear();
                 self.responsive_clicks.clear();
                 self.clicked_this_level.clear();
+                self.ambient_change_counts.clear();
+                self.ambient_observations = 0;
                 // Control physics usually persist across levels — keep the
                 // map, drop only the outstanding forecast.
                 self.forward_model.on_level_advance();
@@ -2180,10 +2234,27 @@ impl VortexWorldModel {
         }
 
         // Real-time adaptation: drop cells already proven dead this level,
-        // and explore never-clicked cells before re-trying clicked ones.
-        // Responsive cells stay eligible (re-clicking them is how toggle /
-        // cycle mechanics make progress).
-        self.click_targets.retain(|t| !self.dead_clicks.contains(t));
+        // never click ambient cells (move counters, timers — clicking the
+        // energy bar costs a move and does nothing), and explore
+        // never-clicked cells before re-trying clicked ones. Responsive
+        // cells stay eligible (re-clicking is how toggle/cycle mechanics
+        // make progress).
+        let ambient_counts = &self.ambient_change_counts;
+        let ambient_obs = self.ambient_observations;
+        let dead = &self.dead_clicks;
+        self.click_targets.retain(|t| {
+            if dead.contains(t) {
+                return false;
+            }
+            if ambient_obs < 5 {
+                return true;
+            }
+            let count = ambient_counts
+                .get(&(t.1 as usize, t.0 as usize))
+                .copied()
+                .unwrap_or(0);
+            (count as f32) / (ambient_obs as f32) <= 0.4
+        });
         self.click_targets.sort_by_key(|t| {
             if !self.clicked_this_level.contains(t) {
                 0 // never tried — highest priority
