@@ -930,6 +930,26 @@ impl VortexEngine {
         // --- Minimal intent classification (only for truly special cases) ---
         let intent = Self::classify_intent(&lower);
 
+        // Personal recall: "what is my name?", "who am I?" — answered from
+        // conversation history, not the knowledge base. Skip introductions
+        // ("my name is X") so they still route to the greeting handler.
+        let is_introduction = lower.contains("my name is") || lower.contains("call me ");
+        if !is_introduction && (lower.contains("who am i") || lower.contains("my name")) {
+            return match self.extract_name_from_history() {
+                Some(n) => (format!("Your name is {}.", n), 0.95),
+                None => (
+                    "You haven't told me your name yet. What should I call you?".to_string(),
+                    0.8,
+                ),
+            };
+        }
+
+        // Anaphoric math: "now add 10 to that result", "double it" — resolve
+        // the referent from the last numeric answer in this conversation.
+        if let Some(resp) = self.try_anaphoric_math(&lower) {
+            return resp;
+        }
+
         // Math gets its own path because it needs exact computation
         if intent == ConversationalIntent::MathQuestion {
             return self.answer_math_conversational(&lower, msg);
@@ -1037,7 +1057,7 @@ impl VortexEngine {
         // --- Compose intelligent response ---
         match intent {
             ConversationalIntent::Greeting => {
-                let introduced_name = Self::extract_name_from_text(&lower);
+                let introduced_name = Self::extract_name_from_text(&lower, msg);
                 let remembered_name = self.extract_name_from_history();
                 let name = introduced_name.or(remembered_name);
                 let greeting = if let Some(ref n) = name {
@@ -1244,11 +1264,13 @@ impl VortexEngine {
     }
 
     /// Extract a name from the current message text (static, no history needed)
-    /// Handles: "my name is X", "i'm X", "call me X"
-    fn extract_name_from_text(lower: &str) -> Option<String> {
+    /// Handles: "my name is X", "i'm X", "call me X". The prefix is located
+    /// in the lowercased text but the name is sliced from the original so
+    /// casing like "McKale" survives.
+    fn extract_name_from_text(lower: &str, original: &str) -> Option<String> {
         for prefix in &["my name is ", "i'm ", "i am ", "call me "] {
             if let Some(pos) = lower.find(prefix) {
-                let rest = &lower[pos + prefix.len()..];
+                let rest = &original[pos + prefix.len()..];
                 let name: String = rest.split(|c: char| !c.is_alphabetic())
                     .next().unwrap_or("").to_string();
                 if name.len() >= 2 && name.len() <= 20 {
@@ -1421,9 +1443,10 @@ impl VortexEngine {
         // Factual recall
         if lower.starts_with("what") || lower.starts_with("who") || lower.starts_with("where") || lower.starts_with("when") {
             return format!(
-                "That's a knowledge question about {}. \
-                I don't have this loaded in lightweight mode. \
-                Run with --load-hf for full knowledge, or give me facts to reason from.", topic
+                "I don't know about {} offhand — I'm running in lightweight mode \
+                without my knowledge datasets loaded. Start me with --load-hf for \
+                full knowledge, or share the relevant facts and I'll reason \
+                through them with you.", topic
             );
         }
 
@@ -1563,11 +1586,12 @@ impl VortexEngine {
             let (rag_topics, rag_facts) = self.rag_engine.knowledge_size();
             let vortex_stats = self.consciousness.vortex.stats();
             return (format!(
-                "I'm Vortex, a pure-Rust AI built on sacred geometry principles. \
-                I use 10 specialized reasoning experts coordinated through a vortex cycle \
-                (1→2→4→8→7→5→1) with sacred observer positions at 3, 6, and 9. \
-                Right now I have {} knowledge topics, {} facts, and {} subjects loaded. \
-                I score 95.6% on standard benchmarks with no GPU and no pretrained weights.",
+                "I'm Vortex, a pure-Rust reasoning engine — no GPU, no pretrained \
+                weights, just specialized reasoning experts coordinated through a \
+                vortex cycle. Right now I have {} knowledge topics, {} facts, and {} \
+                subjects loaded. I'm genuinely good at exact arithmetic and structured \
+                reasoning, and honest about the rest: on open-knowledge benchmarks I'm \
+                still weak. Ask me something and I'll show you how I think.",
                 rag_topics, rag_facts, vortex_stats.subject_count
             ), 0.95);
         }
@@ -1605,12 +1629,13 @@ impl VortexEngine {
 
         // Intelligence questions
         if lower.contains("are you smart") || lower.contains("are you intelligent") {
-            return ("On standard benchmarks I score 95.6% overall: \
-                100% on GSM8K math, 100% on HumanEval code generation, \
-                86.7% on MMLU graduate-level knowledge, 93.3% on HellaSwag commonsense, \
-                and 97.8% on TruthfulQA. That's above GPT-4 on four out of five. \
-                But I'm honest about what I am: a reasoning engine, not a general intelligence. \
-                I'm strong at structured problems and weak at open-ended creativity.".to_string(), 0.9);
+            return ("Honestly? I'm narrow. On integrity-hardened 4-choice benchmarks \
+                I score about 37% overall (chance is 25%): strongest on code-to-spec \
+                matching (~55%) and arithmetic word problems (~35%), near chance on \
+                open-knowledge tests like MMLU. I compute math exactly and reason \
+                through structured problems well, but I'm a reasoning engine with no \
+                pretrained weights, not a general intelligence — and I'd rather tell \
+                you that straight than recite inflated numbers.".to_string(), 0.9);
         }
 
         // Consciousness questions
@@ -1649,6 +1674,98 @@ impl VortexEngine {
             "I'm Vortex, a pure-Rust AI with {} topics and {} facts in my knowledge base. \
             Ask me anything and I'll reason through it.", rag_topics, rag_facts
         ), 0.8)
+    }
+
+    /// The most recent numeric value this conversation produced — the
+    /// referent for follow-ups like "add 10 to that result".
+    fn last_numeric_result(&self) -> Option<f64> {
+        for msg in self.history.iter().rev() {
+            if msg.role == ChatRole::Assistant {
+                // Prefer the value after the last '=' ("15 × 4 = 60.")
+                let tail = msg.content.rsplit('=').next().unwrap_or(&msg.content);
+                let mut last: Option<f64> = None;
+                for tok in tail.split(|c: char| !c.is_ascii_digit() && c != '.' && c != '-') {
+                    if let Ok(v) = tok.parse::<f64>() {
+                        if v.abs() < 1e15 {
+                            last = Some(v);
+                        }
+                    }
+                }
+                if last.is_some() {
+                    return last;
+                }
+            }
+        }
+        None
+    }
+
+    /// Resolve follow-up arithmetic that refers back to the previous answer:
+    /// "now add 10 to that result", "subtract 5 from that", "double it",
+    /// "halve that", "square it". Returns None when the message doesn't
+    /// refer back or no prior numeric answer exists.
+    fn try_anaphoric_math(&self, lower: &str) -> Option<(String, f32)> {
+        let refers_back = lower.contains("that result")
+            || lower.contains("the result")
+            || lower.contains("that answer")
+            || lower.contains("the answer")
+            || lower.contains("that number")
+            || lower.contains("to that")
+            || lower.contains("from that")
+            || lower.contains("by that")
+            || lower == "double it"
+            || lower == "halve it"
+            || lower == "square it"
+            || lower.contains("double that")
+            || lower.contains("halve that")
+            || lower.contains("half of that")
+            || lower.contains("square that")
+            || ((lower.starts_with("now ") || lower.starts_with("then ") || lower.starts_with("and "))
+                && lower.contains(" it"));
+        if !refers_back {
+            return None;
+        }
+        let prev = self.last_numeric_result()?;
+
+        // Parameterless transforms first
+        if lower.contains("double") {
+            return Some((format!("{} × 2 = {}.", Self::format_num(prev), Self::format_num(prev * 2.0)), 0.95));
+        }
+        if lower.contains("halve") || lower.contains("half of") {
+            return Some((format!("{} ÷ 2 = {}.", Self::format_num(prev), Self::format_num(prev / 2.0)), 0.95));
+        }
+        if lower.contains("square root") || lower.contains("sqrt") {
+            return Some((format!("√{} = {}.", Self::format_num(prev), Self::format_num(prev.sqrt())), 0.95));
+        }
+        if lower.contains("square") {
+            return Some((format!("{}² = {}.", Self::format_num(prev), Self::format_num(prev * prev)), 0.95));
+        }
+
+        // One-operand operations: the message's number applies to prev
+        let nums: Vec<f64> = lower
+            .split(|c: char| !c.is_ascii_digit() && c != '.')
+            .filter_map(|s| s.parse::<f64>().ok())
+            .collect();
+        let n = *nums.first()?;
+
+        let (sym, result) = if lower.contains("add") || lower.contains("plus") {
+            (" + ", prev + n)
+        } else if lower.contains("subtract") || lower.contains("minus") || lower.contains("take away") {
+            (" - ", prev - n)
+        } else if lower.contains("times") || lower.contains("multiply") {
+            (" × ", prev * n)
+        } else if lower.contains("divide") {
+            if n.abs() < 1e-10 {
+                return Some(("Division by zero is undefined.".to_string(), 0.95));
+            }
+            (" ÷ ", prev / n)
+        } else {
+            return None;
+        };
+
+        Some((
+            format!("{}{}{} = {}.", Self::format_num(prev), sym, Self::format_num(n), Self::format_num(result)),
+            0.95,
+        ))
     }
 
     /// Answer math questions conversationally.
@@ -1996,7 +2113,8 @@ impl VortexEngine {
         &self.history
     }
 
-    /// Capitalize the first letter of a string
+    /// Capitalize the first letter of a string; interior capitals
+    /// (McKale, DeShawn) pass through untouched.
     fn capitalize(s: &str) -> String {
         let s = s.trim();
         if s.is_empty() { return String::new(); }

@@ -72,6 +72,11 @@ struct Args {
     /// Enable web learning (overrides --fast)
     #[arg(long)]
     web_learn: bool,
+
+    /// Piped mode: treat ALL of stdin as one prompt (legacy behavior).
+    /// Default is one conversation turn per line.
+    #[arg(long)]
+    single: bool,
 }
 
 // =============================================================================
@@ -133,26 +138,45 @@ fn run_single(engine: &mut VortexEngine, prompt: &str, args: &Args) {
 // Piped stdin mode
 // =============================================================================
 
-/// Read all lines from stdin, join them, process as one prompt
+/// Piped stdin. Default: each line is one conversation turn (REPL
+/// semantics — history carries across turns, so scripted multi-turn
+/// conversations work). With --single: join all lines into one prompt.
 fn run_piped(engine: &mut VortexEngine, args: &Args) {
     let stdin = io::stdin();
-    let mut input = String::new();
 
-    for line in stdin.lock().lines() {
-        match line {
-            Ok(l) => {
-                if !input.is_empty() {
-                    input.push('\n');
+    if args.single {
+        let mut input = String::new();
+        for line in stdin.lock().lines() {
+            match line {
+                Ok(l) => {
+                    if !input.is_empty() {
+                        input.push('\n');
+                    }
+                    input.push_str(&l);
                 }
-                input.push_str(&l);
+                Err(_) => break,
             }
-            Err(_) => break,
         }
+        if !input.trim().is_empty() {
+            let response = engine.chat(input.trim());
+            print_response(&response, args);
+        }
+        return;
     }
 
-    if !input.trim().is_empty() {
-        let response = engine.chat(input.trim());
+    for line in stdin.lock().lines() {
+        let Ok(line) = line else { break };
+        let turn = line.trim();
+        if turn.is_empty() {
+            continue;
+        }
+        if turn == "exit" || turn == "quit" || turn == "/quit" || turn == "/exit" {
+            break;
+        }
+        println!("You: {}", turn);
+        let response = engine.chat(turn);
         print_response(&response, args);
+        println!();
     }
 }
 

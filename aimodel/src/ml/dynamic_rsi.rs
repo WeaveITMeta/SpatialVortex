@@ -418,7 +418,8 @@ impl DynamicRSI {
         let gen = profile.rsi_generations;
         profile.rsi_generations += 1;
 
-        println!("   [RSI-GEN-{}] Retuning strategy for '{}': accuracy={:.1}% ({}/{})",
+        // stderr: diagnostics must never interleave with chat output on stdout
+        eprintln!("   [RSI-GEN-{}] Retuning strategy for '{}': accuracy={:.1}% ({}/{})",
             gen + 1, source, accuracy * 100.0, profile.correct, profile.total);
 
         // ---- RULE 0: If pipeline NEVER commits, disable it (pure overhead) ----
@@ -501,7 +502,7 @@ impl DynamicRSI {
         // Update strategy name to reflect RSI generation
         profile.strategy.strategy_name = format!("rsi-gen-{}/{}", gen + 1, source);
 
-        println!("   [RSI-GEN-{}] New strategy: pipeline={}/{:.1} unified={}/{:.1} multi_expert={} passes={}",
+        eprintln!("   [RSI-GEN-{}] New strategy: pipeline={}/{:.1} unified={}/{:.1} multi_expert={} passes={}",
             gen + 1,
             profile.strategy.use_pipeline, profile.strategy.pipeline_threshold,
             profile.strategy.use_unified, profile.strategy.unified_threshold,
