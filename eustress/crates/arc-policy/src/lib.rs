@@ -1,3 +1,4 @@
+pub mod epistemic;
 pub mod forward_model;
 pub mod predicates;
 pub mod qlearn;

@@ -466,6 +466,9 @@ pub struct KnowledgeSnapshot {
     /// for games never seen before.
     #[serde(default)]
     pub q_table: crate::qlearn::QTable,
+    /// Causal claims with epistemic status — the agent's verified science.
+    #[serde(default)]
+    pub ledger: crate::epistemic::EpistemicLedger,
 }
 
 // ─── Click Mechanic Learning ─────────────────────────────────────────────────
@@ -618,6 +621,10 @@ pub struct VortexWorldModel {
     /// posterior-weighted — reward shaping follows what we currently
     /// believe winning means, updated at every completion.
     predicate_ensemble: Option<crate::predicates::PredicateEnsemble>,
+    /// Epistemic ledger: causal claims with the scientific lifecycle
+    /// Observed -> Correlated -> Verified -> Law. Interventions with
+    /// declared predictions are the only road to Law status.
+    ledger: crate::epistemic::EpistemicLedger,
     /// Progress metric at the previous step (targets remaining / goal
     /// distance), for shaped-reward deltas.
     prev_progress: f32,
@@ -688,6 +695,7 @@ impl VortexWorldModel {
             ambient_observations: 0,
             q_table: crate::qlearn::QTable::default(),
             predicate_ensemble: None,
+            ledger: crate::epistemic::EpistemicLedger::default(),
             prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
@@ -772,6 +780,7 @@ impl VortexWorldModel {
         }
         self.forward_model.reset();
         self.q_table.reset_pending();
+        self.ledger.reset_pending();
         self.prev_progress = 0.0;
         if let Some(profile) = self.game_profiles.get(game_id) {
             info!(
@@ -849,6 +858,7 @@ impl VortexWorldModel {
             recipe_library: self.recipe_library.clone(),
             game_profiles,
             q_table: self.q_table.clone(),
+            ledger: self.ledger.clone(),
         };
         serde_json::to_string_pretty(&snapshot).unwrap_or_default()
     }
@@ -889,6 +899,7 @@ impl VortexWorldModel {
         self.recipe_library = snapshot.recipe_library;
         self.game_profiles = snapshot.game_profiles;
         self.q_table = snapshot.q_table;
+        self.ledger = snapshot.ledger;
 
         info!(
             "Imported knowledge: {} nodes, {} edges, {} archetypes, {} recipes, global_ira={:.3}",
@@ -1148,6 +1159,22 @@ impl VortexWorldModel {
                             }
                         }
                     }
+                    // Effect signature for the epistemic ledger: the first
+                    // non-ambient change plus magnitude — compact, comparable.
+                    let effect_sig = match changes.first() {
+                        Some((r, c, old, newv)) => format!("d({},{}:{}->{})x{}", r, c, old, newv, changes.len()),
+                        None => "none".to_string(),
+                    };
+                    let claim_id = format!("click({},{})", cx, cy);
+                    self.ledger.observe_cooccurrence(&format!("{}->{}", claim_id, effect_sig));
+                    if let Some((intent, held)) = self.ledger.resolve_intent(&effect_sig) {
+                        info!(
+                            "  LEDGER: intent {} expected {} got {} — {}",
+                            intent.claim_id, intent.expected_effect, effect_sig,
+                            if held { "VERIFIED" } else { "CONTRADICTED" }
+                        );
+                    }
+
                     if !changes.is_empty() {
                         info!(
                             "  CLICK LEARN: click({},{}) → {} cell changes: {:?}",
@@ -2469,6 +2496,28 @@ impl VortexWorldModel {
         // under a pure unclicked-first sweep. Every 4th click re-presses
         // the strongest known-responsive cell.
         self.click_count += 1;
+        // Intervention scheduling: periodically test the scientific
+        // frontier — re-click a correlated-but-unverified claim's cell with
+        // a DECLARED prediction, so verification (not just correlation)
+        // accumulates. This is the ledger driving behavior.
+        if self.click_count % 8 == 0 {
+            if let Some(claim) = self.ledger.frontier(1).first() {
+                // claim ids look like "click(x,y)->effect"
+                if let Some(rest) = claim.strip_prefix("click(") {
+                    if let Some(end) = rest.find(')') {
+                        let coords: Vec<u32> = rest[..end]
+                            .split(',')
+                            .filter_map(|v| v.parse().ok())
+                            .collect();
+                        if coords.len() == 2 {
+                            let expected = claim.split("->").nth(1).unwrap_or("none").to_string();
+                            self.ledger.declare_intent(claim, &expected);
+                            return (coords[0], coords[1]);
+                        }
+                    }
+                }
+            }
+        }
         if self.click_count % 4 == 0 {
             if let Some(&confirm) = self.responsive_clicks.iter().next() {
                 if !self.dead_clicks.contains(&confirm) {
