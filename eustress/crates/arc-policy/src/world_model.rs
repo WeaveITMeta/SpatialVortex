@@ -200,15 +200,17 @@ impl ActionModel {
 /// Snapshot of one level's accumulated learning, restored on revisits
 /// (death resets bounce through earlier levels; the frontier level's
 /// knowledge must survive the round trip).
-#[derive(Clone, Default)]
-struct LevelMemory {
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct LevelMemory {
     dead_clicks: std::collections::HashSet<(u32, u32)>,
     /// Clicks that immediately preceded a death at this level — banned on
     /// revisits. Not dead (they had effects); FATAL.
     fatal_clicks: std::collections::HashSet<(u32, u32)>,
     responsive_clicks: std::collections::HashSet<(u32, u32)>,
     clicked_this_level: std::collections::HashSet<(u32, u32)>,
+    #[serde(skip)]
     ambient_change_counts: HashMap<(usize, usize), u32>,
+    #[serde(skip)]
     ambient_observations: u32,
     predicate_ensemble: Option<crate::predicates::PredicateEnsemble>,
 }
@@ -819,6 +821,10 @@ impl VortexWorldModel {
             // Bank what we believe winning means here, even when no
             // control map was learned (click games have none).
             profile.predicates = self.predicate_ensemble.clone();
+            // Bank the current level's state, then the whole vault: next
+            // card's elimination resumes at lesson N+1, not lesson 1.
+            self.save_level_memory(self.prev_levels);
+            profile.level_vault = self.level_memory.clone();
             if !profile.control_map.is_empty() || profile.predicates.is_some() {
                 info!(
                     "  PROFILE saved for {}: {} controls, predicates={}, ira={:.2}",
@@ -833,6 +839,17 @@ impl VortexWorldModel {
         self.forward_model.reset();
         self.q_table.reset_pending();
         self.ledger.reset_pending();
+        self.level_memory = self
+            .game_profiles
+            .get(game_id)
+            .map(|p| p.level_vault.clone())
+            .unwrap_or_default();
+        if !self.level_memory.is_empty() {
+            info!(
+                "  LEVEL VAULT restored for {}: {} levels of accumulated lessons",
+                game_id, self.level_memory.len()
+            );
+        }
         // Replay the playbook: workflows compiled on previous wins load as
         // win recipes — the strongest knowledge we own about this game.
         {

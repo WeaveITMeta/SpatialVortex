@@ -84,6 +84,10 @@ pub struct GameProfile {
     /// a revisit starts from what we already believe winning means here.
     #[serde(default)]
     pub predicates: Option<crate::predicates::PredicateEnsemble>,
+    /// Per-level learning vault (fatal/dead/responsive clicks, predicate
+    /// state) — cross-card continuation of the elimination search.
+    #[serde(default)]
+    pub level_vault: HashMap<u32, crate::world_model::LevelMemory>,
 }
 
 /// Online forward model over tracked objects.
@@ -159,6 +163,7 @@ impl ObjectForwardModel {
             ira,
             episodes: 1,
             predicates: None,
+            level_vault: HashMap::new(),
         })
     }
 
