@@ -1,4 +1,8 @@
+pub mod backward_chain;
 pub mod epistemic;
+pub mod forensics;
+pub mod router;
+pub mod workflows;
 pub mod forward_model;
 pub mod predicates;
 pub mod qlearn;

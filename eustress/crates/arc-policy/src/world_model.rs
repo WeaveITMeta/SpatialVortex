@@ -30,7 +30,7 @@ use eustress_vortex_core::{
 use eustress_vortex_grid2d::{Grid2D, GridAnalyzer, ObjectExtractor, Connectivity};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use tracing::info;
+use tracing::{debug, info};
 
 // ─── IRA: Internal Representation Accuracy ──────────────────────────────────
 
@@ -469,6 +469,12 @@ pub struct KnowledgeSnapshot {
     /// Causal claims with epistemic status — the agent's verified science.
     #[serde(default)]
     pub ledger: crate::epistemic::EpistemicLedger,
+    /// Learned S/R/K dispatch weights.
+    #[serde(default)]
+    pub router: crate::router::LinearRouter,
+    /// Death causes and hazard colors.
+    #[serde(default)]
+    pub forensics: crate::forensics::DeathForensics,
 }
 
 // ─── Click Mechanic Learning ─────────────────────────────────────────────────
@@ -625,6 +631,16 @@ pub struct VortexWorldModel {
     /// Observed -> Correlated -> Verified -> Law. Interventions with
     /// declared predictions are the only road to Law status.
     ledger: crate::epistemic::EpistemicLedger,
+    /// Learned S/R/K dispatch: linear softmax over the standardized delta
+    /// stream, trained online from shaped reward.
+    router: crate::router::LinearRouter,
+    /// The route chosen this step (class + features), resolved against the
+    /// next step's reward. Runtime-only.
+    last_route: Option<(crate::router::DispatchClass, [f32; crate::router::FEATURE_DIM])>,
+    /// Death-cause classification and hazard knowledge.
+    forensics: crate::forensics::DeathForensics,
+    /// Predicate progress at the previous step (router feature).
+    prev_predicate_progress: f32,
     /// Progress metric at the previous step (targets remaining / goal
     /// distance), for shaped-reward deltas.
     prev_progress: f32,
@@ -696,6 +712,10 @@ impl VortexWorldModel {
             q_table: crate::qlearn::QTable::default(),
             predicate_ensemble: None,
             ledger: crate::epistemic::EpistemicLedger::default(),
+            router: crate::router::LinearRouter::new(),
+            last_route: None,
+            forensics: crate::forensics::DeathForensics::default(),
+            prev_predicate_progress: 0.0,
             prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
@@ -866,6 +886,8 @@ impl VortexWorldModel {
             game_profiles,
             q_table: self.q_table.clone(),
             ledger: self.ledger.clone(),
+            router: self.router.clone(),
+            forensics: self.forensics.clone(),
         };
         serde_json::to_string_pretty(&snapshot).unwrap_or_default()
     }
@@ -907,6 +929,8 @@ impl VortexWorldModel {
         self.game_profiles = snapshot.game_profiles;
         self.q_table = snapshot.q_table;
         self.ledger = snapshot.ledger;
+        self.router = snapshot.router;
+        self.forensics = snapshot.forensics;
 
         info!(
             "Imported knowledge: {} nodes, {} edges, {} archetypes, {} recipes, global_ira={:.3}",
@@ -917,6 +941,29 @@ impl VortexWorldModel {
             self.global_ira,
         );
         Ok(())
+    }
+
+    /// Record a GAME_OVER for forensics: classify the cause, file it as a
+    /// ledger claim (reproducibility makes it a hazard Law), and remember
+    /// hazard colors that A* and click targeting must avoid.
+    pub fn record_death(&mut self, last_action: &str) {
+        let Some(ref grid) = self.prev_grid else { return };
+        let avatar_cell = self
+            .object_tracker
+            .agent()
+            .map(|a| (a.current.centroid.0.round() as usize, a.current.centroid.1.round() as usize));
+        let typical = self.forensics.typical_life_len();
+        let cause = self.forensics.classify(
+            grid,
+            grid,
+            last_action,
+            avatar_cell,
+            self.steps_since_level_advance,
+            typical,
+        );
+        let claim = self.forensics.ledger_claim(&cause);
+        self.ledger.observe_cooccurrence(&claim);
+        info!("  FORENSICS: death classified as {:?} → claim {}", cause, claim);
     }
 
     /// Core decision function. Called once per game step.
@@ -991,6 +1038,11 @@ impl VortexWorldModel {
             // Dyna-Q: replay stored real transitions while the API
             // round-trip is in flight — free planning between actions.
             self.q_table.dyna_replay(50);
+            // Router learning: the dispatch class chosen last step is
+            // credited with the same shaped reward.
+            if let Some((class, features)) = self.last_route.take() {
+                self.router.update(&class, reward, &features);
+            }
         }
 
         // ── FORWARD MODEL: fold the last action's outcome in ──────────────
@@ -1434,6 +1486,27 @@ impl VortexWorldModel {
                     );
                     self.win_recipes.push(recipe.clone());
 
+                    // Compile the verified strategy into an engine-native
+                    // workflow object: nodes are intents, edges carry law
+                    // ids + IRA. The agent writes its own playbook.
+                    {
+                        let doc = crate::workflows::compile(
+                            &format!("win_l{}_s{}", levels, self.step_in_game),
+                            game_id,
+                            self.step_in_game,
+                            &self.current_level_actions,
+                            &self.ledger,
+                        );
+                        let space_dir = crate::space_writer::SpaceWriterConfig::default()
+                            .universe_root
+                            .join("spaces")
+                            .join(format!("game_{}", game_id));
+                        match crate::workflows::write_to_space(&space_dir, &doc) {
+                            Ok(path) => info!("  WORKFLOW compiled → {:?}", path),
+                            Err(e) => debug!("workflow write skipped: {}", e),
+                        }
+                    }
+
                     // Add to cross-game library (dedup by fingerprint, max 50)
                     if !self.recipe_library.iter().any(|r| {
                         r.start_fingerprint == recipe.start_fingerprint
@@ -1644,12 +1717,81 @@ impl VortexWorldModel {
             }
         }
 
-        if let Some(d) = self.try_recipe_replay(available, grid) {
-            return d;
+        // S/R/K ROUTE: learned dispatch over the standardized delta stream.
+        // Skill keeps the rehearsed-first ladder; Rule promotes the Q-layer;
+        // Knowledge demotes shortcuts so exploration/hypothesis paths run.
+        let route_class = {
+            let inputs = crate::router::RouterInputs {
+                n_changes_net_ambient: self
+                    .recent_action_effects
+                    .back()
+                    .map(|(_, e)| if *e { 1 } else { 0 })
+                    .unwrap_or(0),
+                n_object_events: self.object_frame.objects.len() as u32,
+                global_ira: self.global_ira,
+                ira_trend: self
+                    .ira_history
+                    .last()
+                    .map(|(_, a)| a - self.global_ira)
+                    .unwrap_or(0.0),
+                predicate_progress: self
+                    .predicate_ensemble
+                    .as_ref()
+                    .map(|e| e.progress(grid))
+                    .unwrap_or(0.0),
+                predicate_progress_delta: self
+                    .predicate_ensemble
+                    .as_ref()
+                    .map(|e| e.progress(grid) - self.prev_predicate_progress)
+                    .unwrap_or(0.0),
+                mechanic_known: self.click_mechanic.is_some()
+                    || !self.forward_model.control_map().is_empty(),
+                control_map_size: self.forward_model.control_map().len() as u32,
+                targets_remaining: self.click_targets.len() as u32,
+                novel_state: false,
+                blocked: self.is_stuck(),
+                steps_since_level_advance: self.steps_since_level_advance,
+            };
+            self.prev_predicate_progress = inputs.predicate_progress;
+            let features = crate::router::DeltaFeatures::extract(&inputs);
+            let (class, _conf) = self.router.choose(&features);
+            self.last_route = Some((class, features));
+            class
+        };
+
+        // BACKWARD CHAIN: a plan of VERIFIED Laws toward the current best
+        // win-interpretation outranks value estimates. Replanned every step
+        // — preconditions drop stale steps as the real board diverges.
+        if available.contains(&6) {
+            if let Some(ref ensemble) = self.predicate_ensemble {
+                let steps =
+                    crate::backward_chain::plan(grid, ensemble, &self.ledger, 6);
+                if let Some(step) = steps.first() {
+                    self.ledger
+                        .declare_intent(&step.claim_id, &step.expected_effect);
+                    self.last_click_pos = Some(step.click);
+                    let d = PolicyDecision {
+                        action: format!("6:{},{}", step.click.0, step.click.1),
+                        confidence: (0.6 + step.ira * 0.3).min(0.95),
+                        reasoning: format!(
+                            "law_plan: {} (ira={:.2}, plan_len={})",
+                            step.claim_id, step.ira, steps.len()
+                        ),
+                    };
+                    self.current_level_actions.push(d.action.clone());
+                    return d;
+                }
+            }
         }
 
-        if let Some(d) = self.try_plan_buffer(available, grid) {
-            return d;
+        if route_class != crate::router::DispatchClass::Knowledge {
+            if let Some(d) = self.try_recipe_replay(available, grid) {
+                return d;
+            }
+
+            if let Some(d) = self.try_plan_buffer(available, grid) {
+                return d;
+            }
         }
 
         // FORWARD MODEL: probe controls, then walk toward goals (keyboard games)
@@ -1775,13 +1917,22 @@ impl VortexWorldModel {
             use crate::object_tracker::ObjectRole;
             let control_map = self.forward_model.control_map();
             if !control_map.is_empty() {
-                let blocked: std::collections::HashSet<(i32, i32)> = self
+                let mut blocked: std::collections::HashSet<(i32, i32)> = self
                     .object_tracker
                     .tracked_objects()
                     .iter()
                     .filter(|t| t.classification.role == ObjectRole::StaticBarrier)
                     .flat_map(|t| t.current.cells.iter().map(|&(r, c)| (r as i32, c as i32)))
                     .collect();
+                // Verified hazards are path costs too: navigation inherits
+                // every death ever explained.
+                let objs: Vec<(u8, Vec<(usize, usize)>)> = self
+                    .object_tracker
+                    .tracked_objects()
+                    .iter()
+                    .map(|t| (t.current.color, t.current.cells.clone()))
+                    .collect();
+                blocked.extend(self.forensics.hazard_cells(&objs));
                 let start = (avatar.0.round() as i32, avatar.1.round() as i32);
                 let goal_cell = (goal.0.round() as i32, goal.1.round() as i32);
                 if let Some(action) = crate::forward_model::astar_step(
