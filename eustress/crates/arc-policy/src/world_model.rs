@@ -462,6 +462,10 @@ pub struct KnowledgeSnapshot {
     /// probe phase, so knowledge genuinely persists across sessions.
     #[serde(default)]
     pub game_profiles: HashMap<String, crate::forward_model::GameProfile>,
+    /// Cross-game Q-table over abstract states — the transferable prior
+    /// for games never seen before.
+    #[serde(default)]
+    pub q_table: crate::qlearn::QTable,
 }
 
 // ─── Click Mechanic Learning ─────────────────────────────────────────────────
@@ -607,6 +611,12 @@ pub struct VortexWorldModel {
     ambient_change_counts: HashMap<(usize, usize), u32>,
     /// Total observations contributing to ambient_change_counts.
     ambient_observations: u32,
+    /// Cross-game Q-table over abstracted states — transfers to unseen
+    /// games because abstract situations recur across games.
+    q_table: crate::qlearn::QTable,
+    /// Progress metric at the previous step (targets remaining / goal
+    /// distance), for shaped-reward deltas.
+    prev_progress: f32,
     /// Online object-level forward model: control mapping, per-action IRA,
     /// and goal-directed stepping for keyboard games.
     forward_model: crate::forward_model::ObjectForwardModel,
@@ -672,8 +682,48 @@ impl VortexWorldModel {
             clicked_this_level: std::collections::HashSet::new(),
             ambient_change_counts: HashMap::new(),
             ambient_observations: 0,
+            q_table: crate::qlearn::QTable::default(),
+            prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
+        }
+    }
+
+    /// Current abstract state for the Q-layer plus a scalar progress metric
+    /// (higher = closer to done) for shaped rewards.
+    fn abstract_state(&self) -> (crate::qlearn::AbstractState, f32) {
+        if self.click_only_game || self.click_mechanic.is_some() {
+            let remaining = self.click_targets.len();
+            (
+                crate::qlearn::AbstractState::click(remaining, self.click_mechanic.is_some()),
+                -(remaining as f32),
+            )
+        } else {
+            let avatar = self.object_tracker.agent().map(|a| a.current.centroid);
+            let goal = self
+                .object_frame
+                .goal_candidates
+                .first()
+                .and_then(|&id| self.object_tracker.get(id))
+                .map(|g| g.current.centroid);
+            let blocked = self
+                .recent_action_effects
+                .back()
+                .map(|(_, had)| !had)
+                .unwrap_or(false);
+            match (avatar, goal) {
+                (Some(a), Some(g)) => {
+                    let (dr, dc) = (g.0 - a.0, g.1 - a.1);
+                    (
+                        crate::qlearn::AbstractState::movement(dr, dc, blocked),
+                        -(dr.abs() + dc.abs()),
+                    )
+                }
+                _ => (
+                    crate::qlearn::AbstractState(format!("explore|b{}", blocked as u8)),
+                    0.0,
+                ),
+            }
         }
     }
 
@@ -703,6 +753,8 @@ impl VortexWorldModel {
             }
         }
         self.forward_model.reset();
+        self.q_table.reset_pending();
+        self.prev_progress = 0.0;
         if let Some(profile) = self.game_profiles.get(game_id) {
             info!(
                 "  PROFILE adopted for {}: {} controls known, probing skipped",
@@ -778,6 +830,7 @@ impl VortexWorldModel {
             games_played: self.decomposer.action_history.len() as u32,
             recipe_library: self.recipe_library.clone(),
             game_profiles,
+            q_table: self.q_table.clone(),
         };
         serde_json::to_string_pretty(&snapshot).unwrap_or_default()
     }
@@ -817,6 +870,7 @@ impl VortexWorldModel {
         self.global_ira = snapshot.global_ira;
         self.recipe_library = snapshot.recipe_library;
         self.game_profiles = snapshot.game_profiles;
+        self.q_table = snapshot.q_table;
 
         info!(
             "Imported knowledge: {} nodes, {} edges, {} archetypes, {} recipes, global_ira={:.3}",
@@ -884,6 +938,21 @@ impl VortexWorldModel {
             grid.height, grid.width, grid.distinct_colors(),
             object_map.object_count(), object_events.len(), self.step_in_game,
         );
+
+        // ── Q-LAYER: score the pending transition ─────────────────────────
+        // Reward = true reward (level advance) + progress shaping + step
+        // cost + first-visit curiosity, all from signals already computed.
+        {
+            let (state_now, progress_now) = self.abstract_state();
+            let first_visit = !self.q_table.states.contains_key(&state_now.0);
+            let reward = crate::qlearn::shaped_reward(
+                levels > self.prev_levels,
+                progress_now - self.prev_progress,
+                first_visit,
+            );
+            self.q_table.observe(reward, &state_now);
+            self.prev_progress = progress_now;
+        }
 
         // ── FORWARD MODEL: fold the last action's outcome in ──────────────
         // Updates the per-action displacement stats and scores the pending
@@ -1501,6 +1570,26 @@ impl VortexWorldModel {
         if let Some(d) = self.try_forward_model_move(available, grid) {
             self.current_level_actions.push(d.action.clone());
             return d;
+        }
+
+        // Q-LAYER: cross-game value estimates over abstract states. Fires
+        // once this situation has been visited enough (here or in OTHER
+        // games — the table transfers) and its best action looks positive.
+        {
+            let (state, _) = self.abstract_state();
+            if let Some((action, q, conf)) = self.q_table.choose(&state, available) {
+                if conf >= 0.3 && q > 0.2 && available.contains(&action) {
+                    self.q_table.act(&state, action);
+                    let d = self.make_decision(
+                        action,
+                        (0.4 + conf * 0.4).min(0.85),
+                        grid,
+                        format!("q_layer: {} → action_{} (q={:.2}, conf={:.2})", state.0, action, q, conf),
+                    );
+                    self.current_level_actions.push(d.action.clone());
+                    return d;
+                }
+            }
         }
 
         // MCTS: try when we have any exploration data

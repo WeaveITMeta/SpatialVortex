@@ -1,4 +1,5 @@
 pub mod forward_model;
+pub mod qlearn;
 pub mod scene_mirror;
 pub mod space_writer;
 pub mod symbolic_decomposer;
