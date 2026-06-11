@@ -833,6 +833,31 @@ impl VortexWorldModel {
         self.forward_model.reset();
         self.q_table.reset_pending();
         self.ledger.reset_pending();
+        // Replay the playbook: workflows compiled on previous wins load as
+        // win recipes — the strongest knowledge we own about this game.
+        {
+            let space_dir = crate::space_writer::SpaceWriterConfig::default()
+                .universe_root
+                .join("spaces")
+                .join(format!("game_{}", game_id));
+            let docs = crate::workflows::load_from_space(&space_dir);
+            if !docs.is_empty() {
+                info!("  PLAYBOOK: {} compiled workflows loaded for {}", docs.len(), game_id);
+                for doc in docs.iter().take(8) {
+                    let actions: Vec<String> =
+                        doc.nodes.iter().map(|n| n.action.clone()).collect();
+                    if !actions.is_empty() {
+                        self.recipe_library.push(WinRecipe {
+                            actions,
+                            start_fingerprint: 0,
+                            length: doc.nodes.len(),
+                            replay_successes: doc.successes,
+                            origin_game: doc.game_id.clone(),
+                        });
+                    }
+                }
+            }
+        }
         self.prev_progress = 0.0;
         if let Some(profile) = self.game_profiles.get(game_id) {
             info!(
