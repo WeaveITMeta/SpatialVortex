@@ -203,6 +203,9 @@ impl ActionModel {
 #[derive(Clone, Default)]
 struct LevelMemory {
     dead_clicks: std::collections::HashSet<(u32, u32)>,
+    /// Clicks that immediately preceded a death at this level — banned on
+    /// revisits. Not dead (they had effects); FATAL.
+    fatal_clicks: std::collections::HashSet<(u32, u32)>,
     responsive_clicks: std::collections::HashSet<(u32, u32)>,
     clicked_this_level: std::collections::HashSet<(u32, u32)>,
     ambient_change_counts: HashMap<(usize, usize), u32>,
@@ -654,6 +657,8 @@ pub struct VortexWorldModel {
     forensics: crate::forensics::DeathForensics,
     /// Predicate progress at the previous step (router feature).
     prev_predicate_progress: f32,
+    /// Clicks at the current level that immediately preceded deaths.
+    fatal_clicks: std::collections::HashSet<(u32, u32)>,
     /// Per-level learning memory: click knowledge and win-interpretations
     /// keyed by level number. A death reset used to wipe the frontier
     /// level's learning — ten visits to level 2, each one amnesiac. Now
@@ -735,6 +740,7 @@ impl VortexWorldModel {
             forensics: crate::forensics::DeathForensics::default(),
             prev_predicate_progress: 0.0,
             level_memory: HashMap::new(),
+            fatal_clicks: std::collections::HashSet::new(),
             prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
@@ -964,14 +970,21 @@ impl VortexWorldModel {
 
     /// Bank the current level's learning state into the vault.
     fn save_level_memory(&mut self, level: u32) {
-        self.level_memory.insert(level, LevelMemory {
-            dead_clicks: self.dead_clicks.clone(),
-            responsive_clicks: self.responsive_clicks.clone(),
-            clicked_this_level: self.clicked_this_level.clone(),
-            ambient_change_counts: self.ambient_change_counts.clone(),
-            ambient_observations: self.ambient_observations,
-            predicate_ensemble: self.predicate_ensemble.clone(),
-        });
+        // Union-merge with any prior visit: knowledge accumulates across
+        // visits instead of the last visit overwriting the rest.
+        let entry = self.level_memory.entry(level).or_default();
+        entry.dead_clicks.extend(self.dead_clicks.iter().copied());
+        entry.fatal_clicks.extend(self.fatal_clicks.iter().copied());
+        entry.responsive_clicks.extend(self.responsive_clicks.iter().copied());
+        entry.clicked_this_level.extend(self.clicked_this_level.iter().copied());
+        for (k, v) in &self.ambient_change_counts {
+            let c = entry.ambient_change_counts.entry(*k).or_insert(0);
+            *c = (*c).max(*v);
+        }
+        entry.ambient_observations = entry.ambient_observations.max(self.ambient_observations);
+        if self.predicate_ensemble.is_some() {
+            entry.predicate_ensemble = self.predicate_ensemble.clone();
+        }
     }
 
     /// Restore a previously visited level's learning, or start clean.
@@ -982,6 +995,7 @@ impl VortexWorldModel {
                 level, m.dead_clicks.len(), m.responsive_clicks.len(), m.clicked_this_level.len()
             );
             self.dead_clicks = m.dead_clicks;
+            self.fatal_clicks = m.fatal_clicks;
             self.responsive_clicks = m.responsive_clicks;
             self.clicked_this_level = m.clicked_this_level;
             self.ambient_change_counts = m.ambient_change_counts;
@@ -991,6 +1005,7 @@ impl VortexWorldModel {
             }
         } else {
             self.dead_clicks.clear();
+            self.fatal_clicks.clear();
             self.responsive_clicks.clear();
             self.clicked_this_level.clear();
             self.ambient_change_counts.clear();
@@ -1021,6 +1036,18 @@ impl VortexWorldModel {
         );
         let claim = self.forensics.ledger_claim(&cause);
         self.ledger.observe_cooccurrence(&claim);
+        // The click that immediately preceded this death is banned at this
+        // level on every future visit — the direct loop-breaker for
+        // identical win→death cycles.
+        if last_action.starts_with("6:") {
+            if let Some(coords) = last_action.strip_prefix("6:") {
+                let parts: Vec<u32> = coords.split(',').filter_map(|v| v.parse().ok()).collect();
+                if parts.len() == 2 {
+                    self.fatal_clicks.insert((parts[0], parts[1]));
+                    info!("  FORENSICS: click ({},{}) marked FATAL at this level", parts[0], parts[1]);
+                }
+            }
+        }
         info!("  FORENSICS: death classified as {:?} → claim {}", cause, claim);
     }
 
@@ -1835,10 +1862,15 @@ impl VortexWorldModel {
             if let Some(ref ensemble) = self.predicate_ensemble {
                 let steps =
                     crate::backward_chain::plan(grid, ensemble, &self.ledger, 6);
+                let steps: Vec<_> = steps
+                    .into_iter()
+                    .filter(|st| !self.fatal_clicks.contains(&st.click))
+                    .collect();
                 if let Some(step) = steps.first() {
                     self.ledger
                         .declare_intent(&step.claim_id, &step.expected_effect);
                     self.last_click_pos = Some(step.click);
+                    self.clicked_this_level.insert(step.click);
                     let d = PolicyDecision {
                         action: format!("6:{},{}", step.click.0, step.click.1),
                         confidence: (0.6 + step.ira * 0.3).min(0.95),
@@ -2704,8 +2736,9 @@ impl VortexWorldModel {
         let ambient_counts = &self.ambient_change_counts;
         let ambient_obs = self.ambient_observations;
         let dead = &self.dead_clicks;
+        let fatal = &self.fatal_clicks;
         self.click_targets.retain(|t| {
-            if dead.contains(t) {
+            if dead.contains(t) || fatal.contains(t) {
                 return false;
             }
             if ambient_obs < 5 {
