@@ -614,6 +614,10 @@ pub struct VortexWorldModel {
     /// Cross-game Q-table over abstracted states — transfers to unseen
     /// games because abstract situations recur across games.
     q_table: crate::qlearn::QTable,
+    /// Competing win-condition interpretations for the current level,
+    /// posterior-weighted — reward shaping follows what we currently
+    /// believe winning means, updated at every completion.
+    predicate_ensemble: Option<crate::predicates::PredicateEnsemble>,
     /// Progress metric at the previous step (targets remaining / goal
     /// distance), for shaped-reward deltas.
     prev_progress: f32,
@@ -683,6 +687,7 @@ impl VortexWorldModel {
             ambient_change_counts: HashMap::new(),
             ambient_observations: 0,
             q_table: crate::qlearn::QTable::default(),
+            predicate_ensemble: None,
             prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
@@ -700,9 +705,16 @@ impl VortexWorldModel {
             // sparse one. This is the forward-looking win signal the
             // post-hoc LevelCompletionAnalyzer can't give us.
             let structural = structural_improvement_score(grid) as f32;
+            // Posterior-weighted win-predicate progress dominates when the
+            // ensemble exists; structural order remains as a stabilizer.
+            let predicate_progress = self
+                .predicate_ensemble
+                .as_ref()
+                .map(|e| e.progress(grid))
+                .unwrap_or(0.0);
             (
                 crate::qlearn::AbstractState::click(remaining, self.click_mechanic.is_some()),
-                structural * 4.0 - remaining as f32 * 0.25,
+                predicate_progress * 6.0 + structural * 2.0 - remaining as f32 * 0.1,
             )
         } else {
             let avatar = self.object_tracker.agent().map(|a| a.current.centroid);
@@ -983,6 +995,9 @@ impl VortexWorldModel {
         if self.level_start_grid.is_none() {
             self.level_start_grid = Some(grid.clone());
             self.level_start_frame = Some(self.object_frame.clone());
+            // Fresh win-condition hypotheses for the new level
+            self.predicate_ensemble =
+                Some(crate::predicates::PredicateEnsemble::init_from_grid(&grid));
         }
 
         // ── SCENE MIRROR: update live entity state ──────────────────────
@@ -1330,6 +1345,20 @@ impl VortexWorldModel {
             // Detect level advance → capture win recipe
             if level_advanced {
                 info!("  LEVEL ADVANCE: {} → {}", self.prev_levels, levels);
+
+                // Bayesian update: the previous frame is the winning state —
+                // predicates satisfied there gain posterior, others lose it.
+                if let Some(ref mut ensemble) = self.predicate_ensemble {
+                    ensemble.on_level_complete(prev);
+                    if let Some(best) = ensemble.best() {
+                        info!(
+                            "  PREDICATE: best win-interpretation now {:?} (p={:.2}, conf={})",
+                            best.kind, best.posterior, best.confirmations
+                        );
+                    }
+                }
+                // New level gets fresh hypotheses (seeded on next observe)
+                self.predicate_ensemble = None;
 
                 // New level, new board: click responsiveness doesn't carry over
                 self.dead_clicks.clear();
@@ -2434,10 +2463,19 @@ impl VortexWorldModel {
             return (grid.width as u32 / 2, grid.height as u32 / 2);
         }
 
-        // Head of the priority order: clicking marks the cell as tried, so
-        // the next rebuild naturally advances to the next-best target —
-        // unclicked cells first, then known-responsive ones.
+        // Alternate fresh exploration with re-activation of the most
+        // responsive cell: confirm-button mechanics (tn36's winning run
+        // pressed (0,0) sixteen times between target clicks) never fire
+        // under a pure unclicked-first sweep. Every 4th click re-presses
+        // the strongest known-responsive cell.
         self.click_count += 1;
+        if self.click_count % 4 == 0 {
+            if let Some(&confirm) = self.responsive_clicks.iter().next() {
+                if !self.dead_clicks.contains(&confirm) {
+                    return confirm;
+                }
+            }
+        }
         let target = self.click_targets[0];
         self.clicked_this_level.insert(target);
         target
@@ -2613,10 +2651,15 @@ impl VortexWorldModel {
         // those are all clicked (and possibly dead), exploration must move
         // on to the rest of the board. Append every untried non-background
         // cell so the level's clickable surface is eventually covered.
+        // PLUS all border cells regardless of color: the tn36 coverage
+        // diff showed 67 of 96 winning cells excluded, clustered on
+        // borders/corners — switches live where bg-filters and 1..h-1
+        // loops never look. Hidden affordances have no signifier.
         let bg = grid.background_color();
         for r in 0..grid.height {
             for c in 0..grid.width {
-                if grid.cells[r][c] == bg {
+                let is_border = r == 0 || c == 0 || r + 1 == grid.height || c + 1 == grid.width;
+                if grid.cells[r][c] == bg && !is_border {
                     continue;
                 }
                 let pt = (c as u32, r as u32);
