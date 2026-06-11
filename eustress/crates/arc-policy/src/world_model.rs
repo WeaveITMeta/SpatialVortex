@@ -197,6 +197,19 @@ impl ActionModel {
 
 // ─── Win Recipe + Plan Buffer ────────────────────────────────────────────────
 
+/// Snapshot of one level's accumulated learning, restored on revisits
+/// (death resets bounce through earlier levels; the frontier level's
+/// knowledge must survive the round trip).
+#[derive(Clone, Default)]
+struct LevelMemory {
+    dead_clicks: std::collections::HashSet<(u32, u32)>,
+    responsive_clicks: std::collections::HashSet<(u32, u32)>,
+    clicked_this_level: std::collections::HashSet<(u32, u32)>,
+    ambient_change_counts: HashMap<(usize, usize), u32>,
+    ambient_observations: u32,
+    predicate_ensemble: Option<crate::predicates::PredicateEnsemble>,
+}
+
 /// A recorded action sequence that caused a level advance.
 /// Captured when `levels_completed` increments, replayed on subsequent levels.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -641,6 +654,11 @@ pub struct VortexWorldModel {
     forensics: crate::forensics::DeathForensics,
     /// Predicate progress at the previous step (router feature).
     prev_predicate_progress: f32,
+    /// Per-level learning memory: click knowledge and win-interpretations
+    /// keyed by level number. A death reset used to wipe the frontier
+    /// level's learning — ten visits to level 2, each one amnesiac. Now
+    /// every visit resumes where the last one ended.
+    level_memory: HashMap<u32, LevelMemory>,
     /// Progress metric at the previous step (targets remaining / goal
     /// distance), for shaped-reward deltas.
     prev_progress: f32,
@@ -716,6 +734,7 @@ impl VortexWorldModel {
             last_route: None,
             forensics: crate::forensics::DeathForensics::default(),
             prev_predicate_progress: 0.0,
+            level_memory: HashMap::new(),
             prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
@@ -941,6 +960,45 @@ impl VortexWorldModel {
             self.global_ira,
         );
         Ok(())
+    }
+
+    /// Bank the current level's learning state into the vault.
+    fn save_level_memory(&mut self, level: u32) {
+        self.level_memory.insert(level, LevelMemory {
+            dead_clicks: self.dead_clicks.clone(),
+            responsive_clicks: self.responsive_clicks.clone(),
+            clicked_this_level: self.clicked_this_level.clone(),
+            ambient_change_counts: self.ambient_change_counts.clone(),
+            ambient_observations: self.ambient_observations,
+            predicate_ensemble: self.predicate_ensemble.clone(),
+        });
+    }
+
+    /// Restore a previously visited level's learning, or start clean.
+    fn restore_level_memory(&mut self, level: u32) {
+        if let Some(m) = self.level_memory.get(&level).cloned() {
+            info!(
+                "  LEVEL MEMORY restored for level {}: {} dead, {} responsive, {} clicked",
+                level, m.dead_clicks.len(), m.responsive_clicks.len(), m.clicked_this_level.len()
+            );
+            self.dead_clicks = m.dead_clicks;
+            self.responsive_clicks = m.responsive_clicks;
+            self.clicked_this_level = m.clicked_this_level;
+            self.ambient_change_counts = m.ambient_change_counts;
+            self.ambient_observations = m.ambient_observations;
+            if m.predicate_ensemble.is_some() {
+                self.predicate_ensemble = m.predicate_ensemble;
+            }
+        } else {
+            self.dead_clicks.clear();
+            self.responsive_clicks.clear();
+            self.clicked_this_level.clear();
+            self.ambient_change_counts.clear();
+            self.ambient_observations = 0;
+        }
+        // Fresh exploration order either way
+        self.click_targets.clear();
+        self.click_count = 0;
     }
 
     /// Record a GAME_OVER for forensics: classify the cause, file it as a
@@ -1442,6 +1500,18 @@ impl VortexWorldModel {
                 }
             }
 
+            // Detect level DECREASE (death reset bounced us to an earlier
+            // level): bank the frontier level's learning before it's lost,
+            // restore the earlier level's memory so its replay is instant.
+            // End the prev borrow before memory operations need &mut self
+            let winning_frame = prev.clone();
+            if levels < self.prev_levels {
+                info!("  LEVEL RESET: {} → {} (banking frontier memory)", self.prev_levels, levels);
+                self.save_level_memory(self.prev_levels);
+                self.restore_level_memory(levels);
+                self.prev_levels = levels;
+            }
+
             // Detect level advance → capture win recipe
             if level_advanced {
                 info!("  LEVEL ADVANCE: {} → {}", self.prev_levels, levels);
@@ -1449,7 +1519,7 @@ impl VortexWorldModel {
                 // Bayesian update: the previous frame is the winning state —
                 // predicates satisfied there gain posterior, others lose it.
                 if let Some(ref mut ensemble) = self.predicate_ensemble {
-                    ensemble.on_level_complete(prev);
+                    ensemble.on_level_complete(&winning_frame);
                     if let Some(best) = ensemble.best() {
                         info!(
                             "  PREDICATE: best win-interpretation now {:?} (p={:.2}, conf={})",
@@ -1460,12 +1530,11 @@ impl VortexWorldModel {
                 // New level gets fresh hypotheses (seeded on next observe)
                 self.predicate_ensemble = None;
 
-                // New level, new board: click responsiveness doesn't carry over
-                self.dead_clicks.clear();
-                self.responsive_clicks.clear();
-                self.clicked_this_level.clear();
-                self.ambient_change_counts.clear();
-                self.ambient_observations = 0;
+                // Bank the completed level's learning; restore the new
+                // level's memory if we've been there before (death resets
+                // bounce us back through completed levels).
+                self.save_level_memory(self.prev_levels);
+                self.restore_level_memory(levels);
                 // Control physics usually persist across levels — keep the
                 // map, drop only the outstanding forecast.
                 self.forward_model.on_level_advance();
