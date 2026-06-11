@@ -770,10 +770,17 @@ impl VortexWorldModel {
         // reset it — adopting a stored profile if we've played this game
         // before (probe phase skipped on revisits).
         if !self.current_game.is_empty() {
-            if let Some(profile) = self.forward_model.to_profile() {
+            let mut profile = self.forward_model.to_profile().unwrap_or_default();
+            // Bank what we believe winning means here, even when no
+            // control map was learned (click games have none).
+            profile.predicates = self.predicate_ensemble.clone();
+            if !profile.control_map.is_empty() || profile.predicates.is_some() {
                 info!(
-                    "  PROFILE saved for {}: {} controls mapped, ira={:.2}",
-                    self.current_game, profile.control_map.len(), profile.ira
+                    "  PROFILE saved for {}: {} controls, predicates={}, ira={:.2}",
+                    self.current_game,
+                    profile.control_map.len(),
+                    profile.predicates.is_some(),
+                    profile.ira
                 );
                 self.game_profiles.insert(self.current_game.clone(), profile);
             }
@@ -1006,9 +1013,23 @@ impl VortexWorldModel {
         if self.level_start_grid.is_none() {
             self.level_start_grid = Some(grid.clone());
             self.level_start_frame = Some(self.object_frame.clone());
-            // Fresh win-condition hypotheses for the new level
-            self.predicate_ensemble =
-                Some(crate::predicates::PredicateEnsemble::init_from_grid(&grid));
+            // Fresh win-condition hypotheses for the new level, seeded by
+            // this game's stored posteriors when we've played it before —
+            // interpretation itself transfers.
+            let mut ensemble = crate::predicates::PredicateEnsemble::init_from_grid(&grid);
+            if let Some(stored) = self
+                .game_profiles
+                .get(game_id)
+                .and_then(|p| p.predicates.as_ref())
+            {
+                for sp in &stored.predicates {
+                    if let Some(p) = ensemble.predicates.iter_mut().find(|p| p.kind == sp.kind) {
+                        p.posterior = (p.posterior + sp.posterior * 2.0) / 3.0;
+                        p.confirmations = sp.confirmations;
+                    }
+                }
+            }
+            self.predicate_ensemble = Some(ensemble);
         }
 
         // ── SCENE MIRROR: update live entity state ──────────────────────

@@ -80,6 +80,10 @@ pub struct GameProfile {
     pub ira: f32,
     /// Episodes that contributed to this profile.
     pub episodes: u32,
+    /// Win-condition interpretation posteriors learned for this game —
+    /// a revisit starts from what we already believe winning means here.
+    #[serde(default)]
+    pub predicates: Option<crate::predicates::PredicateEnsemble>,
 }
 
 /// Online forward model over tracked objects.
@@ -154,6 +158,7 @@ impl ObjectForwardModel {
             control_map,
             ira,
             episodes: 1,
+            predicates: None,
         })
     }
 
