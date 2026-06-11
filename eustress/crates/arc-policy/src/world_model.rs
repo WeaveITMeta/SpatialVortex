@@ -691,12 +691,18 @@ impl VortexWorldModel {
 
     /// Current abstract state for the Q-layer plus a scalar progress metric
     /// (higher = closer to done) for shaped rewards.
-    fn abstract_state(&self) -> (crate::qlearn::AbstractState, f32) {
+    fn abstract_state(&self, grid: &Grid2D) -> (crate::qlearn::AbstractState, f32) {
         if self.click_only_game || self.click_mechanic.is_some() {
             let remaining = self.click_targets.len();
+            // Progress blends structural order (uniformity/symmetry — the
+            // board approaching a solved configuration) with targets
+            // remaining: a dense, win-correlated gradient instead of a
+            // sparse one. This is the forward-looking win signal the
+            // post-hoc LevelCompletionAnalyzer can't give us.
+            let structural = structural_improvement_score(grid) as f32;
             (
                 crate::qlearn::AbstractState::click(remaining, self.click_mechanic.is_some()),
-                -(remaining as f32),
+                structural * 4.0 - remaining as f32 * 0.25,
             )
         } else {
             let avatar = self.object_tracker.agent().map(|a| a.current.centroid);
@@ -943,7 +949,7 @@ impl VortexWorldModel {
         // Reward = true reward (level advance) + progress shaping + step
         // cost + first-visit curiosity, all from signals already computed.
         {
-            let (state_now, progress_now) = self.abstract_state();
+            let (state_now, progress_now) = self.abstract_state(&grid);
             let first_visit = !self.q_table.states.contains_key(&state_now.0);
             let reward = crate::qlearn::shaped_reward(
                 levels > self.prev_levels,
@@ -1581,7 +1587,7 @@ impl VortexWorldModel {
         // is not an option here because the forward-model stage above
         // already owns that path.
         {
-            let (state, _) = self.abstract_state();
+            let (state, _) = self.abstract_state(grid);
             let mut menu: Vec<u32> = available.to_vec();
             if available.contains(&6) && !self.click_targets.is_empty() {
                 menu.push(crate::qlearn::OPT_CLICK_TARGETS);
