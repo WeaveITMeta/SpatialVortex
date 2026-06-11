@@ -59,15 +59,39 @@ pub struct StateValues {
     pub visits: u32,
 }
 
-/// Tabular Q-learner shared across games and sessions.
+/// Macro-action (option) ids — the Q-layer arbitrates over these alongside
+/// primitive actions 1-7. Executing an option delegates to the policy
+/// component that implements it (hierarchical RL: Q over options collapses
+/// 50-step problems into 3-option problems).
+pub const OPT_GOAL_STEP: u32 = 100; // forward-model / A* step toward goal
+pub const OPT_CLICK_TARGETS: u32 = 101; // click best remaining target
+pub const OPT_RECIPE: u32 = 102; // replay a known win recipe
+
+/// Tabular Q-learner shared across games and sessions, with eligibility
+/// traces (Q(λ)) and Dyna-style experience replay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QTable {
     pub states: HashMap<String, StateValues>,
     pub alpha: f32,
     pub gamma: f32,
+    /// Trace decay (λ·γ combined). Smears sparse rewards backward along
+    /// the trajectory — the win-click's 117 enabling moves get credit too.
+    pub lambda: f32,
     /// Pending transition: (state, action) awaiting its outcome.
     #[serde(skip)]
     pending: Option<(String, u32)>,
+    /// Eligibility trace: recent (state, action, eligibility) along the
+    /// current trajectory. Reset at episode boundaries.
+    #[serde(skip)]
+    trace: Vec<(String, u32, f32)>,
+    /// Dyna replay buffer of real experienced transitions
+    /// (state, action, reward, next_state). Replayed between real steps —
+    /// hundreds of free updates per API round-trip.
+    #[serde(skip)]
+    replay: Vec<(String, u32, f32, String)>,
+    /// Round-robin cursor into the replay buffer.
+    #[serde(skip)]
+    replay_cursor: usize,
 }
 
 impl Default for QTable {
@@ -76,7 +100,11 @@ impl Default for QTable {
             states: HashMap::new(),
             alpha: 0.3,
             gamma: 0.9,
+            lambda: 0.8,
             pending: None,
+            trace: Vec::new(),
+            replay: Vec::new(),
+            replay_cursor: 0,
         }
     }
 }
@@ -107,8 +135,9 @@ impl QTable {
         self.pending = Some((state.0.clone(), action));
     }
 
-    /// TD update for the pending transition given the observed reward and
-    /// the successor state.
+    /// TD update for the pending transition: Q(λ) — the TD error updates
+    /// every (state, action) on the eligibility trace, scaled by its decay.
+    /// The transition also lands in the Dyna replay buffer.
     pub fn observe(&mut self, reward: f32, next_state: &AbstractState) {
         let Some((s, a)) = self.pending.take() else { return };
         let next_max = self
@@ -116,14 +145,69 @@ impl QTable {
             .get(&next_state.0)
             .map(|e| e.q.values().copied().fold(0.0f32, f32::max))
             .unwrap_or(0.0);
-        let entry = self.states.entry(s).or_default();
-        let q = entry.q.entry(a).or_insert(0.0);
-        *q += self.alpha * (reward + self.gamma * next_max - *q);
+        let current_q = self
+            .states
+            .get(&s)
+            .and_then(|e| e.q.get(&a))
+            .copied()
+            .unwrap_or(0.0);
+        let delta = reward + self.gamma * next_max - current_q;
+
+        // Push onto the trace, decay existing eligibilities
+        for t in &mut self.trace {
+            t.2 *= self.lambda;
+        }
+        self.trace.push((s.clone(), a, 1.0));
+        if self.trace.len() > 64 {
+            self.trace.remove(0);
+        }
+
+        // Q(λ): apply the TD error along the whole trace
+        for (ts, ta, elig) in &self.trace {
+            let entry = self.states.entry(ts.clone()).or_default();
+            let q = entry.q.entry(*ta).or_insert(0.0);
+            *q += self.alpha * delta * elig;
+        }
+
+        // Dyna: remember the real transition (ring buffer)
+        if self.replay.len() >= 4096 {
+            let idx = self.replay_cursor % self.replay.len();
+            self.replay[idx] = (s, a, reward, next_state.0.clone());
+        } else {
+            self.replay.push((s, a, reward, next_state.0.clone()));
+        }
+        self.replay_cursor = self.replay_cursor.wrapping_add(1);
     }
 
-    /// Drop any pending transition (game/level boundary).
+    /// Dyna-Q planning: replay `k` stored real transitions through the TD
+    /// update. Called between real steps — the table keeps learning while
+    /// the API round-trip is in flight.
+    pub fn dyna_replay(&mut self, k: usize) {
+        if self.replay.is_empty() {
+            return;
+        }
+        // Deterministic stride walk (no RNG dependency): coprime-ish step
+        let stride = 97;
+        for i in 0..k {
+            let idx = (self.replay_cursor.wrapping_mul(31).wrapping_add(i * stride))
+                % self.replay.len();
+            let (s, a, r, ns) = self.replay[idx].clone();
+            let next_max = self
+                .states
+                .get(&ns)
+                .map(|e| e.q.values().copied().fold(0.0f32, f32::max))
+                .unwrap_or(0.0);
+            let entry = self.states.entry(s).or_default();
+            let q = entry.q.entry(a).or_insert(0.0);
+            *q += self.alpha * 0.5 * (r + self.gamma * next_max - *q);
+        }
+    }
+
+    /// Drop pending transition AND the eligibility trace (episode boundary
+    /// — credit must not leak across levels or games).
     pub fn reset_pending(&mut self) {
         self.pending = None;
+        self.trace.clear();
     }
 }
 

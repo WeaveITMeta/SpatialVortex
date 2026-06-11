@@ -952,6 +952,9 @@ impl VortexWorldModel {
             );
             self.q_table.observe(reward, &state_now);
             self.prev_progress = progress_now;
+            // Dyna-Q: replay stored real transitions while the API
+            // round-trip is in flight — free planning between actions.
+            self.q_table.dyna_replay(50);
         }
 
         // ── FORWARD MODEL: fold the last action's outcome in ──────────────
@@ -1572,22 +1575,43 @@ impl VortexWorldModel {
             return d;
         }
 
-        // Q-LAYER: cross-game value estimates over abstract states. Fires
-        // once this situation has been visited enough (here or in OTHER
-        // games — the table transfers) and its best action looks positive.
+        // Q-LAYER: cross-game value estimates over abstract states,
+        // arbitrating over OPTIONS (macro-actions) as well as primitives —
+        // hierarchical RL with UCB-style optimism in choose(). Goal-stepping
+        // is not an option here because the forward-model stage above
+        // already owns that path.
         {
             let (state, _) = self.abstract_state();
-            if let Some((action, q, conf)) = self.q_table.choose(&state, available) {
-                if conf >= 0.3 && q > 0.2 && available.contains(&action) {
-                    self.q_table.act(&state, action);
-                    let d = self.make_decision(
-                        action,
-                        (0.4 + conf * 0.4).min(0.85),
-                        grid,
-                        format!("q_layer: {} → action_{} (q={:.2}, conf={:.2})", state.0, action, q, conf),
-                    );
-                    self.current_level_actions.push(d.action.clone());
-                    return d;
+            let mut menu: Vec<u32> = available.to_vec();
+            if available.contains(&6) && !self.click_targets.is_empty() {
+                menu.push(crate::qlearn::OPT_CLICK_TARGETS);
+            }
+            if !self.recipe_library.is_empty() || !self.win_recipes.is_empty() {
+                menu.push(crate::qlearn::OPT_RECIPE);
+            }
+            if let Some((choice, q, conf)) = self.q_table.choose(&state, &menu) {
+                if conf >= 0.3 && q > 0.2 {
+                    let decision = match choice {
+                        crate::qlearn::OPT_CLICK_TARGETS => Some(self.make_decision(
+                            6,
+                            (0.4 + conf * 0.4).min(0.85),
+                            grid,
+                            format!("q_option: {} → click_targets (q={:.2})", state.0, q),
+                        )),
+                        crate::qlearn::OPT_RECIPE => self.try_recipe_replay(available, grid),
+                        a if available.contains(&a) => Some(self.make_decision(
+                            a,
+                            (0.4 + conf * 0.4).min(0.85),
+                            grid,
+                            format!("q_layer: {} → action_{} (q={:.2}, conf={:.2})", state.0, a, q, conf),
+                        )),
+                        _ => None,
+                    };
+                    if let Some(d) = decision {
+                        self.q_table.act(&state, choice);
+                        self.current_level_actions.push(d.action.clone());
+                        return d;
+                    }
                 }
             }
         }
@@ -1661,6 +1685,49 @@ impl VortexWorldModel {
         let avatar = avatar?;
         let goal_id = self.object_frame.goal_candidates.first().copied()?;
         let goal = self.object_tracker.get(goal_id).map(|g| g.current.centroid)?;
+
+        // A* first: route around barrier-classified cells instead of
+        // greedily walking into them (the ACTION5-fixation failure mode).
+        {
+            use crate::object_tracker::ObjectRole;
+            let control_map = self.forward_model.control_map();
+            if !control_map.is_empty() {
+                let blocked: std::collections::HashSet<(i32, i32)> = self
+                    .object_tracker
+                    .tracked_objects()
+                    .iter()
+                    .filter(|t| t.classification.role == ObjectRole::StaticBarrier)
+                    .flat_map(|t| t.current.cells.iter().map(|&(r, c)| (r as i32, c as i32)))
+                    .collect();
+                let start = (avatar.0.round() as i32, avatar.1.round() as i32);
+                let goal_cell = (goal.0.round() as i32, goal.1.round() as i32);
+                if let Some(action) = crate::forward_model::astar_step(
+                    &control_map,
+                    start,
+                    goal_cell,
+                    &|r, c| blocked.contains(&(r, c)),
+                    (grid.height as i32, grid.width as i32),
+                ) {
+                    if available.contains(&action) {
+                        let ira = self.forward_model.action_ira.get(&action).copied().unwrap_or(0.5);
+                        if ira >= 0.35 {
+                            self.forward_model.predict(action, avatar);
+                            let d = self.make_decision(
+                                action,
+                                (0.5 + ira * 0.4).min(0.9),
+                                grid,
+                                format!(
+                                    "fm_astar: action_{} pathing to goal obj_{} (ira={:.2})",
+                                    action, goal_id, ira
+                                ),
+                            );
+                            return Some(d);
+                        }
+                    }
+                }
+            }
+        }
+
         let (action, progress, ira) = self.forward_model.step_toward(avatar, goal)?;
         if !available.contains(&action) || ira < 0.35 {
             return None;

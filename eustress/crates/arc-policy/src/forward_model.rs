@@ -282,9 +282,82 @@ impl ObjectForwardModel {
     }
 }
 
+/// First action along the A* path from `start` to `goal` (row, col),
+/// moving only in directions the learned control map provides and never
+/// entering blocked cells. Greedy stepping walks into walls (one game
+/// fixated on a single action oscillating against a barrier); A* routes
+/// around them optimally. Returns None when no path exists within budget.
+pub fn astar_step(
+    control_map: &HashMap<u32, (i32, i32)>,
+    start: (i32, i32),
+    goal: (i32, i32),
+    is_blocked: &dyn Fn(i32, i32) -> bool,
+    bounds: (i32, i32),
+) -> Option<u32> {
+    use std::cmp::Reverse;
+    use std::collections::{BinaryHeap, HashMap as Map};
+
+    if control_map.is_empty() || start == goal {
+        return None;
+    }
+    let h = |p: (i32, i32)| (p.0 - goal.0).abs() + (p.1 - goal.1).abs();
+
+    let mut open: BinaryHeap<(Reverse<i32>, (i32, i32))> = BinaryHeap::new();
+    let mut g: Map<(i32, i32), i32> = Map::new();
+    let mut first_action: Map<(i32, i32), u32> = Map::new();
+
+    open.push((Reverse(h(start)), start));
+    g.insert(start, 0);
+
+    let mut explored = 0;
+    while let Some((_, cur)) = open.pop() {
+        explored += 1;
+        if explored > 4096 {
+            break;
+        }
+        if cur == goal || h(cur) <= 1 {
+            return first_action.get(&cur).copied();
+        }
+        let cur_g = *g.get(&cur).unwrap_or(&i32::MAX);
+        for (&action, &(dr, dc)) in control_map {
+            let next = (cur.0 + dr, cur.1 + dc);
+            if next.0 < 0 || next.1 < 0 || next.0 >= bounds.0 || next.1 >= bounds.1 {
+                continue;
+            }
+            if is_blocked(next.0, next.1) {
+                continue;
+            }
+            let tentative = cur_g + 1;
+            if tentative < *g.get(&next).unwrap_or(&i32::MAX) {
+                g.insert(next, tentative);
+                // Propagate which FIRST action started this path
+                let fa = first_action.get(&cur).copied().unwrap_or(action);
+                first_action.insert(next, fa);
+                open.push((Reverse(tentative + h(next)), next));
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn astar_routes_around_walls() {
+        let mut map = HashMap::new();
+        map.insert(1u32, (-1i32, 0i32)); // up
+        map.insert(2, (1, 0)); // down
+        map.insert(3, (0, -1)); // left
+        map.insert(4, (0, 1)); // right
+        // Row 5 walled for c>=1 and column 5 walled below row 0: from
+        // (5,0) the ONLY viable first move is up; the path crosses via
+        // row 0 and descends to the goal at (4,9).
+        let blocked = |r: i32, c: i32| (c == 5 && r != 0) || (r == 5 && c >= 1);
+        let first = astar_step(&map, (5, 0), (4, 9), &blocked, (10, 10));
+        assert_eq!(first, Some(1), "must start by moving up to round the wall");
+    }
 
     #[test]
     fn control_map_learned_from_consistent_motion() {
