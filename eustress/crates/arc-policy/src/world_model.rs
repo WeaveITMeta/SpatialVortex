@@ -925,7 +925,10 @@ impl VortexWorldModel {
                     "goal"
                 } else {
                     match t.classification.role {
-                        ObjectRole::Agent => "avatar",
+                        // Only the tracker-selected avatar (checked above)
+                        // earns the avatar tag — other action-correlated
+                        // movers are pushed blocks / scrolling, i.e. movable
+                        ObjectRole::Agent => "movable",
                         ObjectRole::StaticBarrier => "barrier",
                         ObjectRole::Movable => "movable",
                         ObjectRole::Collectible => "collectible",
@@ -2298,6 +2301,7 @@ impl VortexWorldModel {
         // Combined with dead-click learning this sweeps the interactive
         // surface in ~object-count actions instead of ~cell-count.
         {
+            use crate::object_tracker::ObjectRole;
             let mut objs: Vec<(usize, (u32, u32))> = self
                 .object_tracker
                 .tracked_objects()
@@ -2307,16 +2311,24 @@ impl VortexWorldModel {
                     // Representative cell: the member cell nearest the centroid
                     // (a centroid of an L-shape can fall outside the object).
                     let (cy, cx) = t.current.centroid;
+                    // Goal-classified objects outrank everything (r11l — the
+                    // first game to score — scored because its goals were
+                    // identified and clicked); then smallest-first.
+                    let rank = if t.classification.role == ObjectRole::Goal {
+                        t.current.area
+                    } else {
+                        t.current.area + 100_000
+                    };
                     t.current.cells.iter()
                         .min_by_key(|(r, c)| {
                             let dr = *r as f32 - cy;
                             let dc = *c as f32 - cx;
                             ((dr * dr + dc * dc) * 100.0) as i64
                         })
-                        .map(|(r, c)| (t.current.area, (*c as u32, *r as u32)))
+                        .map(|(r, c)| (rank, (*c as u32, *r as u32)))
                 })
                 .collect();
-            objs.sort_by_key(|(area, _)| *area);
+            objs.sort_by_key(|(rank, _)| *rank);
             for (_, pt) in objs {
                 if !self.dead_clicks.contains(&pt) && seen.insert(pt) {
                     targets.push(pt);

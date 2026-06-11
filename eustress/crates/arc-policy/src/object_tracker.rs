@@ -341,7 +341,17 @@ impl ObjectTracker {
 
     /// Get the identified agent object, if any.
     pub fn agent(&self) -> Option<&TrackedObject> {
-        self.tracked.iter().find(|t| t.classification.role == ObjectRole::Agent)
+        // There is one avatar, not many: scrolling backgrounds and pushed
+        // blocks also "move with actions", which over-classifies Agent
+        // (one game tagged 1,523 avatar cells). Pick the single strongest
+        // action-correlated mover; callers treat the rest as Movable.
+        self.tracked.iter()
+            .filter(|t| t.classification.role == ObjectRole::Agent)
+            .max_by(|a, b| {
+                a.classification.confidence
+                    .partial_cmp(&b.classification.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     }
 
     /// Get the identified agent's stable ID, if any.
