@@ -235,9 +235,33 @@ impl EquivEntry {
 /// Symmetric: (a, b) and (b, a) map to the same entry.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EquivalenceCache {
+    // serde_json requires string map keys; a tuple key here made the whole
+    // KnowledgeSnapshot unserializable (0-byte knowledge files). Serialize
+    // as a list of pairs instead.
+    #[serde(with = "equiv_entries_serde")]
     entries: HashMap<(u64, u64, u64), EquivEntry>,
     pub total_lookups: u64,
     pub total_hits: u64,
+}
+
+mod equiv_entries_serde {
+    use super::EquivEntry;
+    use std::collections::HashMap;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        map: &HashMap<(u64, u64, u64), EquivEntry>,
+        ser: S,
+    ) -> Result<S::Ok, S::Error> {
+        map.iter().collect::<Vec<_>>().serialize(ser)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        de: D,
+    ) -> Result<HashMap<(u64, u64, u64), EquivEntry>, D::Error> {
+        let pairs: Vec<((u64, u64, u64), EquivEntry)> = Vec::deserialize(de)?;
+        Ok(pairs.into_iter().collect())
+    }
 }
 
 impl EquivalenceCache {

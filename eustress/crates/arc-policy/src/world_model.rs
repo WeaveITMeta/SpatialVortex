@@ -3388,4 +3388,16 @@ mod tests {
         assert_eq!(actions.len(), 3);
         assert_eq!(actions[0].name, "game_action_1");
     }
+
+    #[test]
+    fn knowledge_export_import_roundtrip() {
+        let mut model = VortexWorldModel::new();
+        // Touch the equivalence cache — its tuple-keyed map once made the
+        // whole snapshot unserializable (0-byte knowledge files).
+        model.decomposer.equiv_cache.entry(1, 2, 3).update(1.0);
+        let json = model.export_knowledge();
+        assert!(!json.is_empty(), "export must serialize");
+        let mut restored = VortexWorldModel::new();
+        restored.import_knowledge(&json).expect("import must succeed");
+    }
 }
