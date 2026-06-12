@@ -110,6 +110,18 @@ pub fn write_game_space(
     write_archetypes_toml(&space_dir, &model.decomposer)?;
     write_soul_service(&space_dir)?;
     write_action_rules_soul(&space_dir, model)?;
+    // Cognitive mind map: claims/predicates/hazards/recipes as live
+    // 3D nodes the engine's mind-map tooling can inspect and drag.
+    // Throttled: ~50 small files per export is too heavy for the
+    // every-5th-action debounce cadence on a synced drive.
+    {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static MINDMAP_TICK: AtomicU32 = AtomicU32::new(0);
+        if MINDMAP_TICK.fetch_add(1, Ordering::Relaxed) % 12 == 0 {
+            let (nodes, edges) = model.mindmap_layout(game_id);
+            crate::mindmap_export::write_mindmap(&space_dir, &nodes, &edges, &chrono_now())?;
+        }
+    }
 
     // Write hot scene state via ArcSceneMirror → current.toml
     model.scene_mirror.write_to_space(&space_dir)?;

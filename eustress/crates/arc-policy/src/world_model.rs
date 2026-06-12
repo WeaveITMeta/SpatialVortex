@@ -1075,6 +1075,145 @@ impl VortexWorldModel {
         Ok(())
     }
 
+    /// Build the cognitive mind map: claims, predicates, hazards, and
+    /// recipes as positioned, colored nodes. Epistemic strength maps to
+    /// opacity; hazards sit at their (scaled) grid coordinates so the
+    /// 3D workspace shows WHERE the danger is, not just that it exists.
+    pub fn mindmap_layout(
+        &self,
+        game_id: &str,
+    ) -> (Vec<crate::mindmap_export::MindNode>, Vec<(usize, usize)>) {
+        use crate::epistemic::ClaimStatus;
+        use crate::mindmap_export::MindNode;
+        let mut nodes: Vec<MindNode> = Vec::new();
+        let mut edges: Vec<(usize, usize)> = Vec::new();
+
+        nodes.push(MindNode {
+            name: format!("Center_{}", game_id),
+            label: format!("{} L{}", game_id, self.prev_levels),
+            color: (255, 205, 70),
+            transparency: 0.0,
+            position: (0.0, 25.0, 0.0),
+            tags: vec!["mindmap_center".into()],
+        });
+
+        let hub = |name: &str, angle: f32| MindNode {
+            name: name.to_string(),
+            label: name.replace('_', " "),
+            color: (120, 150, 190),
+            transparency: 0.1,
+            position: (18.0 * angle.cos(), 25.0, 18.0 * angle.sin()),
+            tags: vec!["mindmap_hub".into()],
+        };
+        let claims_hub = nodes.len();
+        nodes.push(hub("Claims", 0.0));
+        let preds_hub = nodes.len();
+        nodes.push(hub("Win_predicates", std::f32::consts::FRAC_PI_2));
+        let hazards_hub = nodes.len();
+        nodes.push(hub("Hazards", std::f32::consts::PI));
+        let recipes_hub = nodes.len();
+        nodes.push(hub("Recipes", std::f32::consts::PI * 1.5));
+        for h in [claims_hub, preds_hub, hazards_hub, recipes_hub] {
+            edges.push((0, h));
+        }
+
+        // Claims: strongest first, capped. Lifecycle rung sets the color,
+        // IRA sets the opacity, recency is the index along Z (temporal axis).
+        let mut claims: Vec<(&String, &crate::epistemic::CausalClaim)> =
+            self.ledger.claims.iter().collect();
+        claims.sort_by_key(|(_, c)| {
+            std::cmp::Reverse((c.status as u8, c.verifications, c.observations))
+        });
+        for (i, (id, c)) in claims.iter().take(24).enumerate() {
+            let color = match c.status {
+                ClaimStatus::Law => (255, 205, 70),
+                ClaimStatus::Verified => (90, 200, 120),
+                ClaimStatus::Correlated => (90, 140, 220),
+                ClaimStatus::Observed => (150, 150, 150),
+            };
+            let a = i as f32 * 0.5;
+            let idx = nodes.len();
+            nodes.push(MindNode {
+                name: format!("claim_{}_{}", i, id),
+                label: format!(
+                    "{} [{:?} o{} v{} ira {:.2}]",
+                    id, c.status, c.observations, c.verifications, c.ira
+                ),
+                color,
+                transparency: (1.0 - c.ira).clamp(0.0, 0.85),
+                position: (
+                    18.0 + 8.0 + 5.0 * a.cos(),
+                    25.0 + 5.0 * a.sin(),
+                    -(i as f32) * 2.0,
+                ),
+                tags: vec!["claim".into(), format!("status_{:?}", c.status).to_lowercase()],
+            });
+            edges.push((claims_hub, idx));
+        }
+
+        if let Some(ref ensemble) = self.predicate_ensemble {
+            for (i, p) in ensemble.predicates.iter().enumerate() {
+                let idx = nodes.len();
+                nodes.push(MindNode {
+                    name: format!("pred_{}_{:?}", i, p.kind),
+                    label: format!("{:?} p={:.2} ({}x)", p.kind, p.posterior, p.confirmations),
+                    color: (175, 169, 236),
+                    transparency: (1.0 - p.posterior).clamp(0.0, 0.85),
+                    position: (
+                        4.0 * (i as f32),
+                        25.0 + 8.0 + 4.0,
+                        18.0 + 6.0,
+                    ),
+                    tags: vec!["predicate".into()],
+                });
+                edges.push((preds_hub, idx));
+            }
+        }
+
+        // Hazards live at their actual (scaled) grid coordinates.
+        let objs: Vec<(u8, Vec<(usize, usize)>)> = self
+            .object_tracker
+            .tracked_objects()
+            .iter()
+            .map(|t| (t.current.color, t.current.cells.clone()))
+            .collect();
+        let hazard_cells = self.forensics.hazard_cells(&objs);
+        for (i, (r, c)) in hazard_cells.iter().take(16).enumerate() {
+            let idx = nodes.len();
+            nodes.push(MindNode {
+                name: format!("hazard_{}_{}_{}", i, r, c),
+                label: format!("hazard ({}, {})", r, c),
+                color: (226, 75, 74),
+                transparency: 0.1,
+                position: (
+                    *c as f32 * 0.5 - 16.0,
+                    8.0,
+                    *r as f32 * 0.5 - 16.0,
+                ),
+                tags: vec!["hazard".into()],
+            });
+            edges.push((hazards_hub, idx));
+        }
+
+        for (i, recipe) in self.win_recipes.iter().take(8).enumerate() {
+            let idx = nodes.len();
+            nodes.push(MindNode {
+                name: format!("recipe_{}", i),
+                label: format!(
+                    "recipe {} steps, {} wins",
+                    recipe.length, recipe.replay_successes
+                ),
+                color: (29, 158, 117),
+                transparency: if recipe.replay_successes > 0 { 0.0 } else { 0.5 },
+                position: (-(18.0 + 8.0 + 3.0 * i as f32), 25.0, -4.0 * i as f32),
+                tags: vec!["recipe".into()],
+            });
+            edges.push((recipes_hub, idx));
+        }
+
+        (nodes, edges)
+    }
+
     /// Bank the current level's learning state into the vault.
     fn save_level_memory(&mut self, level: u32) {
         // Union-merge with any prior visit: knowledge accumulates across

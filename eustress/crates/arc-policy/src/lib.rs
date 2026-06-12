@@ -4,6 +4,7 @@ pub mod forensics;
 pub mod router;
 pub mod workflows;
 pub mod forward_model;
+pub mod mindmap_export;
 pub mod predicates;
 pub mod qlearn;
 pub mod scene_mirror;
