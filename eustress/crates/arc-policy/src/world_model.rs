@@ -952,8 +952,12 @@ impl VortexWorldModel {
                 game_profiles.insert(self.current_game.clone(), profile);
             }
         }
+        // Bound the snapshot: unpruned graphs hit the import sanity
+        // limits within a few cards (128k edges by card 21).
+        let mut graph = self.causal_graph.clone();
+        graph.prune_to(60_000);
         let snapshot = KnowledgeSnapshot {
-            causal_graph: self.causal_graph.clone(),
+            causal_graph: graph,
             decomposer: self.decomposer.clone(),
             global_ira: self.global_ira,
             games_played: self.decomposer.action_history.len() as u32,

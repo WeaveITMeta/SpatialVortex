@@ -267,6 +267,35 @@ impl CausalGraph {
 
     // ─── Edge operations ─────────────────────────────────────────────
 
+    /// Drop the weakest edges until at most `max_edges` remain, then
+    /// drop nodes left with no edges. Long-running agents accrete edges
+    /// without bound (cross-card snapshots hit import sanity limits);
+    /// pruning by strength keeps the load-bearing structure.
+    pub fn prune_to(&mut self, max_edges: usize) {
+        if self.edges.len() <= max_edges {
+            return;
+        }
+        let mut order: Vec<usize> = (0..self.edges.len()).collect();
+        order.sort_by(|&a, &b| {
+            self.edges[b].edge.strength()
+                .partial_cmp(&self.edges[a].edge.strength())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        order.truncate(max_edges);
+        order.sort_unstable();
+        let kept: Vec<Edge> = order.iter().map(|&i| self.edges[i].clone()).collect();
+        self.edges = kept;
+        self.outgoing.clear();
+        self.incoming.clear();
+        for (i, e) in self.edges.iter().enumerate() {
+            self.outgoing.entry(e.from.clone()).or_default().push(i);
+            self.incoming.entry(e.to.clone()).or_default().push(i);
+        }
+        self.nodes.retain(|id, node| {
+            node.is_law() || self.outgoing.contains_key(id) || self.incoming.contains_key(id)
+        });
+    }
+
     pub fn add_edge(&mut self, from: &str, to: &str, edge: CausalEdge) {
         let idx = self.edges.len();
         self.edges.push(Edge {
