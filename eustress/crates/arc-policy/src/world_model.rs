@@ -661,6 +661,10 @@ pub struct VortexWorldModel {
     prev_predicate_progress: f32,
     /// Clicks at the current level that immediately preceded deaths.
     fatal_clicks: std::collections::HashSet<(u32, u32)>,
+    /// Recipes abandoned at the current level — never re-matched here.
+    /// (An abandoned recipe that re-matches itself recursed to stack
+    /// overflow; this set bounds the retry chain.)
+    abandoned_recipes: std::collections::HashSet<usize>,
     /// Per-level learning memory: click knowledge and win-interpretations
     /// keyed by level number. A death reset used to wipe the frontier
     /// level's learning — ten visits to level 2, each one amnesiac. Now
@@ -743,6 +747,7 @@ impl VortexWorldModel {
             prev_predicate_progress: 0.0,
             level_memory: HashMap::new(),
             fatal_clicks: std::collections::HashSet::new(),
+            abandoned_recipes: std::collections::HashSet::new(),
             prev_progress: 0.0,
             forward_model: crate::forward_model::ObjectForwardModel::new(),
             game_profiles: HashMap::new(),
@@ -1056,6 +1061,7 @@ impl VortexWorldModel {
         // Fresh exploration order either way
         self.click_targets.clear();
         self.click_count = 0;
+        self.abandoned_recipes.clear();
     }
 
     /// Record a GAME_OVER for forensics: classify the cause, file it as a
@@ -2601,6 +2607,7 @@ impl VortexWorldModel {
                             .unwrap_or(0);
                         if !available.contains(&action_id) {
                             info!("RECIPE REPLAY: action {} not available, abandoning", action_id);
+                            self.abandoned_recipes.insert(recipe_idx);
                             self.replay_cursor = None;
                             return None;
                         }
@@ -2615,7 +2622,9 @@ impl VortexWorldModel {
                         });
                     } else {
                         info!("RECIPE REPLAY: no grid change at step {}, abandoning", step_idx);
+                        self.abandoned_recipes.insert(recipe_idx);
                         self.replay_cursor = None;
+                        return None;
                     }
                 } else {
                     // Recipe exhausted
@@ -2636,7 +2645,8 @@ impl VortexWorldModel {
             let current_fp = grid_fingerprint(grid);
 
             // Exact fingerprint match
-            if let Some(idx) = self.win_recipes.iter().position(|r| r.start_fingerprint == current_fp) {
+            if let Some(idx) = self.win_recipes.iter().enumerate()
+                .position(|(i, r)| r.start_fingerprint == current_fp && !self.abandoned_recipes.contains(&i)) {
                 info!(
                     "RECIPE MATCH (fingerprint): starting replay of recipe {} ({} actions)",
                     idx, self.win_recipes[idx].length
@@ -2648,13 +2658,18 @@ impl VortexWorldModel {
             // Same-game heuristic: after level 0, try the most recent recipe
             // (levels in the same game often have the same solution pattern)
             if self.prev_levels > 0 {
-                let idx = self.win_recipes.len() - 1;
-                info!(
-                    "RECIPE MATCH (same-game heuristic): trying recipe {} ({} actions)",
-                    idx, self.win_recipes[idx].length
-                );
-                self.replay_cursor = Some((idx, 0));
-                return self.try_recipe_replay(available, grid);
+                // Most recent recipe NOT already abandoned at this level
+                let candidate = (0..self.win_recipes.len())
+                    .rev()
+                    .find(|i| !self.abandoned_recipes.contains(i));
+                if let Some(idx) = candidate {
+                    info!(
+                        "RECIPE MATCH (same-game heuristic): trying recipe {} ({} actions)",
+                        idx, self.win_recipes[idx].length
+                    );
+                    self.replay_cursor = Some((idx, 0));
+                    return self.try_recipe_replay(available, grid);
+                }
             }
         }
 
