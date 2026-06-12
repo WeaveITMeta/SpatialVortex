@@ -2682,11 +2682,20 @@ impl VortexWorldModel {
             }
         }
 
-        // Cross-game: try recipe_library for fingerprint match with prior successes
+        // Cross-game: try recipe_library for fingerprint match with prior
+        // successes. Playbook entries for THIS game carry fingerprint 0
+        // (compiled workflows don't record the start grid) — match them at
+        // the start of the game, where they were recorded.
         if self.replay_cursor.is_none() && self.win_recipes.is_empty() {
             let current_fp = grid_fingerprint(grid);
             if let Some(lib_recipe) = self.recipe_library.iter()
-                .find(|r| r.start_fingerprint == current_fp && r.replay_successes > 0)
+                .find(|r| {
+                    (r.start_fingerprint == current_fp && r.replay_successes > 0)
+                        || (r.start_fingerprint == 0
+                            && r.origin_game == self.current_game
+                            && self.prev_levels == 0
+                            && self.steps_since_level_advance < 5)
+                })
                 .cloned()
             {
                 info!(
