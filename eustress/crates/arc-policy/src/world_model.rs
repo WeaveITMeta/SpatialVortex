@@ -591,6 +591,8 @@ pub struct VortexWorldModel {
     /// Ensemble from the level just completed, awaiting re-targeting
     /// against the next level's first observed grid.
     predicate_carry: Option<crate::predicates::PredicateEnsemble>,
+    /// Avatar centroid after the previous step, for dead-move detection.
+    prev_avatar: Option<(f32, f32)>,
     /// Steps since last level advance (for detecting total stagnation).
     steps_since_level_advance: u32,
     /// Actions since last submit.
@@ -729,6 +731,7 @@ impl VortexWorldModel {
             level_total_changes: 0,
             action_use_counts: std::collections::HashMap::new(),
             predicate_carry: None,
+            prev_avatar: None,
             steps_since_level_advance: 0,
             actions_since_submit: 0,
             current_level_actions: Vec::new(),
@@ -1200,45 +1203,6 @@ impl VortexWorldModel {
 
         let props = grid.analyze();
 
-        // ── DEAD-MOVE LEARNING ────────────────────────────────────────────
-        // Mirror of the dead-click ban for movement actions: an arrow that
-        // changes nothing several times in a row is a wall — stop pressing
-        // it this level. Cleared when the action works again, on level
-        // advance, and when every direction would be excluded.
-        if let (Some(prev), Some(last)) = (self.prev_grid.as_ref(), self.last_action_id) {
-            let delta = prev.cells_changed(&grid) as u64;
-            self.level_total_changes += delta;
-            if (1..=4).contains(&last) {
-                if delta == 0 {
-                    let streak = self.move_noop_streak.entry(last).or_insert(0);
-                    *streak += 1;
-                    if *streak >= 3 && self.suppressed_moves.insert(last) {
-                        info!("  MOVE LEARN: action {} no-op x{} — suppressed this level", last, streak);
-                    }
-                } else {
-                    self.move_noop_streak.insert(last, 0);
-                    self.suppressed_moves.remove(&last);
-                }
-            }
-        }
-        if levels > self.prev_levels {
-            self.move_noop_streak.clear();
-            self.suppressed_moves.clear();
-            self.level_total_changes = 0;
-            self.action_use_counts.clear();
-        }
-        if !self.suppressed_moves.is_empty() {
-            let filtered: Vec<u32> = available.iter().copied()
-                .filter(|a| !self.suppressed_moves.contains(a))
-                .collect();
-            if !filtered.is_empty() {
-                available = filtered;
-            } else {
-                self.suppressed_moves.clear();
-                self.move_noop_streak.clear();
-            }
-        }
-
         // ── MENU / CONFIRM AWARENESS ──────────────────────────────────────
         // A board where NOTHING has responded after several steps is most
         // likely a start screen or confirmation prompt, not a hostile
@@ -1270,6 +1234,66 @@ impl VortexWorldModel {
         let object_events = self.object_tracker.update(&object_map, self.last_action_id);
         self.object_frame = self.object_tracker.current_frame();
         self.agent_object_id = self.object_tracker.agent_id();
+
+        // ── DEAD-MOVE LEARNING ────────────────────────────────────────────
+        // Mirror of the dead-click ban for movement actions: an arrow that
+        // changes nothing several times in a row is a wall — stop pressing
+        // it this level. Cleared when the action works again, on level
+        // advance, and when every direction would be excluded.
+        if let (Some(prev), Some(last)) = (self.prev_grid.as_ref(), self.last_action_id) {
+            let delta = prev.cells_changed(&grid) as u64;
+            self.level_total_changes += delta;
+            if (1..=4).contains(&last) {
+                // "Did the move do anything?" must ignore ambient churn —
+                // a blinking timer defeats a raw cells_changed test (tr87
+                // pressed one arrow 591 times while a counter animated).
+                // Avatar displacement is the ground truth when known.
+                let avatar_now = self.object_tracker.agent().map(|a| a.current.centroid);
+                let moved = match (self.prev_avatar, avatar_now) {
+                    (Some(p0), Some(p1)) => (p0.0 - p1.0).abs() + (p0.1 - p1.1).abs() >= 0.5,
+                    _ => {
+                        let mut non_ambient = 0u32;
+                        for r in 0..grid.height.min(prev.height) {
+                            for c in 0..grid.width.min(prev.width) {
+                                if grid.cells[r][c] != prev.cells[r][c]
+                                    && !self.is_ambient_cell(r, c)
+                                {
+                                    non_ambient += 1;
+                                }
+                            }
+                        }
+                        non_ambient > 0
+                    }
+                };
+                if !moved {
+                    let streak = self.move_noop_streak.entry(last).or_insert(0);
+                    *streak += 1;
+                    if *streak >= 3 && self.suppressed_moves.insert(last) {
+                        info!("  MOVE LEARN: action {} no-op x{} — suppressed this level", last, streak);
+                    }
+                } else {
+                    self.move_noop_streak.insert(last, 0);
+                    self.suppressed_moves.remove(&last);
+                }
+            }
+        }
+        if levels > self.prev_levels {
+            self.move_noop_streak.clear();
+            self.suppressed_moves.clear();
+            self.level_total_changes = 0;
+            self.action_use_counts.clear();
+        }
+        if !self.suppressed_moves.is_empty() {
+            let filtered: Vec<u32> = available.iter().copied()
+                .filter(|a| !self.suppressed_moves.contains(a))
+                .collect();
+            if !filtered.is_empty() {
+                available = filtered;
+            } else {
+                self.suppressed_moves.clear();
+                self.move_noop_streak.clear();
+            }
+        }
 
         info!(
             "OBSERVE: {}x{} grid, {} colors, {} objects, {} obj_events, step {}",
@@ -1948,6 +1972,7 @@ impl VortexWorldModel {
         }
 
         // Save state for next step
+        self.prev_avatar = self.object_tracker.agent().map(|a| a.current.centroid);
         *self.action_use_counts.entry(action_id).or_insert(0) += 1;
         self.prev_grid = Some(grid);
         self.last_action_id = Some(action_id);
