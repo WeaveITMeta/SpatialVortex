@@ -1756,7 +1756,14 @@ impl VortexWorldModel {
         //   6. Exploit (solve loop simulation → best predicted action)
         //   7. Diversity fallback (round-robin through effective actions)
 
-        let decision = if self.undo_explorer.should_explore(self.step_in_game) && !self.click_only_game {
+        // A known winning recipe outranks undo probing — exploration can
+        // run after the bank is secured (sp80's probe phase preempted its
+        // own win recipe every card).
+        let recipe_first = self.try_recipe_replay(&available, &grid);
+        let decision = if let Some(d) = recipe_first {
+            self.in_exploration = false;
+            d
+        } else if self.undo_explorer.should_explore(self.step_in_game) && !self.click_only_game {
             // Undo-safe exploration: probe actions via undo to build state graph
             if let Some(action) = self.undo_explorer.next_action(&available, &grid) {
                 self.in_exploration = true;
