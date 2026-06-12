@@ -964,7 +964,8 @@ impl VortexWorldModel {
             router: self.router.clone(),
             forensics: self.forensics.clone(),
         };
-        match serde_json::to_string_pretty(&snapshot) {
+        // Compact JSON — pretty-printing doubled a 50MB snapshot.
+        match serde_json::to_string(&snapshot) {
             Ok(json) => json,
             Err(e) => {
                 // Identify the failing field — serde_json's error doesn't
@@ -997,7 +998,9 @@ impl VortexWorldModel {
         // take 9+ seconds). A healthy graph is a few thousand nodes; if
         // the snapshot is implausibly large, start clean instead of
         // inheriting the bloat.
-        const MAX_SANE_BYTES: usize = 50 * 1024 * 1024;
+        // Generous: a healthy compact snapshot is tens of MB; the bound
+        // exists to reject the 2GB pre-dedupe pathology, not real growth.
+        const MAX_SANE_BYTES: usize = 256 * 1024 * 1024;
         if json.len() > MAX_SANE_BYTES {
             return Err(format!(
                 "knowledge snapshot is {:.1}MB (> {}MB sanity bound) — \
