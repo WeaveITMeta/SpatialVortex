@@ -136,6 +136,20 @@ pub fn delete_game_space(config: &SpaceWriterConfig, game_id: &str) -> Result<()
     Ok(())
 }
 
+/// Load shared knowledge written by a previous run, if present.
+pub fn load_knowledge(config: &SpaceWriterConfig, model: &mut VortexWorldModel) {
+    let path = config.universe_root.join("knowledge").join("vortex_knowledge.json");
+    match std::fs::read_to_string(&path) {
+        Ok(json) if !json.trim().is_empty() => {
+            if let Err(e) = model.import_knowledge(&json) {
+                tracing::warn!("knowledge import skipped: {e}");
+            }
+        }
+        Ok(_) => tracing::warn!("knowledge file at {} is empty — starting clean", path.display()),
+        Err(_) => tracing::info!("no prior knowledge at {} — starting clean", path.display()),
+    }
+}
+
 /// Write shared knowledge directory (survives across games).
 pub fn write_knowledge(
     config: &SpaceWriterConfig,
@@ -145,10 +159,20 @@ pub fn write_knowledge(
     std::fs::create_dir_all(&knowledge_dir)
         .map_err(|e| format!("Failed to create knowledge dir: {}", e))?;
 
-    // Write knowledge as JSON (compact, fast to parse)
+    // Write knowledge as JSON (compact, fast to parse). An export
+    // failure yields an empty string — never truncate the existing
+    // file with it. Write via temp+rename so a crash mid-write can't
+    // leave a half-written snapshot.
     let json = model.export_knowledge();
-    std::fs::write(knowledge_dir.join("vortex_knowledge.json"), &json)
+    if json.is_empty() {
+        return Err("knowledge export produced no data — keeping previous file".into());
+    }
+    let final_path = knowledge_dir.join("vortex_knowledge.json");
+    let tmp_path = knowledge_dir.join("vortex_knowledge.json.tmp");
+    std::fs::write(&tmp_path, &json)
         .map_err(|e| format!("Failed to write knowledge JSON: {}", e))?;
+    std::fs::rename(&tmp_path, &final_path)
+        .map_err(|e| format!("Failed to swap knowledge JSON: {}", e))?;
 
     // Also write human-readable TOML summary
     let summary = knowledge_summary_toml(model);

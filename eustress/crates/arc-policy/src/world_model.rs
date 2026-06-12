@@ -961,7 +961,29 @@ impl VortexWorldModel {
             router: self.router.clone(),
             forensics: self.forensics.clone(),
         };
-        serde_json::to_string_pretty(&snapshot).unwrap_or_default()
+        match serde_json::to_string_pretty(&snapshot) {
+            Ok(json) => json,
+            Err(e) => {
+                // Identify the failing field — serde_json's error doesn't
+                // say which one (NaN/inf floats are the usual culprit).
+                tracing::error!("knowledge export failed: {e}");
+                for (name, r) in [
+                    ("causal_graph", serde_json::to_string(&snapshot.causal_graph).map(|_| ())),
+                    ("decomposer", serde_json::to_string(&snapshot.decomposer).map(|_| ())),
+                    ("recipe_library", serde_json::to_string(&snapshot.recipe_library).map(|_| ())),
+                    ("game_profiles", serde_json::to_string(&snapshot.game_profiles).map(|_| ())),
+                    ("q_table", serde_json::to_string(&snapshot.q_table).map(|_| ())),
+                    ("ledger", serde_json::to_string(&snapshot.ledger).map(|_| ())),
+                    ("router", serde_json::to_string(&snapshot.router).map(|_| ())),
+                    ("forensics", serde_json::to_string(&snapshot.forensics).map(|_| ())),
+                ] {
+                    if let Err(fe) = r {
+                        tracing::error!("  knowledge export: field {name} fails: {fe}");
+                    }
+                }
+                String::new()
+            }
+        }
     }
 
     /// Import cross-game knowledge from a previous session.
