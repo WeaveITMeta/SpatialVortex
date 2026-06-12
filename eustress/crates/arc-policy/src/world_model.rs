@@ -2710,14 +2710,18 @@ impl VortexWorldModel {
         // the start of the game, where they were recorded.
         if self.replay_cursor.is_none() && self.win_recipes.is_empty() {
             let current_fp = grid_fingerprint(grid);
+            // Among matching candidates prefer proven recipes, then the
+            // shortest — a long exploratory workflow must not shadow a
+            // known 52-step win.
             if let Some(lib_recipe) = self.recipe_library.iter()
-                .find(|r| {
+                .filter(|r| {
                     (r.start_fingerprint == current_fp && r.replay_successes > 0)
                         || (r.start_fingerprint == 0
                             && r.origin_game == self.current_game
                             && self.prev_levels == 0
                             && self.steps_since_level_advance < 5)
                 })
+                .min_by_key(|r| (std::cmp::Reverse(r.replay_successes), r.length))
                 .cloned()
             {
                 info!(
