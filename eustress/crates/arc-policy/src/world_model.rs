@@ -2677,8 +2677,14 @@ impl VortexWorldModel {
                 } else {
                     // Recipe exhausted
                     info!("RECIPE REPLAY: completed {} steps", recipe.length);
-                    // Mark success if we're about to see a level advance
-                    if let Some(r) = self.win_recipes.get_mut(recipe_idx) {
+                    // Completing without an immediate level advance means
+                    // the recipe doesn't win from this state — retire it
+                    // for the level or it replays in a loop, burning the
+                    // whole budget (observed: 80-step recipe cycling).
+                    if self.steps_since_level_advance > recipe.actions.len() {
+                        info!("RECIPE REPLAY: no win on completion, retiring recipe {}", recipe_idx);
+                        self.abandoned_recipes.insert(recipe_idx);
+                    } else if let Some(r) = self.win_recipes.get_mut(recipe_idx) {
                         r.replay_successes += 1;
                     }
                     self.replay_cursor = None;
