@@ -2645,8 +2645,17 @@ impl VortexWorldModel {
             let current_fp = grid_fingerprint(grid);
 
             // Exact fingerprint match
+            // Playbook-loaded recipes carry fingerprint 0 (unknown start):
+            // let them match at the start of the game (level 0, early
+            // steps) where they were recorded.
             if let Some(idx) = self.win_recipes.iter().enumerate()
-                .position(|(i, r)| r.start_fingerprint == current_fp && !self.abandoned_recipes.contains(&i)) {
+                .position(|(i, r)| {
+                    !self.abandoned_recipes.contains(&i)
+                        && (r.start_fingerprint == current_fp
+                            || (r.start_fingerprint == 0
+                                && self.prev_levels == 0
+                                && self.steps_since_level_advance < 5))
+                }) {
                 info!(
                     "RECIPE MATCH (fingerprint): starting replay of recipe {} ({} actions)",
                     idx, self.win_recipes[idx].length
