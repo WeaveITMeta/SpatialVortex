@@ -577,6 +577,12 @@ pub struct VortexWorldModel {
     action_structural_scores: HashMap<u32, (u32, u32)>,
     /// Round-robin index for action diversity when no clear winner.
     diversity_index: usize,
+    /// Consecutive no-effect uses per movement action (1-4) this level.
+    move_noop_streak: std::collections::HashMap<u32, u32>,
+    /// Movement actions suppressed this level after repeated no-ops —
+    /// the dead-click ban, for arrows. Stops one-direction wall-spam
+    /// (591 of 600 actions on tr87 were a single arrow key).
+    suppressed_moves: std::collections::HashSet<u32>,
     /// Steps since last level advance (for detecting total stagnation).
     steps_since_level_advance: u32,
     /// Actions since last submit.
@@ -710,6 +716,8 @@ impl VortexWorldModel {
             click_only_game: false,
             action_structural_scores: HashMap::new(),
             diversity_index: 0,
+            move_noop_streak: std::collections::HashMap::new(),
+            suppressed_moves: std::collections::HashSet::new(),
             steps_since_level_advance: 0,
             actions_since_submit: 0,
             current_level_actions: Vec::new(),
@@ -908,6 +916,8 @@ impl VortexWorldModel {
         self.click_only_game = false;
         self.action_structural_scores.clear();
         self.diversity_index = 0;
+        self.move_noop_streak.clear();
+        self.suppressed_moves.clear();
         self.steps_since_level_advance = 0;
         self.actions_since_submit = 0;
         // Reset scene mirror for new game (clear entities)
@@ -1174,6 +1184,41 @@ impl VortexWorldModel {
         };
 
         let props = grid.analyze();
+
+        // ── DEAD-MOVE LEARNING ────────────────────────────────────────────
+        // Mirror of the dead-click ban for movement actions: an arrow that
+        // changes nothing several times in a row is a wall — stop pressing
+        // it this level. Cleared when the action works again, on level
+        // advance, and when every direction would be excluded.
+        if let (Some(prev), Some(last)) = (self.prev_grid.as_ref(), self.last_action_id) {
+            if (1..=4).contains(&last) {
+                if prev.cells_changed(&grid) == 0 {
+                    let streak = self.move_noop_streak.entry(last).or_insert(0);
+                    *streak += 1;
+                    if *streak >= 3 && self.suppressed_moves.insert(last) {
+                        info!("  MOVE LEARN: action {} no-op x{} — suppressed this level", last, streak);
+                    }
+                } else {
+                    self.move_noop_streak.insert(last, 0);
+                    self.suppressed_moves.remove(&last);
+                }
+            }
+        }
+        if levels > self.prev_levels {
+            self.move_noop_streak.clear();
+            self.suppressed_moves.clear();
+        }
+        if !self.suppressed_moves.is_empty() {
+            let filtered: Vec<u32> = available.iter().copied()
+                .filter(|a| !self.suppressed_moves.contains(a))
+                .collect();
+            if !filtered.is_empty() {
+                available = filtered;
+            } else {
+                self.suppressed_moves.clear();
+                self.move_noop_streak.clear();
+            }
+        }
 
         // ── OBJECT EXTRACTION + TRACKING ──────────────────────────────────
         let object_map = ObjectExtractor::extract(&grid, Connectivity::Four);
