@@ -588,6 +588,9 @@ pub struct VortexWorldModel {
     level_total_changes: u64,
     /// Uses per action id this level, for novelty-weighted fallback.
     action_use_counts: std::collections::HashMap<u32, u32>,
+    /// Ensemble from the level just completed, awaiting re-targeting
+    /// against the next level's first observed grid.
+    predicate_carry: Option<crate::predicates::PredicateEnsemble>,
     /// Steps since last level advance (for detecting total stagnation).
     steps_since_level_advance: u32,
     /// Actions since last submit.
@@ -725,6 +728,7 @@ impl VortexWorldModel {
             suppressed_moves: std::collections::HashSet::new(),
             level_total_changes: 0,
             action_use_counts: std::collections::HashMap::new(),
+            predicate_carry: None,
             steps_since_level_advance: 0,
             actions_since_submit: 0,
             current_level_actions: Vec::new(),
@@ -927,6 +931,8 @@ impl VortexWorldModel {
         self.suppressed_moves.clear();
         self.level_total_changes = 0;
         self.action_use_counts.clear();
+        self.predicate_carry = None;
+        self.forensics.reset_life();
         self.steps_since_level_advance = 0;
         self.actions_since_submit = 0;
         // Reset scene mirror for new game (clear entities)
@@ -1317,7 +1323,12 @@ impl VortexWorldModel {
             // Fresh win-condition hypotheses for the new level, seeded by
             // this game's stored posteriors when we've played it before —
             // interpretation itself transfers.
-            let mut ensemble = crate::predicates::PredicateEnsemble::init_from_grid(&grid);
+            let mut ensemble = if let Some(mut carried) = self.predicate_carry.take() {
+                carried.carry_to_next_level(&grid);
+                carried
+            } else {
+                crate::predicates::PredicateEnsemble::init_from_grid(&grid)
+            };
             if let Some(stored) = self
                 .game_profiles
                 .get(game_id)
@@ -1718,14 +1729,26 @@ impl VortexWorldModel {
                         );
                     }
                 }
-                // New level gets fresh hypotheses (seeded on next observe)
-                self.predicate_ensemble = None;
+                // Carry the verified mechanic forward as a prior: the new
+                // level usually has MORE of the same, not a new game. The
+                // ensemble re-derives targets from the next observed grid
+                // (carry happens there); only the posteriors survive here.
+                if let Some(ref ensemble) = self.predicate_ensemble {
+                    if let Some(best) = ensemble.best_verified() {
+                        info!(
+                            "  PREDICATE CARRY: {:?} (p={:.2}) carried to level {} as prior",
+                            best.kind, best.posterior, levels
+                        );
+                    }
+                }
+                self.predicate_carry = self.predicate_ensemble.take();
 
                 // Bank the completed level's learning; restore the new
                 // level's memory if we've been there before (death resets
                 // bounce us back through completed levels).
                 self.save_level_memory(self.prev_levels);
                 self.restore_level_memory(levels);
+                self.forensics.reset_life();
                 // Control physics usually persist across levels — keep the
                 // map, drop only the outstanding forecast.
                 self.forward_model.on_level_advance();
@@ -1915,6 +1938,13 @@ impl VortexWorldModel {
                 }
             }
             self.clicks_since_submit += 1;
+        }
+
+        // Feed the forensics evidence stream (timer trends, last actions,
+        // avatar color) so the death classifiers have data to fire on.
+        {
+            let avatar_color = self.object_tracker.agent().map(|a| a.current.color);
+            self.forensics.observe_step(&grid, &decision.action, avatar_color);
         }
 
         // Save state for next step
@@ -2185,8 +2215,24 @@ impl VortexWorldModel {
 
         // Phase 2: goal-directed stepping (IRA-gated)
         let avatar = avatar?;
-        let goal_id = self.object_frame.goal_candidates.first().copied()?;
-        let goal = self.object_tracker.get(goal_id).map(|g| g.current.centroid)?;
+        // Tracker-nominated goal first; otherwise infer the most goal-like
+        // cell from the grid itself (rare-color singleton, avatar twin,
+        // isolated object) — movement games rarely label their goals.
+        let goal: (f32, f32) = match self.object_frame.goal_candidates.first().copied()
+            .and_then(|id| self.object_tracker.get(id).map(|g| g.current.centroid))
+        {
+            Some(g) => g,
+            None => {
+                let s = crate::goal_inference::infer_goal_cell(grid, &self.object_frame)?;
+                if self.step_in_game % 100 == 0 {
+                    info!(
+                        "  GOAL INFER: cell {:?} via {:?} (conf {:.2})",
+                        s.cell, s.heuristic, s.confidence
+                    );
+                }
+                (s.cell.0 as f32, s.cell.1 as f32)
+            }
+        };
 
         // A* first: route around barrier-classified cells instead of
         // greedily walking into them (the ACTION5-fixation failure mode).
@@ -2228,8 +2274,8 @@ impl VortexWorldModel {
                                 (0.5 + ira * 0.4).min(0.9),
                                 grid,
                                 format!(
-                                    "fm_astar: action_{} pathing to goal obj_{} (ira={:.2})",
-                                    action, goal_id, ira
+                                    "fm_astar: action_{} pathing to goal {:?} (ira={:.2})",
+                                    action, goal, ira
                                 ),
                             );
                             return Some(d);
@@ -2249,8 +2295,8 @@ impl VortexWorldModel {
             (0.5 + ira * 0.4).min(0.9),
             grid,
             format!(
-                "fm_goal_step: action_{} toward goal obj_{} (progress={:.2}, ira={:.2})",
-                action, goal_id, progress, ira
+                "fm_goal_step: action_{} toward goal {:?} (progress={:.2}, ira={:.2})",
+                action, goal, progress, ira
             ),
         );
         Some(d)
