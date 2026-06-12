@@ -592,6 +592,8 @@ pub struct VortexWorldModel {
     recipe_library: Vec<WinRecipe>,
     /// Active recipe replay cursor: (recipe_index, step_within_recipe).
     replay_cursor: Option<(usize, usize)>,
+    /// Consecutive replay steps with no visible grid change.
+    replay_silent_steps: u32,
     /// Buffered multi-step plan from solve().
     plan_buffer: PlanBuffer,
     /// Recent action history for stuck-action detection (last N actions + whether they changed the grid).
@@ -715,6 +717,7 @@ impl VortexWorldModel {
             win_recipes: Vec::new(),
             recipe_library: Vec::new(),
             replay_cursor: None,
+            replay_silent_steps: 0,
             plan_buffer: PlanBuffer::default(),
             recent_action_effects: VecDeque::new(),
             // Object perception
@@ -2610,10 +2613,20 @@ impl VortexWorldModel {
         if let Some((recipe_idx, step_idx)) = self.replay_cursor {
             if let Some(recipe) = self.win_recipes.get(recipe_idx).cloned() {
                 if step_idx < recipe.actions.len() {
-                    // Verify the last replay step had some effect (on-track check)
-                    let on_track = self.prev_grid.as_ref().map_or(true, |prev| {
+                    // Verify the replay is having SOME effect. A single
+                    // silent step is normal — winning sequences contain
+                    // selection/confirm clicks with no visible grid delta
+                    // (every lp85 replay died on one) — so only abandon
+                    // after several consecutive silent steps.
+                    let changed = self.prev_grid.as_ref().map_or(true, |prev| {
                         prev.cells_changed(grid) > 0
                     });
+                    if changed {
+                        self.replay_silent_steps = 0;
+                    } else {
+                        self.replay_silent_steps += 1;
+                    }
+                    let on_track = self.replay_silent_steps < 4;
 
                     if on_track {
                         let action = recipe.actions[step_idx].clone();
@@ -2643,7 +2656,11 @@ impl VortexWorldModel {
                             ),
                         });
                     } else {
-                        info!("RECIPE REPLAY: no grid change at step {}, abandoning", step_idx);
+                        info!(
+                            "RECIPE REPLAY: {} consecutive silent steps at step {}, abandoning",
+                            self.replay_silent_steps, step_idx
+                        );
+                        self.replay_silent_steps = 0;
                         self.abandoned_recipes.insert(recipe_idx);
                         self.replay_cursor = None;
                         return None;
