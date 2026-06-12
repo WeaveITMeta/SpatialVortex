@@ -2626,7 +2626,13 @@ impl VortexWorldModel {
                     } else {
                         self.replay_silent_steps += 1;
                     }
-                    let on_track = self.replay_silent_steps < 4;
+                    // A recipe recorded on THIS game replays the exact
+                    // winning path — run it to completion regardless of
+                    // visible deltas (lp85's winning top-row clicks are
+                    // all silent). Silence only aborts cross-game
+                    // transfers, where divergence is the likely cause.
+                    let trusted = recipe.origin_game == self.current_game;
+                    let on_track = trusted || self.replay_silent_steps < 4;
 
                     if on_track {
                         let action = recipe.actions[step_idx].clone();
