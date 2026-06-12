@@ -583,6 +583,11 @@ pub struct VortexWorldModel {
     /// the dead-click ban, for arrows. Stops one-direction wall-spam
     /// (591 of 600 actions on tr87 were a single arrow key).
     suppressed_moves: std::collections::HashSet<u32>,
+    /// Total grid-cell changes observed this level — zero after many
+    /// steps means a menu/confirm screen, not a hostile board.
+    level_total_changes: u64,
+    /// Uses per action id this level, for novelty-weighted fallback.
+    action_use_counts: std::collections::HashMap<u32, u32>,
     /// Steps since last level advance (for detecting total stagnation).
     steps_since_level_advance: u32,
     /// Actions since last submit.
@@ -718,6 +723,8 @@ impl VortexWorldModel {
             diversity_index: 0,
             move_noop_streak: std::collections::HashMap::new(),
             suppressed_moves: std::collections::HashSet::new(),
+            level_total_changes: 0,
+            action_use_counts: std::collections::HashMap::new(),
             steps_since_level_advance: 0,
             actions_since_submit: 0,
             current_level_actions: Vec::new(),
@@ -918,6 +925,8 @@ impl VortexWorldModel {
         self.diversity_index = 0;
         self.move_noop_streak.clear();
         self.suppressed_moves.clear();
+        self.level_total_changes = 0;
+        self.action_use_counts.clear();
         self.steps_since_level_advance = 0;
         self.actions_since_submit = 0;
         // Reset scene mirror for new game (clear entities)
@@ -1191,8 +1200,10 @@ impl VortexWorldModel {
         // it this level. Cleared when the action works again, on level
         // advance, and when every direction would be excluded.
         if let (Some(prev), Some(last)) = (self.prev_grid.as_ref(), self.last_action_id) {
+            let delta = prev.cells_changed(&grid) as u64;
+            self.level_total_changes += delta;
             if (1..=4).contains(&last) {
-                if prev.cells_changed(&grid) == 0 {
+                if delta == 0 {
                     let streak = self.move_noop_streak.entry(last).or_insert(0);
                     *streak += 1;
                     if *streak >= 3 && self.suppressed_moves.insert(last) {
@@ -1207,6 +1218,8 @@ impl VortexWorldModel {
         if levels > self.prev_levels {
             self.move_noop_streak.clear();
             self.suppressed_moves.clear();
+            self.level_total_changes = 0;
+            self.action_use_counts.clear();
         }
         if !self.suppressed_moves.is_empty() {
             let filtered: Vec<u32> = available.iter().copied()
@@ -1218,6 +1231,32 @@ impl VortexWorldModel {
                 self.suppressed_moves.clear();
                 self.move_noop_streak.clear();
             }
+        }
+
+        // ── MENU / CONFIRM AWARENESS ──────────────────────────────────────
+        // A board where NOTHING has responded after several steps is most
+        // likely a start screen or confirmation prompt, not a hostile
+        // level — cycle the rare actions (confirm-like 5 and 7 first)
+        // until something reacts.
+        if self.level_total_changes == 0 && self.step_in_game >= 8 {
+            let mut order: Vec<u32> = available.iter().copied()
+                .filter(|a| *a == 5 || *a == 7)
+                .chain(available.iter().copied().filter(|a| *a != 5 && *a != 7 && *a != 6))
+                .collect();
+            if order.is_empty() {
+                order = available.clone();
+            }
+            let pick = order[(self.step_in_game as usize / 2) % order.len()];
+            info!("MENU PROBE: board silent for {} steps — trying action {}", self.step_in_game, pick);
+            *self.action_use_counts.entry(pick).or_insert(0) += 1;
+            self.prev_grid = Some(grid);
+            self.last_action_id = Some(pick);
+            self.step_in_game += 1;
+            return PolicyDecision {
+                action: if pick == 6 { "6:32,32".to_string() } else { pick.to_string() },
+                confidence: 0.3,
+                reasoning: format!("menu probe: zero grid response in {} steps", self.step_in_game),
+            };
         }
 
         // ── OBJECT EXTRACTION + TRACKING ──────────────────────────────────
@@ -1879,6 +1918,7 @@ impl VortexWorldModel {
         }
 
         // Save state for next step
+        *self.action_use_counts.entry(action_id).or_insert(0) += 1;
         self.prev_grid = Some(grid);
         self.last_action_id = Some(action_id);
         self.step_in_game += 1;
@@ -1934,10 +1974,14 @@ impl VortexWorldModel {
                 .copied()
                 .collect();
             if !alternatives.is_empty() {
-                let idx = self.diversity_index % alternatives.len();
+                // Novelty-weighted: escape toward the LEAST-tried action
+                // this level, not a blind rotation — unexplored inputs
+                // carry the most information.
                 self.diversity_index += 1;
-                let action = alternatives[idx];
-                info!("STUCK ESCAPE: was repeating action_{}, trying action_{}", stuck_action, action);
+                let action = alternatives.iter().copied()
+                    .min_by_key(|a| self.action_use_counts.get(a).copied().unwrap_or(0))
+                    .unwrap_or(alternatives[self.diversity_index % alternatives.len()]);
+                info!("STUCK ESCAPE: was repeating action_{}, trying least-tried action_{}", stuck_action, action);
                 let d = self.make_decision(action, 0.25, grid,
                     format!("stuck_escape: breaking action_{} loop, trying action_{}", stuck_action, action));
                 self.current_level_actions.push(d.action.clone());
