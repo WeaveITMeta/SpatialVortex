@@ -68,6 +68,7 @@ pub mod vortex_diffusion;
 pub mod vortex_planner;
 pub mod parallel_fusion;
 pub mod grid_encoder;
+pub mod grid_tokenizer;
 pub mod arc_trajectory;
 pub mod causal_model;
 pub mod symbol_resolver;
@@ -178,6 +179,10 @@ pub use reasoning_engine::{
 };
 pub use recursive_chains::{SNOATNode, SNOATChain, ChainPathwayReasoner};
 pub use vortex_planner::{VortexSymbolicPlanner, PlanStep, PlanTrace, SacredGateResult};
+pub use grid_tokenizer::{
+    GridTokenizer,
+    BYTE_VOCAB, TOK_MASK, TOK_PAD, TOK_SEP, TOK_ACT_BASE, NUM_ACTIONS, VOCAB_SIZE,
+};
 pub use grid_encoder::{
     GridEncoder, GridEncoderConfig, EncodedGrid, TransformEncoding,
     ArcGrid, CellEmbedding, FluxPositionMap, SacredGateResult as GridSacredGateResult,

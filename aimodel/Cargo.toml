@@ -142,6 +142,10 @@ name = "vortex-cli"
 path = "src/bin/vortex_cli.rs"
 
 [[bin]]
+name = "corpus_extract"
+path = "src/bin/corpus_extract.rs"
+
+[[bin]]
 name = "arc-eval"
 path = "src/bin/arc_eval.rs"
 
