@@ -29,13 +29,19 @@ members = [
     "crates/vortex-core",
     "crates/vortex-grid2d",
     "crates/vortex-scene3d",
+    "crates/vortex-world-model",
+    "crates/arc-sim",
 ]
 
 resolver = "2"
 
 [workspace.dependencies]
-# Core Bevy 0.18 (uses wgpu 28 for Slint GPU renderer compatibility)
-bevy = { version = "0.18", default-features = false }
+# Core Bevy 0.19 (uses wgpu 29 for Slint GPU renderer compatibility).
+# Must match EustressEngine/eustress/Cargo.toml — the submodule's crates are
+# members of THIS workspace and inherit `workspace = true`, so a version skew
+# here compiles 0.19-era engine code against the older Bevy API (submodule
+# commit 2de13f0 migrated 0.18 -> 0.19, avian 0.6 -> 0.7, wgpu 28 -> 29).
+bevy = { version = "0.19", default-features = false }
 
 # Synced from EustressEngine/eustress/Cargo.toml workspace.dependencies —
 # engine crates inherit these and this outer workspace must define them too
@@ -84,8 +90,8 @@ loro = "1.4"  # High-perf CRDT library
 bevy_quinnet = "0.14"  # QUIC client/server for P2P (Bevy 0.19 compatible)
 quinn = "0.11"  # Underlying QUIC transport
 
-# Physics (Avian 0.6.0 — crates.io release, Bevy 0.18 compatible)
-avian3d = { version = "0.6", default-features = false, features = ["3d", "f32", "parry-f32", "debug-plugin", "parallel", "collider-from-mesh", "bevy_scene", "xpbd_joints"] }
+# Physics (Avian 0.7.0 — crates.io release, Bevy 0.19 compatible)
+avian3d = { version = "0.7", default-features = false, features = ["3d", "f32", "parry-f32", "debug-plugin", "parallel", "collider-from-mesh", "bevy_scene", "xpbd_joints"] }
 
 # Luau scripting runtime (Roblox Luau via mlua)
 mlua = { version = "0.10", features = ["luau", "serialize", "send"] }
