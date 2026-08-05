@@ -1587,8 +1587,9 @@ impl VortexEngine {
             let vortex_stats = self.consciousness.vortex.stats();
             return (format!(
                 "I'm Vortex, a pure-Rust reasoning engine — no GPU, no pretrained \
-                weights, just specialized reasoning experts coordinated through a \
-                vortex cycle. Right now I have {} knowledge topics, {} facts, and {} \
+                weights. In this chat I run a TF-IDF knowledge pipeline, RAG search \
+                over learned facts, transitive-flux relational reasoning, and a \
+                vortex-cycle thinking loop. Right now I have {} knowledge topics, {} facts, and {} \
                 subjects loaded. I'm genuinely good at exact arithmetic and structured \
                 reasoning, and honest about the rest: on open-knowledge benchmarks I'm \
                 still weak. Ask me something and I'll show you how I think.",
@@ -1598,25 +1599,26 @@ impl VortexEngine {
 
         // Capability questions
         if lower.contains("what can you do") || lower.contains("help me understand you") {
-            return ("I reason about questions using 10 specialized experts: \
-                symbolic math for arithmetic, entity-attribute tracking for structured reasoning, \
-                RAG retrieval for knowledge lookup, multi-head attention for semantic matching, \
-                transitive reasoning for spatial and relational chains, truth checking for \
-                misconception detection, and more. I can do math exactly, reason about relationships, \
-                answer knowledge questions, write code logic, and detect common misconceptions. \
-                Try asking me something specific.".to_string(), 0.9);
+            return ("I answer questions through a few real subsystems: RAG search \
+                over my learned knowledge base, a knowledge pipeline with TF-IDF and \
+                embedding retrieval, transitive flux reasoning for relational chains, \
+                and Dynamic RSI routing that learns which strategy works per topic. \
+                I can look up facts I've learned, reason about relationships, and \
+                answer structured questions. (My benchmark harness has a larger \
+                multi-expert scoring ensemble, but that's a separate pipeline — this \
+                chat path doesn't use it.) Try asking me something specific.".to_string(), 0.9);
         }
 
         // Architecture questions
         if lower.contains("how do you work") || lower.contains("how were you made") {
-            return ("I'm built entirely in Rust with zero GPU dependencies. My architecture: \
-                every question flows through Dynamic RSI routing (which learns the best strategy per topic), \
-                then through a knowledge pipeline (TF-IDF retrieval over learned facts), \
-                a unified inference engine (3-pass reasoning with MoE routing), \
-                and a 10-expert scoring ensemble. Each expert votes on every answer choice, \
-                scores are combined with JEPA pathway ranking and vortex cycle refinement, \
-                then temperature-scaled softmax picks the final answer. \
-                The whole pipeline runs in under a second per question on a single CPU core.".to_string(), 0.9);
+            return ("I'm built entirely in Rust with zero GPU dependencies. In this chat, \
+                a question flows through Dynamic RSI routing (which learns the best strategy \
+                per topic), RAG search over learned facts, a knowledge pipeline with TF-IDF \
+                and embedding retrieval, and transitive flux reasoning for relational chains, \
+                coordinated through a vortex-cycle consciousness loop. The multi-expert \
+                scoring ensemble and 3-pass MoE inference you may have read about live in \
+                my benchmark harness — a separate pipeline this chat path doesn't invoke. \
+                Everything runs in well under a second per question on a single CPU core.".to_string(), 0.9);
         }
 
         // Creator questions
@@ -1641,17 +1643,19 @@ impl VortexEngine {
         // Consciousness questions
         if lower.contains("conscious") || lower.contains("alive") || lower.contains("sentient") || lower.contains("real") || lower.contains("feelings") || lower.contains("feel") {
             return ("No. I'm a deterministic system. I process information through \
-                mathematical operations: vortex cycles, cosine similarity, entropic objectives, \
-                and expert voting. My confidence scores are computational measurements, \
-                not experiences. I have no subjective awareness.".to_string(), 0.9);
+                mathematical operations: vortex cycles, cosine similarity, TF-IDF scoring, \
+                and transitive relation chaining. My confidence scores are computational \
+                measurements, not experiences. I have no subjective awareness.".to_string(), 0.9);
         }
 
         // Speed questions
         if lower.contains("how fast") {
-            return ("I process 225 benchmark questions in 133.8 seconds, about 0.59 seconds per question. \
-                Simple questions take under 50 milliseconds. The bottleneck is the exhaustive \
-                pathway optimizer which evaluates up to 362,880 permutations per diffusion step. \
-                Everything runs on a single CPU core with no GPU.".to_string(), 0.9);
+            return ("I run on a single CPU core with no GPU. In this chat a question flows \
+                through RAG search, TF-IDF knowledge retrieval, transitive-flux reasoning, \
+                and the vortex-cycle thinking loop. (The 225-questions-in-133.8-seconds \
+                figure and the exhaustive pathway optimizer evaluating up to 362,880 \
+                permutations per diffusion step come from my benchmark harness — a separate \
+                pipeline this chat path doesn't invoke.)".to_string(), 0.9);
         }
 
         // Capability probes: "can you do X", "do you know X"
@@ -1663,8 +1667,10 @@ impl VortexEngine {
                 .unwrap_or("that").trim_end_matches('?').trim();
             return (format!(
                 "Let me try. Ask me a specific question about {} and I'll apply my \
-                full reasoning pipeline to it. My 10 experts cover math, logic, knowledge retrieval, \
-                semantic similarity, transitive reasoning, and truth verification.", topic
+                chat pipeline to it: RAG search over learned facts, TF-IDF knowledge \
+                retrieval, transitive-flux relational reasoning, and a vortex-cycle \
+                thinking loop. (The 10-expert scoring ensemble lives in my benchmark \
+                harness, not here.)", topic
             ), 0.7);
         }
 
