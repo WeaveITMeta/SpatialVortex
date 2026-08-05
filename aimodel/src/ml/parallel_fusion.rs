@@ -785,6 +785,12 @@ pub struct FluxMatrixProcessor {
     pub sacred_positions: [usize; 3],
     /// Transitive chain validator for sacred gate checks
     pub validator: TransitiveChainValidator,
+    /// Injected six-head spatial encoder (context → embedding). Defaults to the
+    /// deterministic `FallbackHashEncoder` so aimodel builds and tests
+    /// standalone; the engine swaps in a real Candle-backed six-head encoder via
+    /// `with_encoder` / `set_encoder`. This replaces the inline hash embedding
+    /// that `query_to_flux_object` used to build (now `FallbackHashEncoder`).
+    pub encoder: Box<dyn crate::ml::flux_walk::SpatialEncoder>,
 }
 
 impl Default for FluxMatrixProcessor {
@@ -793,6 +799,7 @@ impl Default for FluxMatrixProcessor {
             vortex_cycle: [1, 2, 4, 8, 7, 5],
             sacred_positions: [3, 6, 9],
             validator: TransitiveChainValidator::default(),
+            encoder: crate::ml::flux_walk::default_encoder(),
         }
     }
 }
@@ -800,35 +807,63 @@ impl Default for FluxMatrixProcessor {
 impl FluxMatrixProcessor {
     pub fn new() -> Self { Self::default() }
 
+    /// Builder: inject a real six-head `SpatialEncoder` (e.g. the engine's
+    /// CandleEmbedder bridge) at construction time. Preserves the vortex/sacred
+    /// configuration.
+    pub fn with_encoder(encoder: Box<dyn crate::ml::flux_walk::SpatialEncoder>) -> Self {
+        Self { encoder, ..Self::default() }
+    }
+
+    /// Swap the encoder on an existing processor at runtime.
+    pub fn set_encoder(&mut self, encoder: Box<dyn crate::ml::flux_walk::SpatialEncoder>) {
+        self.encoder = encoder;
+    }
+
     /// Convert a query string into a FluxObject at position 1.
+    ///
+    /// The embedding now comes from the injected six-head `SpatialEncoder`; the
+    /// inline hash embedding this method used to build has moved to
+    /// `FallbackHashEncoder` in `crate::ml::flux_walk` (used only as the
+    /// standalone fallback). The digital-root `value` — which selects the
+    /// starting trigram — is still derived from a stable hash of the query bytes,
+    /// independent of the embedding, so the 1→2→4→8→7→5 entry point is
+    /// byte-for-byte unchanged even when a real encoder is injected.
     pub fn query_to_flux_object(&self, query: &str) -> FluxObject {
-        // Build a simple hash-based embedding (real use: replace with text encoder)
+        let ctx = crate::ml::flux_walk::NodeContext::from_query(query);
+        let embedding = self.encoder.encode(&ctx).embedding;
+
+        // Digital-root start position: positional index only, not the semantic
+        // embedding. Kept as a stable byte-hash so the walk entry point is
+        // preserved exactly.
         let mut h = DefaultHasher::new();
         for byte in query.as_bytes() { h.write_u8(*byte); }
         let hash = h.finish();
-
-        let dim = 64usize;
-        let embedding: Vec<f32> = (0..dim)
-            .map(|i| {
-                let v = hash.wrapping_add(i as u64).wrapping_mul(6364136223846793005);
-                (v as i64 as f32) / (i64::MAX as f32)
-            })
-            .collect();
-
-        // Normalize
-        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let embedding = if norm > 1e-8 {
-            embedding.iter().map(|x| x / norm).collect()
-        } else {
-            embedding
-        };
 
         FluxObject {
             value: self.digital_root(hash),
             embedding,
             query: query.to_string(),
-            label: format!("pos1:{}", &query[..query.len().min(20)]),
+            label: format!("pos1:{}", crate::ml::flux_walk::safe_truncate(query, 20)),
         }
+    }
+
+    /// Gated pointer-walk entry point (the six-head decoder side). Delegates to
+    /// `crate::ml::flux_walk::pointer_walk`, which streams the vortex cycle and
+    /// ranks each node's REAL authored neighbors from `provider`, returning the
+    /// same `(ReasoningPath, Vec<bool>)` shape as `process_query`. `process_query`
+    /// remains the legacy fallback so inference stays live during the transition.
+    pub fn walk_query(
+        &self,
+        decoder: &dyn crate::ml::flux_walk::WalkDecoder,
+        provider: &dyn crate::ml::flux_walk::CandidateProvider,
+        query: &str,
+        start_node_id: u64,
+        seed: u64,
+        max_steps: usize,
+    ) -> (ReasoningPath, Vec<bool>) {
+        crate::ml::flux_walk::pointer_walk(
+            self, decoder, provider, query, start_node_id, seed, max_steps,
+        )
     }
 
     /// Digital root: reduce to single digit 1-9.

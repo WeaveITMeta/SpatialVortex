@@ -34,3 +34,4 @@ eval_results_forge.json
 
 # Local API server state — contains live keys
 vortex_keys.json
+corpus.jsonl

@@ -43,6 +43,12 @@ forge = ["dep:forge-orchestration"]
 # Core
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# Parses Eustress's real on-disk `_instance.toml` interchange format so aimodel
+# speaks the engine's schema directly (see ml::eustress_schema). Deliberately a
+# FORMAT boundary, not a link boundary: eustress-common is Bevy-coupled
+# (bevy_render/bevy_pbr/bevy_gltf) and depending on it would drag the whole
+# render stack into this CPU-only crate.
+toml = "0.8"
 thiserror = "1.0"
 anyhow = "1.0"
 tokio = { version = "1.48", features = ["full"] }
@@ -81,8 +87,11 @@ linfa-reduction = { version = "0.8", optional = true }
 linfa-linear = { version = "0.8", optional = true }
 ndarray = { version = "0.16", optional = true, features = ["rayon"] }
 
-# Apache Iggy streaming (ARC-AGI-3 agent bridge, Eustress platform)
-iggy = { version = "0.9", default-features = false }
+# Streaming for the ARC-AGI-3 agent bridge now goes through Eustress Streams
+# (crates/stream), not Apache Iggy. Iggy was removed: it was vestigial (only the
+# deprecated arc-agent-iggy stub referenced it) and it dragged in
+# compio-quic → rustls → aws-lc-sys, whose C build (cmake/nasm) broke
+# `cargo test`/benchmark builds on this host. See SpatialVortexArchitecture.csv.
 bytes = "1.7"
 
 # Vortex Grid2D — structural analysis for ARC-AGI-3 grids
@@ -150,10 +159,6 @@ name = "arc-eval"
 path = "src/bin/arc_eval.rs"
 
 [[bin]]
-name = "arc-agent-iggy"
-path = "src/bin/arc_agent_iggy.rs"
-
-[[bin]]
 name = "vortex-api"
 path = "src/bin/vortex_api.rs"
 required-features = ["web"]
@@ -162,8 +167,3 @@ required-features = ["web"]
 name = "forge-eval"
 path = "src/bin/forge_eval.rs"
 required-features = ["forge"]
-
-# Patch iggy_common 0.9.0: fix cfg guard on posix_fadvise to exclude Windows.
-# Same patch used in eustress workspace.
-[patch.crates-io]
-iggy_common = { path = "../eustress/EustressEngine/eustress/.patches/iggy_common-0.9.0" }

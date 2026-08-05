@@ -78,7 +78,6 @@
 //!
 //! ### Serving — High-Performance API
 //! - [`ContinuousBatchScheduler`] — 1200+ RPS continuous batching
-//! - [`MoEGate`] — Expert routing for inference
 //! - [`MCPServer`] — Model Context Protocol server
 //!
 //! ## Feature Flags
@@ -203,9 +202,6 @@ pub use ml::{
     WebCrawler, CrawlerConfig,
 };
 
-// Swarm intelligence
-pub use ml::{SacredSwarm, SacredSwarmConfig, SwarmAgent, SwarmTask};
-
 // JEPA
 pub use ml::{JEPAConfig, JEPAPredictor, QuantumJEPAOptimizer};
 
@@ -237,7 +233,6 @@ pub use cognition::{
 
 pub use serving::{
     ContinuousBatchScheduler, BatchConfig,
-    MoEGate, ExpertType,
     MCPServer, MCPServerConfig,
 };
 #[cfg(feature = "web")]

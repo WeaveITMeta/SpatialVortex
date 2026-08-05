@@ -107,10 +107,27 @@ impl SubwordTokenizer {
     fn add_token(&mut self, text: &str, id: u32) {
         self.vocab.insert(id, text.to_string());
         self.token_to_id.insert(text.to_string(), id);
-        // Initialize embedding with Xavier initialization
+        // Xavier-scaled pseudo-random init via hashing (id, dim) -> value.
+        // The previous scheme, sin(id*0.1 + i*0.01), sweeps less than half a
+        // sine period across embed_dim=256 dimensions, so different token IDs
+        // produce near-identical curve shapes just phase-shifted — nearly
+        // every token embedding starts out cosine ~1.0 with every other one,
+        // before any training. Box-Muller over a hash of (id, dim) gives each
+        // (token, dimension) pair an independent, deterministic, roughly
+        // Gaussian value instead, so tokens are genuinely decorrelated at init.
+        use std::hash::{Hash, Hasher};
         let scale = (2.0 / self.embed_dim as f32).sqrt();
         let embedding: Vec<f32> = (0..self.embed_dim)
-            .map(|i| ((id as f32 * 0.1 + i as f32 * 0.01).sin() * scale))
+            .map(|i| {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                id.hash(&mut hasher);
+                i.hash(&mut hasher);
+                let h = hasher.finish();
+                let u1 = ((h & 0xFFFF_FFFF) as f32 / u32::MAX as f32).max(1e-7);
+                let u2 = (((h >> 32) & 0xFFFF_FFFF) as f32 / u32::MAX as f32).max(1e-7);
+                let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+                z * scale
+            })
             .collect();
         self.embeddings.insert(id, embedding);
     }
@@ -1191,155 +1208,6 @@ impl ExpertType {
     }
 }
 
-/// Dynamic MoE router that routes to ALL experts with weighted contributions
-#[derive(Debug, Clone)]
-pub struct DynamicMoERouter {
-    /// Expert weights (learned)
-    pub expert_weights: HashMap<ExpertType, f32>,
-    /// Expert embeddings for routing
-    pub expert_embeddings: HashMap<ExpertType, Vec<f32>>,
-    /// Embedding dimension
-    pub embed_dim: usize,
-    /// Minimum weight threshold
-    pub min_weight: f32,
-    /// Temperature for softmax
-    pub temperature: f32,
-}
-
-impl DynamicMoERouter {
-    pub fn new(embed_dim: usize) -> Self {
-        let mut expert_weights = HashMap::new();
-        let mut expert_embeddings = HashMap::new();
-        
-        // Initialize all experts with equal weights
-        for expert in ExpertType::all() {
-            expert_weights.insert(expert, 1.0);
-            
-            // Create unique embedding for each expert
-            let embedding: Vec<f32> = (0..embed_dim)
-                .map(|i| {
-                    let seed = expert as usize * 1000 + i;
-                    ((seed as f32 * 0.1).sin() + (seed as f32 * 0.03).cos()) * 0.5
-                })
-                .collect();
-            expert_embeddings.insert(expert, embedding);
-        }
-        
-        Self {
-            expert_weights,
-            expert_embeddings,
-            embed_dim,
-            min_weight: 0.01,
-            temperature: 1.0,
-        }
-    }
-    
-    /// Route to all experts with weighted contributions based on input
-    pub fn route(&self, input_embedding: &[f32]) -> Vec<(ExpertType, f32)> {
-        let mut scores: Vec<(ExpertType, f32)> = ExpertType::all()
-            .into_iter()
-            .map(|expert| {
-                let expert_embed = self.expert_embeddings.get(&expert).unwrap();
-                let base_weight = *self.expert_weights.get(&expert).unwrap_or(&1.0);
-                
-                // Compute similarity between input and expert embedding
-                let similarity = cosine_similarity(input_embedding, expert_embed);
-                
-                // Combine base weight with similarity
-                let score = base_weight * (1.0 + similarity);
-                (expert, score)
-            })
-            .collect();
-        
-        // Apply softmax with temperature
-        let max_score = scores.iter().map(|(_, s)| *s).fold(f32::NEG_INFINITY, f32::max);
-        let exp_scores: Vec<f32> = scores.iter()
-            .map(|(_, s)| ((s - max_score) / self.temperature).exp())
-            .collect();
-        let sum_exp: f32 = exp_scores.iter().sum();
-        
-        // Normalize and apply minimum weight
-        scores.iter()
-            .zip(exp_scores.iter())
-            .map(|((expert, _), &exp_score)| {
-                let weight = (exp_score / sum_exp).max(self.min_weight);
-                (*expert, weight)
-            })
-            .collect()
-    }
-    
-    /// Route based on question complexity
-    pub fn route_by_complexity(&self, question: &str, input_embedding: &[f32]) -> Vec<(ExpertType, f32)> {
-        let question_lower = question.to_lowercase();
-        
-        // Analyze question complexity
-        let has_math = question.chars().any(|c| c.is_ascii_digit()) 
-            || ["calculate", "compute", "sum", "total", "how many", "how much"]
-                .iter().any(|kw| question_lower.contains(kw));
-        
-        let has_causal = ["because", "why", "cause", "effect", "result", "therefore"]
-            .iter().any(|kw| question_lower.contains(kw));
-        
-        let has_temporal = ["when", "before", "after", "first", "then", "finally"]
-            .iter().any(|kw| question_lower.contains(kw));
-        
-        let has_knowledge = ["what is", "who is", "where is", "define", "explain"]
-            .iter().any(|kw| question_lower.contains(kw));
-        
-        let word_count = question.split_whitespace().count();
-        let is_complex = word_count > 15 || question.contains(',');
-        
-        // Get base routing
-        let mut routing = self.route(input_embedding);
-        
-        // Boost relevant experts based on question analysis
-        for (expert, weight) in &mut routing {
-            match expert {
-                ExpertType::Math if has_math => *weight *= 2.0,
-                ExpertType::Causal if has_causal => *weight *= 1.8,
-                ExpertType::Temporal if has_temporal => *weight *= 1.5,
-                ExpertType::RAG if has_knowledge => *weight *= 1.7,
-                ExpertType::Commonsense if !is_complex => *weight *= 1.3,
-                ExpertType::Attention if is_complex => *weight *= 1.5,
-                _ => {}
-            }
-        }
-        
-        // Re-normalize
-        let total: f32 = routing.iter().map(|(_, w)| *w).sum();
-        for (_, weight) in &mut routing {
-            *weight /= total;
-        }
-        
-        routing
-    }
-    
-    /// Update expert weights based on success/failure
-    pub fn update_weights(&mut self, expert: ExpertType, success: bool, learning_rate: f32) {
-        if let Some(weight) = self.expert_weights.get_mut(&expert) {
-            if success {
-                *weight *= 1.0 + learning_rate;
-            } else {
-                *weight *= 1.0 - learning_rate * 0.5;
-            }
-            *weight = weight.clamp(0.1, 10.0);
-        }
-    }
-    
-    /// Get top-k experts by weight
-    pub fn top_k(&self, routing: &[(ExpertType, f32)], k: usize) -> Vec<(ExpertType, f32)> {
-        let mut sorted = routing.to_vec();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        sorted.into_iter().take(k).collect()
-    }
-}
-
-impl Default for DynamicMoERouter {
-    fn default() -> Self {
-        Self::new(256)
-    }
-}
-
 // =============================================================================
 // Generation Head (Latent → Token Logits)
 // =============================================================================
@@ -2283,8 +2151,70 @@ impl GenerativeVortexEngine {
                                 self.generation_head.bias[v] -= lr * grad;
                             }
                         }
+
+                        // Update the raw token embeddings themselves. Everything above
+                        // (CALM encoder/decoder, contrastive projection, generation_head)
+                        // trains — but none of it touches self.tokenizer.embeddings, which
+                        // is what get_embedding()/get_embeddings() actually return. Without
+                        // this, the tokenizer's embeddings never move from init no matter
+                        // how many epochs run. Nudge context tokens toward the real target
+                        // token's embedding, scaled by how wrong the current prediction is
+                        // (1 - P(target)), so confident-correct predictions barely move
+                        // anything and confident-wrong ones move more; a real, correctly-
+                        // shaped per-dimension gradient (not a scalar broadcast across all
+                        // latent_dim slots, which is what the older `pretrain` method above
+                        // does and why it also would not have produced separated embeddings).
+                        let target_embed = self.tokenizer.get_embedding(target_token as u32);
+                        let p_target = probs.get(target_token).copied().unwrap_or(0.0);
+                        let embed_lr = lr * (1.0 - p_target) * 0.5;
+                        if embed_lr > 1e-6 {
+                            let grad_vec: Vec<f32> = ctx_embed
+                                .iter()
+                                .zip(target_embed.iter())
+                                .map(|(&c, &t)| c - t)
+                                .collect();
+                            for &ctx_token in ctx_tokens {
+                                self.tokenizer.update_embedding(ctx_token, &grad_vec, embed_lr);
+                            }
+                        }
+
+                        // Negative sampling: an attraction-only update (above) has no force
+                        // opposing it, so it collapses the whole embedding space toward a
+                        // common point as training progresses — confirmed empirically, mean
+                        // random-vocab-pair cosine similarity climbed from 0.982 at 3 epochs
+                        // to 0.997 at 10 epochs, even as gen_loss kept falling. This is the
+                        // standard word2vec/skip-gram-negative-sampling counter-force: push
+                        // context embeddings away from a handful of random non-target tokens
+                        // each step, same functional form as the positive update, opposite sign.
+                        const NUM_NEG: usize = 5;
+                        let vocab_n = self.tokenizer.vocab_size() as u64;
+                        if vocab_n > (NUM_NEG as u64 + 1) {
+                            for k in 0..NUM_NEG {
+                                let mix = self
+                                    .training_steps
+                                    .wrapping_mul(2_654_435_761)
+                                    .wrapping_add(pos.wrapping_mul(97))
+                                    .wrapping_add(k * 40_503);
+                                let neg_id = (mix as u64 % vocab_n) as u32;
+                                if neg_id == target_token as u32 {
+                                    continue;
+                                }
+                                let neg_embed = self.tokenizer.get_embedding(neg_id);
+                                let neg_grad: Vec<f32> = ctx_embed
+                                    .iter()
+                                    .zip(neg_embed.iter())
+                                    .map(|(&c, &n)| n - c) // opposite sign of the positive update
+                                    .collect();
+                                let neg_lr = embed_lr * 0.3;
+                                if neg_lr > 1e-6 {
+                                    for &ctx_token in ctx_tokens {
+                                        self.tokenizer.update_embedding(ctx_token, &neg_grad, neg_lr);
+                                    }
+                                }
+                            }
+                        }
                     }
-                    
+
                     self.training_steps += 1;
                 }
             }

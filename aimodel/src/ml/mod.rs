@@ -24,9 +24,9 @@ pub mod betr_selector;
 pub mod integration_test;
 pub mod jepa;
 pub mod neuro_symbolic;
-pub mod task_specific_moe;
+
 pub mod sacred_moe;
-pub mod sacred_swarm;
+
 pub mod generative_arch;
 pub mod transitive_flux;
 pub mod stacked_flux;
@@ -50,10 +50,6 @@ pub use betr_selector::{
     BETRConfig, BenchmarkEmbeddingStore, BETRDocumentScorer, BETRDataSelector,
     BenchmarkEmbedding, ScoredDocument, create_betr_selector,
 };
-pub use task_specific_moe::{
-    TaskSpecificSacredMoE, TaskSpecificMoEConfig, TaskExpertCluster,
-    TaskCategory, ClusterTrainingStats, BenchmarkRouter,
-};
 pub use test_time_compute::{TTCWrapper, TTCConfig};
 pub mod unified_knowledge_pipeline;
 pub mod sacred_attention;
@@ -72,6 +68,9 @@ pub mod grid_tokenizer;
 pub mod arc_trajectory;
 pub mod causal_model;
 pub mod symbol_resolver;
+pub mod flux_walk;
+pub mod spatial_corpus;
+pub mod eustress_schema;
 
 pub use parallel_fusion::{
     SpectralConsensus,
@@ -86,6 +85,20 @@ pub use parallel_fusion::{
     Projection, VonNeumannMerger,
     ExplorerConfig, ExhaustiveExplorer,
     factorial, index_to_permutation,
+};
+
+pub use flux_walk::{
+    NodeId, Head, Oklch, SpatialPos, OcclusionFlags, TypedEdge,
+    NodeContext, HeadAttribution, EncodedNode, RankedCandidate, StepState,
+    SpatialEncoder, WalkDecoder, CandidateProvider,
+    FallbackHashEncoder, GatedPointerDecoder,
+    TableEncoder, SemanticRankDecoder, ProximityCandidateProvider,
+    ReferenceResolver, ReferenceAugmentedProvider,
+    default_encoder, default_decoder, pointer_walk,
+    band_range, digital_root, safe_truncate,
+    VORTEX_CYCLE as FLUX_WALK_VORTEX_CYCLE,
+    SACRED_POSITIONS as FLUX_WALK_SACRED_POSITIONS,
+    FLUX_EMBED_DIM,
 };
 
 pub use hallucinations::{VortexContextPreserver, HallucinationResult};
@@ -133,12 +146,6 @@ pub use sacred_moe::{
     MultiHeadLatentAttention, MoEOutput, ModelStats,
     SacredObservation, ControlSignal, ReasoningSignal,
     PHI, PHI_INV, SACRED_POSITIONS, VORTEX_CYCLE,
-};
-pub use sacred_swarm::{
-    SacredSwarmConfig, SacredSwarm, SwarmAgent, SwarmTask,
-    AgentSpecialization as SwarmAgentSpecialization, AgentState, TaskState,
-    SwarmStepResult, SwarmRunResult, SwarmStats,
-    GeometricOptimizer,
 };
 pub use generative_arch::{
     SubwordTokenizer, SubwordToken,
