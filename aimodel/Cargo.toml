@@ -19,9 +19,13 @@ path = "src/lib.rs"
 [features]
 default = ["burn-cpu", "web-learning"]  # Burn (pure Rust) instead of onnx
 onnx = ["ort", "tokenizers"]
-burn-cpu = ["burn", "burn-ndarray", "burn-autodiff"]
-burn-gpu = ["burn", "burn-tch", "burn-autodiff"]
-burn-wgpu = ["burn", "dep:burn-wgpu", "burn-autodiff"]
+# NOTE: `burn/autodiff` (the feature on the burn facade) is what exposes
+# `burn::backend::Autodiff`. Depending on the `burn-autodiff` crate alone
+# leaves `Autodiff` configured out — which is why no training loop could be
+# written against it. Enabling it here is what lets `.backward()` compile.
+burn-cpu = ["burn", "burn/autodiff", "burn-ndarray", "burn-autodiff"]
+burn-gpu = ["burn", "burn/autodiff", "burn-tch", "burn-autodiff"]
+burn-wgpu = ["burn", "burn/autodiff", "dep:burn-wgpu", "burn-autodiff"]
 bevy_viz = ["bevy"]
 transport = ["wtransport"]
 storage = ["rocksdb"]
