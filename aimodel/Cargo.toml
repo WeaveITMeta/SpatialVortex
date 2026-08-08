@@ -79,7 +79,7 @@ wtransport = { version = "0.2", optional = true }
 rocksdb = { version = "0.22", optional = true }
 
 # Vector embeddings
-embedvec = { version = "0.5", optional = true }
+embedvec = { version = "0.10", optional = true }
 
 # Visualization - Bevy 3D
 bevy = { version = "0.15", optional = true }

@@ -26,7 +26,8 @@ use crate::ml::calm::{CALMEngine, CALMConfig, LatentState};
 use crate::ml::pathway::{ExhaustivePathwayOptimizer, PathwayConfig, ScoredPathway};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 
 // =============================================================================
 // Subword Tokenizer with Learned Embeddings
@@ -104,6 +105,27 @@ impl SubwordTokenizer {
         tokenizer
     }
     
+    /// Deterministic Box-Muller init for one token's embedding.
+    ///
+    /// Pure (no `&self`) so a loaded tokenizer can regenerate embeddings
+    /// bit-identically to a fresh run when no sidecar file is present.
+    fn init_embedding(id: u32, embed_dim: usize) -> Vec<f32> {
+        use std::hash::{Hash, Hasher};
+        let scale = (2.0 / embed_dim as f32).sqrt();
+        (0..embed_dim)
+            .map(|i| {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                id.hash(&mut hasher);
+                i.hash(&mut hasher);
+                let h = hasher.finish();
+                let u1 = ((h & 0xFFFF_FFFF) as f32 / u32::MAX as f32).max(1e-7);
+                let u2 = (((h >> 32) & 0xFFFF_FFFF) as f32 / u32::MAX as f32).max(1e-7);
+                let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+                z * scale
+            })
+            .collect()
+    }
+
     fn add_token(&mut self, text: &str, id: u32) {
         self.vocab.insert(id, text.to_string());
         self.token_to_id.insert(text.to_string(), id);
@@ -115,20 +137,7 @@ impl SubwordTokenizer {
         // before any training. Box-Muller over a hash of (id, dim) gives each
         // (token, dimension) pair an independent, deterministic, roughly
         // Gaussian value instead, so tokens are genuinely decorrelated at init.
-        use std::hash::{Hash, Hasher};
-        let scale = (2.0 / self.embed_dim as f32).sqrt();
-        let embedding: Vec<f32> = (0..self.embed_dim)
-            .map(|i| {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                id.hash(&mut hasher);
-                i.hash(&mut hasher);
-                let h = hasher.finish();
-                let u1 = ((h & 0xFFFF_FFFF) as f32 / u32::MAX as f32).max(1e-7);
-                let u2 = (((h >> 32) & 0xFFFF_FFFF) as f32 / u32::MAX as f32).max(1e-7);
-                let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
-                z * scale
-            })
-            .collect();
+        let embedding = Self::init_embedding(id, self.embed_dim);
         self.embeddings.insert(id, embedding);
     }
     
@@ -282,6 +291,209 @@ impl SubwordTokenizer {
     pub fn vocab_size(&self) -> usize {
         self.vocab.len()
     }
+
+    // ---- persistence -------------------------------------------------------
+    //
+    // Without this, `learn_bpe` runs at the top of every `pretrain`/`pretrain_calm`
+    // and the vocabulary is rebuilt from whatever corpus is at hand, then
+    // discarded at process exit. Nothing accumulates across runs, which makes
+    // every other training improvement unbankable.
+    //
+    // Structure goes to JSON; embeddings go to a separate little-endian f32
+    // sidecar — the same split `spatial_corpus.rs` already uses. They are
+    // deliberately NOT one file: `SubwordTokenizer` must not derive
+    // `Serialize`, because that would drag `embeddings` in, and `#[serde(skip)]`
+    // would silently deserialize to an empty map that `get_embedding`'s
+    // `.unwrap_or_default()` masks as zero vectors.
+
+    /// Rebuild `token_to_id` from `vocab`, resolving duplicates by highest id.
+    ///
+    /// Two different merges can yield the same string — `("a","bc")` and
+    /// `("ab","c")` both produce `"abc"` — so `vocab.len()` can exceed
+    /// `token_to_id.len()`. `add_token` overwrites, and ids are handed out
+    /// monotonically, so last-write-wins is highest-id-wins. Rebuilding by
+    /// arbitrary HashMap order would pick a different id and change what
+    /// `tokenize` emits.
+    fn rebuild_token_to_id(vocab: &HashMap<u32, String>) -> HashMap<String, u32> {
+        let mut out: HashMap<String, u32> = HashMap::with_capacity(vocab.len());
+        for (&id, text) in vocab {
+            out.entry(text.clone())
+                .and_modify(|cur| {
+                    if id > *cur {
+                        *cur = id;
+                    }
+                })
+                .or_insert(id);
+        }
+        out
+    }
+
+    /// Write vocabulary, merges and special ids as JSON.
+    pub fn save(&self, path: &Path) -> std::io::Result<()> {
+        let state = TokenizerState {
+            version: 1,
+            embed_dim: self.embed_dim,
+            pad_id: self.pad_id,
+            unk_id: self.unk_id,
+            bos_id: self.bos_id,
+            eos_id: self.eos_id,
+            next_id: self.next_id,
+            vocab: self.vocab.iter().map(|(&k, v)| (k, v.clone())).collect(),
+            merges: self.merges.clone(),
+        };
+        let json = serde_json::to_string_pretty(&state)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, json)
+    }
+
+    /// Read a tokenizer back. Embeddings are regenerated deterministically;
+    /// call [`Self::load_embeddings`] to overlay trained ones.
+    pub fn load(path: &Path) -> std::io::Result<Self> {
+        let text = std::fs::read_to_string(path)?;
+        let state: TokenizerState = serde_json::from_str(&text)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        if state.version != 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("unsupported tokenizer schema version {}", state.version),
+            ));
+        }
+        let vocab: HashMap<u32, String> = state.vocab.into_iter().collect();
+        let token_to_id = Self::rebuild_token_to_id(&vocab);
+        let embeddings = vocab
+            .keys()
+            .map(|&id| (id, Self::init_embedding(id, state.embed_dim)))
+            .collect();
+        Ok(Self {
+            vocab,
+            token_to_id,
+            embeddings,
+            embed_dim: state.embed_dim,
+            pad_id: state.pad_id,
+            unk_id: state.unk_id,
+            bos_id: state.bos_id,
+            eos_id: state.eos_id,
+            merges: state.merges,
+            next_id: state.next_id,
+        })
+    }
+
+    /// Write embeddings as row-major little-endian f32, rows `0..next_id`.
+    pub fn save_embeddings(&self, path: &Path) -> std::io::Result<()> {
+        let mut buf = Vec::with_capacity(self.next_id as usize * self.embed_dim * 4);
+        for id in 0..self.next_id {
+            let row = self.embeddings.get(&id);
+            for i in 0..self.embed_dim {
+                let v = row.and_then(|r| r.get(i)).copied().unwrap_or(0.0);
+                buf.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, buf)
+    }
+
+    /// Overlay trained embeddings from a sidecar written by [`Self::save_embeddings`].
+    pub fn load_embeddings(&mut self, path: &Path) -> std::io::Result<()> {
+        let bytes = std::fs::read(path)?;
+        let expect = self.next_id as usize * self.embed_dim * 4;
+        if bytes.len() != expect {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "embedding sidecar is {} bytes, expected {} ({} rows x {} dims x 4)",
+                    bytes.len(),
+                    expect,
+                    self.next_id,
+                    self.embed_dim
+                ),
+            ));
+        }
+        for id in 0..self.next_id {
+            let start = id as usize * self.embed_dim * 4;
+            let row: Vec<f32> = (0..self.embed_dim)
+                .map(|i| {
+                    let o = start + i * 4;
+                    f32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]])
+                })
+                .collect();
+            self.embeddings.insert(id, row);
+        }
+        Ok(())
+    }
+
+    /// Write `tokenizer.json` + `tokenizer_embeddings.bin` into `dir`.
+    pub fn save_all(&self, dir: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dir)?;
+        self.save(&dir.join("tokenizer.json"))?;
+        self.save_embeddings(&dir.join("tokenizer_embeddings.bin"))
+    }
+
+    /// Read a tokenizer written by [`Self::save_all`].
+    ///
+    /// A missing embedding sidecar is not an error — embeddings fall back to
+    /// their deterministic init, which is what a fresh run would have produced.
+    pub fn load_all(dir: &Path) -> std::io::Result<Self> {
+        let mut tok = Self::load(&dir.join("tokenizer.json"))?;
+        let side = dir.join("tokenizer_embeddings.bin");
+        if side.exists() {
+            tok.load_embeddings(&side)?;
+        }
+        Ok(tok)
+    }
+
+    /// Load a saved tokenizer, or train and save one.
+    ///
+    /// This is the accumulation entry point: after the first call the vocabulary
+    /// and merges are stable across runs, so downstream training is comparable
+    /// run to run instead of sitting on a fresh random vocabulary each time.
+    pub fn load_or_train(
+        dir: &Path,
+        corpus: &[String],
+        num_merges: usize,
+        embed_dim: usize,
+    ) -> Self {
+        if let Ok(tok) = Self::load_all(dir) {
+            return tok;
+        }
+        let mut tok = Self::new(embed_dim);
+        tok.learn_bpe(corpus, num_merges);
+        let _ = tok.save_all(dir);
+        tok
+    }
+
+    /// Whether BPE merges have already been learned.
+    ///
+    /// `learn_bpe` is NOT idempotent — it pushes to `merges` without dedup and
+    /// mints a fresh id per merged token — so calling it on an already-trained
+    /// tokenizer appends a second merge list and silently changes tokenisation.
+    /// Callers that may run against a loaded tokenizer must check this first.
+    pub fn is_trained(&self) -> bool {
+        !self.merges.is_empty()
+    }
+}
+
+/// On-disk form of [`SubwordTokenizer`]'s discrete state.
+///
+/// `BTreeMap` for the vocabulary so key order on disk is deterministic and two
+/// saves of the same tokenizer diff cleanly. `merges` stays a `Vec` because its
+/// ORDER IS LOAD-BEARING: `tokenize` replays merges in sequence, so reordering
+/// them changes the tokenisation.
+#[derive(Serialize, Deserialize)]
+struct TokenizerState {
+    version: u32,
+    embed_dim: usize,
+    pad_id: u32,
+    unk_id: u32,
+    bos_id: u32,
+    eos_id: u32,
+    next_id: u32,
+    vocab: BTreeMap<u32, String>,
+    merges: Vec<(String, String)>,
 }
 
 // =============================================================================
@@ -1855,7 +2067,13 @@ impl GenerativeVortexEngine {
         println!("Pre-training on {} texts for {} epochs...", texts.len(), epochs);
         
         // Learn BPE merges from corpus
-        self.tokenizer.learn_bpe(texts, 1000);
+        // learn_bpe is NOT idempotent: it pushes to `merges` without dedup and
+        // mints a fresh id per merged token, so re-running it on an already
+        // trained tokenizer appends a SECOND merge list and silently changes
+        // tokenisation. Skip when merges already exist (e.g. loaded from disk).
+        if !self.tokenizer.is_trained() {
+            self.tokenizer.learn_bpe(texts, 1000);
+        }
         
         // Update generation head vocab size
         self.generation_head = GenerationHead::new(
@@ -1960,7 +2178,13 @@ impl GenerativeVortexEngine {
         println!("Pre-training CALM weights on {} texts for {} epochs...", texts.len(), epochs);
         
         // First, learn BPE from corpus
-        self.tokenizer.learn_bpe(texts, 1000);
+        // learn_bpe is NOT idempotent: it pushes to `merges` without dedup and
+        // mints a fresh id per merged token, so re-running it on an already
+        // trained tokenizer appends a SECOND merge list and silently changes
+        // tokenisation. Skip when merges already exist (e.g. loaded from disk).
+        if !self.tokenizer.is_trained() {
+            self.tokenizer.learn_bpe(texts, 1000);
+        }
         
         // Update generation head vocab size
         self.generation_head = GenerationHead::new(
@@ -3379,7 +3603,72 @@ mod tests {
         let text = tokenizer.detokenize(&tokens);
         assert_eq!(text, "hello world");
     }
-    
+
+    /// A tokenizer must survive a restart, or nothing accumulates across runs.
+    #[test]
+    fn tokenizer_persistence_roundtrip() {
+        let dir = std::env::temp_dir().join("vortex_tok_roundtrip");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let corpus: Vec<String> = vec![
+            "the quick brown fox jumps over the lazy dog".into(),
+            "the quick brown cat sleeps under the lazy sun".into(),
+            "quick brown foxes and quick brown cats".into(),
+        ];
+        let mut a = SubwordTokenizer::new(64);
+        a.learn_bpe(&corpus, 20);
+        a.save_all(&dir).expect("save");
+
+        let b = SubwordTokenizer::load_all(&dir).expect("load");
+
+        assert_eq!(a.vocab_size(), b.vocab_size(), "vocab size must survive");
+        assert_eq!(a.merges, b.merges, "merge ORDER is load-bearing for tokenize");
+        assert_eq!(a.embed_dim, b.embed_dim);
+        for probe in ["the quick brown fox", "lazy dog", "unseen zzz"] {
+            assert_eq!(a.tokenize(probe), b.tokenize(probe), "tokenisation drifted for {probe:?}");
+        }
+        let t = b.tokenize("the quick brown fox");
+        assert_eq!(b.detokenize(&t), "the quick brown fox");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Duplicate token strings must resolve to the highest id, matching
+    /// `add_token`'s last-write-wins, or a reload changes what `tokenize` emits.
+    #[test]
+    fn token_to_id_rebuild_prefers_highest_id() {
+        let mut vocab: HashMap<u32, String> = HashMap::new();
+        vocab.insert(7, "abc".to_string());
+        vocab.insert(41, "abc".to_string());
+        vocab.insert(3, "zz".to_string());
+        let m = SubwordTokenizer::rebuild_token_to_id(&vocab);
+        assert_eq!(m.get("abc"), Some(&41), "highest id must win");
+        assert_eq!(m.get("zz"), Some(&3));
+    }
+
+    /// `learn_bpe` appends without dedup, so a guard is the only thing stopping
+    /// a loaded tokenizer from silently growing a second merge list.
+    #[test]
+    fn learn_bpe_is_not_idempotent_so_is_trained_guards_it() {
+        let corpus: Vec<String> = vec![
+            "aa bb aa bb cc".into(),
+            "aa bb aa bb dd".into(),
+        ];
+        let mut t = SubwordTokenizer::new(32);
+        assert!(!t.is_trained(), "fresh tokenizer has no merges");
+        t.learn_bpe(&corpus, 5);
+        assert!(t.is_trained());
+        let merges_once = t.merges.len();
+
+        // Demonstrate the hazard the guard exists to prevent.
+        t.learn_bpe(&corpus, 5);
+        assert!(
+            t.merges.len() > merges_once,
+            "learn_bpe appended again — this is why callers must check is_trained()"
+        );
+    }
+
+
     #[test]
     fn test_sacred_attention() {
         let attention = SacredDynamicAttention::new(256, SacredAttentionConfig::default());
