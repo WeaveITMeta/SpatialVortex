@@ -15,6 +15,7 @@ pub mod training;
 pub mod burn_attention;
 pub mod calm;
 pub mod context_ring;
+pub mod trajectory;
 pub mod burn_calm;
 pub mod vortex_discovery;
 pub mod backends;
