@@ -633,12 +633,64 @@ impl CALMEngine {
         }
     }
     
-    /// Train with contrastive learning
-    /// anchor: question embedding
-    /// positive: correct answer embedding
-    /// negatives: wrong answer embeddings
-    pub fn train_contrastive(&mut self, anchor: &[f32], positive: &[f32], negatives: &[Vec<f32>], learning_rate: f32) {
-        let loss = self.contrastive_loss(anchor, positive, negatives);
+    /// Build beams from a flat embedding, matching `embedding_to_beams` in
+    /// `generative_arch` (9 values per beam, position-tagged).
+    ///
+    /// Call sites that hold only an embedding — not the beams that produced it —
+    /// use this so `train_contrastive` receives an encoder input in the layout
+    /// `encode` expects.
+    pub fn beams_from_embedding(&self, embedding: &[f32]) -> Vec<BeamTensor> {
+        embedding
+            .chunks(9)
+            .enumerate()
+            .map(|(chunk_idx, chunk)| {
+                let mut beam = BeamTensor::default();
+                for (i, &val) in chunk.iter().enumerate().take(9) {
+                    beam.digits[i] = val;
+                }
+                beam.position = chunk_idx as u8;
+                beam.confidence = 1.0;
+                beam
+            })
+            .collect()
+    }
+
+    /// Flatten beams into the encoder's input vector, using exactly the same
+    /// layout as [`CALMEngine::encode`] (chunk_size beams x 9 digits, zero-padded).
+    ///
+    /// Exposed so callers can hand the same input to `train_contrastive` that
+    /// `encode` would have consumed — the weight gradient is undefined without it.
+    pub fn encoder_input_from_beams(&self, beams: &[BeamTensor]) -> Vec<f32> {
+        let chunk_size = self.config.chunk_size.min(beams.len());
+        let mut input = Vec::with_capacity(self.config.chunk_size * 9);
+        for beam in beams.iter().take(chunk_size) {
+            input.extend_from_slice(&beam.digits);
+        }
+        while input.len() < self.config.chunk_size * 9 {
+            input.push(0.0);
+        }
+        input
+    }
+
+    /// Train with contrastive learning.
+    ///
+    /// `beams`     : the beams that produced `anchor` (needed for the gradient)
+    /// `anchor`    : question embedding
+    /// `positive`  : correct answer embedding
+    /// `negatives` : wrong answer embeddings
+    ///
+    /// The encoder computes `latent[i] = Σ_j input[j] * W[i*input_dim + j]`, so
+    /// the gradient w.r.t. a weight is `δ[i] * input[j]`. An earlier version of
+    /// this function applied `δ[i]` alone to every `j` in row `i`, which
+    /// translated whole rows uniformly and carried no input-specific signal —
+    /// it could not learn features. `input[j]` is now included.
+    ///
+    /// Still approximate: the tanh derivative on the encoder activation is not
+    /// applied. For a fully correct update use the autodiff path
+    /// (`BurnCALM` + `training::SsoConfig`), which differentiates the real graph.
+    pub fn train_contrastive(&mut self, beams: &[BeamTensor], anchor: &[f32], positive: &[f32], negatives: &[Vec<f32>], learning_rate: f32) {
+        let _loss = self.contrastive_loss(anchor, positive, negatives);
+        let encoder_input = self.encoder_input_from_beams(beams);
         
         // Add to negative buffer for future use
         if self.negative_buffer.len() < 100 {
@@ -676,11 +728,12 @@ impl CALMEngine {
             
             let total_grad = attract_grad * attract_scale + repel_grad * learning_rate;
             
-            // Update encoder weights
+            // Update encoder weights: dL/dW[i][j] = delta[i] * input[j]
             for j in 0..input_dim.min(self.encoder_weights.len() / latent_dim) {
                 let idx = i * input_dim + j;
                 if idx < self.encoder_weights.len() {
-                    self.encoder_weights[idx] += total_grad;
+                    let x_j = encoder_input.get(j).copied().unwrap_or(0.0);
+                    self.encoder_weights[idx] += total_grad * x_j;
                 }
             }
         }

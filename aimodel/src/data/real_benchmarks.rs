@@ -3502,7 +3502,10 @@ impl RealBenchmarkEvaluator {
                 }
                 
                 if !negatives.is_empty() {
-                    self.calm_engine.train_contrastive(anchor, positive, &negatives, lr);
+                    // The encoder gradient needs the input the encoder saw, so
+                    // rebuild beams from the anchor embedding (same layout as encode).
+                    let anchor_beams = self.calm_engine.beams_from_embedding(anchor);
+                    self.calm_engine.train_contrastive(&anchor_beams, anchor, positive, &negatives, lr);
                 }
             }
         }

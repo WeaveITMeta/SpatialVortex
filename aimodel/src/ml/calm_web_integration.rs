@@ -301,7 +301,10 @@ impl CALMSemanticStore {
             .collect();
         
         // Train CALM with contrastive loss
+        // Encoder gradient needs the encoder's input; rebuild beams from the query.
+        let query_beams = self.calm_engine.beams_from_embedding(&query_embedding);
         self.calm_engine.train_contrastive(
+            &query_beams,
             &query_embedding,
             &positive,
             &negatives,

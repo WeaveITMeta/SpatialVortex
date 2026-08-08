@@ -2070,7 +2070,7 @@ impl GenerativeVortexEngine {
                         }
                         
                         if !negatives.is_empty() {
-                            self.calm.train_contrastive(text_embed, positive_embed, &negatives, lr);
+                            self.calm.train_contrastive(beams, text_embed, positive_embed, &negatives, lr);
                             let pos_sim = cosine_similarity(text_embed, positive_embed);
                             let avg_neg_sim: f32 = negatives.iter()
                                 .map(|n| cosine_similarity(text_embed, n))
