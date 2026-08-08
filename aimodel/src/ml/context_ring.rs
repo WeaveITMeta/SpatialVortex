@@ -103,6 +103,11 @@ pub struct ContextRing {
     /// entry vector is emptied (the summary represents it), so `entries.len()`
     /// can no longer answer "how much history is in here" — this can.
     pub represented: usize,
+    /// Salience mass captured at seal time.
+    ///
+    /// Merge weighting needs this, and it must survive entry eviction — once
+    /// `retain_sealed_entries` is off there are no entries left to sum.
+    pub salience_sum: f32,
 }
 
 impl ContextRing {
@@ -116,6 +121,7 @@ impl ContextRing {
             sealed_step: None,
             merge_depth: 1,
             represented: 0,
+            salience_sum: 0.0,
         }
     }
 
@@ -130,8 +136,15 @@ impl ContextRing {
     }
 
     /// Total salience, used to weight this ring during a merge.
+    ///
+    /// Reads the value captured at seal time once entries have been evicted,
+    /// so merge weighting stays correct under `retain_sealed_entries = false`.
     pub fn total_salience(&self) -> f32 {
-        self.entries.iter().map(|e| e.salience).sum()
+        if self.entries.is_empty() {
+            self.salience_sum
+        } else {
+            self.entries.iter().map(|e| e.salience).sum()
+        }
     }
 
     /// Compute the salience-weighted mean of the entries.
@@ -201,11 +214,30 @@ pub struct ContextRingConfig {
     pub headroom: usize,
     /// How many rings a single automatic merge folds together.
     pub merge_span: usize,
+    /// Keep full-resolution entries inside sealed rings.
+    ///
+    /// `true` (default) lets a sealed ring be re-read verbatim, at the cost of
+    /// resident memory scaling with *addressable* entries:
+    /// `(max_rings + 1) * ring_capacity * dim * 4` bytes.
+    ///
+    /// `false` drops entries at seal, keeping only the summary, `represented`,
+    /// and `salience_sum`. Memory then scales with *rings*, not entries —
+    /// which is what makes very large configurations practical. At
+    /// 4096 x 4096 x dim 256 that is the difference between 16 GiB and ~4 MiB.
+    /// The open ring is always full resolution either way.
+    pub retain_sealed_entries: bool,
 }
 
 impl Default for ContextRingConfig {
     fn default() -> Self {
-        Self { dim: 256, ring_capacity: 256, max_rings: 64, headroom: 32, merge_span: 4 }
+        Self {
+            dim: 256,
+            ring_capacity: 256,
+            max_rings: 64,
+            headroom: 32,
+            merge_span: 4,
+            retain_sealed_entries: true,
+        }
     }
 }
 
@@ -213,6 +245,52 @@ impl ContextRingConfig {
     /// Start from defaults.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The wide preset: **16,777,216 addressable entries**.
+    ///
+    /// `4096 x 4096` at `dim = 256`, with sealed-entry retention **off**.
+    ///
+    /// ```text
+    /// addressable   16,777,216   entries represented
+    /// view width         8,191   vectors attention processes per step
+    /// full-res           4,096   entries readable verbatim (the open ring)
+    /// resident          ~4 MiB   summaries + the open ring
+    /// ```
+    ///
+    /// Retention is off because leaving it on costs 16 GiB — the same config
+    /// is otherwise unusable on ordinary hardware. The trade is that a sealed
+    /// ring can no longer be re-read verbatim; its summary, `represented`
+    /// count, and salience mass survive, so merging and attention are
+    /// unaffected.
+    pub fn wide_16m() -> Self {
+        Self {
+            dim: 256,
+            ring_capacity: 4096,
+            max_rings: 4095,
+            headroom: 256,
+            merge_span: 8,
+            retain_sealed_entries: false,
+        }
+    }
+
+    /// Keep or drop full entries in sealed rings. See the field docs.
+    pub fn with_retain_sealed_entries(mut self, retain: bool) -> Self {
+        self.retain_sealed_entries = retain;
+        self
+    }
+
+    /// Resident bytes for embeddings held at full resolution.
+    ///
+    /// With retention on this scales with addressable entries; with it off,
+    /// only the open ring plus one summary per sealed ring is resident.
+    pub fn resident_bytes(&self) -> usize {
+        let per_vec = self.dim * 4;
+        if self.retain_sealed_entries {
+            (self.max_rings + 1) * self.ring_capacity * per_vec
+        } else {
+            self.ring_capacity * per_vec + self.max_rings * per_vec
+        }
     }
     /// Set embedding width.
     pub fn with_dim(mut self, d: usize) -> Self {
@@ -341,9 +419,16 @@ impl ContextRingBuffer {
         let mut ring = std::mem::replace(&mut self.open, ContextRing::new(self.next_id, self.step));
         self.next_id += 1;
         ring.represented = ring.entries.len();
+        ring.salience_sum = ring.entries.iter().map(|e| e.salience.max(0.0)).sum();
         ring.summary = ring.compute_summary(self.config.dim);
         ring.sealed = true;
         ring.sealed_step = Some(self.step);
+        if !self.config.retain_sealed_entries {
+            // Summary + represented + salience_sum carry everything the view
+            // and merge paths need; the raw entries are the expensive part.
+            ring.entries.clear();
+            ring.entries.shrink_to_fit();
+        }
         self.sealed.push_back(ring);
 
         while self.sealed.len() > self.config.max_rings {
@@ -405,6 +490,7 @@ impl ContextRingBuffer {
             sealed_step,
             merge_depth: depth,
             represented,
+            salience_sum: group.iter().map(|r| r.total_salience()).sum(),
         })
     }
 
@@ -592,5 +678,67 @@ mod tests {
         let c = ContextRingConfig::new(); // 256-entry rings, 64 rings
         assert_eq!(c.view_width(), 320);
         assert_eq!(c.addressable_entries(), 16_640);
+    }
+
+    #[test]
+    fn wide_16m_preset_has_the_advertised_shape() {
+        let c = ContextRingConfig::wide_16m();
+        assert_eq!(c.addressable_entries(), 16_777_216, "16M addressable");
+        assert_eq!(c.view_width(), 8_191, "view width attention pays for");
+        assert_eq!(c.ring_capacity, 4_096, "full-resolution window");
+        assert!(!c.retain_sealed_entries, "retention must be off or this costs 16 GiB");
+    }
+
+    #[test]
+    fn dropping_sealed_entries_collapses_resident_memory() {
+        let retained = ContextRingConfig::wide_16m().with_retain_sealed_entries(true);
+        let dropped = ContextRingConfig::wide_16m();
+        assert_eq!(retained.addressable_entries(), dropped.addressable_entries());
+        // Same reach, vastly different cost: ~16 GiB vs a few MiB.
+        assert!(retained.resident_bytes() > 16_000_000_000);
+        assert!(dropped.resident_bytes() < 10_000_000);
+    }
+
+    #[test]
+    fn evicted_rings_keep_summary_representation_and_salience() {
+        let cfg = cfg().with_retain_sealed_entries(false);
+        let mut b = ContextRingBuffer::new(cfg);
+        for i in 0..6 {
+            b.push(ContextEntry::new(vec![(i + 1) as f32; 4]).with_salience(2.0));
+        }
+        assert_eq!(b.sealed_count(), 2);
+        for id in b.sealed_ids() {
+            assert!(b.summary_of(id).is_some(), "summary must survive eviction");
+        }
+        assert_eq!(b.total_represented(), 6, "history count must survive eviction");
+    }
+
+    #[test]
+    fn merge_weighting_survives_entry_eviction() {
+        // With entries gone, merge weighting must fall back to salience_sum
+        // rather than silently treating every ring as weightless.
+        let cfg = cfg().with_retain_sealed_entries(false);
+        let mut b = ContextRingBuffer::new(cfg);
+        // Ring A: high salience, value 10. Ring B: negligible salience, value 0.
+        for _ in 0..3 {
+            b.push(ContextEntry::new(vec![10.0; 4]).with_salience(100.0));
+        }
+        for _ in 0..3 {
+            b.push(ContextEntry::new(vec![0.0; 4]).with_salience(0.01));
+        }
+        let id = b.merge_sealed(2).expect("merge should occur");
+        let s = b.summary_of(id).expect("merged summary");
+        assert!(s[0] > 9.0, "high-salience ring should dominate, got {}", s[0]);
+    }
+
+    #[test]
+    fn open_ring_stays_full_resolution_when_retention_is_off() {
+        let cfg = cfg().with_retain_sealed_entries(false);
+        let mut b = ContextRingBuffer::new(cfg);
+        b.push_embedding(vec![7.0; 4]);
+        b.push_embedding(vec![8.0; 4]);
+        let v = b.view();
+        assert_eq!(v.recent.len(), 2, "open ring is never evicted");
+        assert_eq!(v.recent[0][0], 7.0);
     }
 }
