@@ -38,17 +38,31 @@ use burn::tensor::backend::Backend;
 use burn::tensor::{Int, Tensor, TensorData};
 
 use vortex::ml::burn_attention::{BurnAttentionConfig, BurnMultiHeadAttention};
+use vortex::ml::generative_arch::SubwordTokenizer;
 use vortex::ml::training::SsoConfig;
 
 type B = Autodiff<NdArray>;
 type Dev = <B as Backend>::Device;
 
-const VOCAB: usize = 32_768;
 const DIM: usize = 128;
+/// Fixed so the untrained baseline is reproducible. It drifted 24.9%-28.5%
+/// across runs while Burn's init was unseeded, which made any comparison
+/// against "untrained" meaningless.
+const SEED: u64 = 0x5EED_2026;
+const TOKENIZER_DIR: &str = "models/mc_tokenizer";
+const BPE_MERGES: usize = 1000;
 const MAX_TOK: usize = 48;
 const EPOCHS: usize = 6;
 const LR: f64 = 2e-3;
 const HELD_OUT: f32 = 0.2;
+
+#[derive(Debug, Clone)]
+struct RawItem {
+    dataset: String,
+    question: String,
+    choices: Vec<String>,
+    answer: usize,
+}
 
 #[derive(Debug, Clone)]
 struct Item {
@@ -58,25 +72,16 @@ struct Item {
     answer: usize,
 }
 
-/// Lowercase whitespace tokens hashed into a fixed vocabulary.
+/// Encode text with the shared BPE tokenizer.
 ///
-/// A learned BPE would be better; a hashed vocab is enough to test whether the
-/// *architecture* can learn the task, without a tokenizer-training step in the
-/// way. Collisions are real but uniform across train and held-out.
-fn tokenize(s: &str) -> Vec<usize> {
-    s.to_lowercase()
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .take(MAX_TOK)
-        .map(|w| {
-            let mut h = DefaultHasher::new();
-            w.hash(&mut h);
-            (h.finish() as usize) % VOCAB
-        })
-        .collect()
+/// Ids are dense `0..vocab_size` by construction -- every `add_token` consumes a
+/// fresh `next_id` and the vocabulary is keyed by id -- so `vocab_size()` is a
+/// valid `num_embeddings` for the Burn table.
+fn encode(tok: &SubwordTokenizer, s: &str) -> Vec<usize> {
+    tok.tokenize(s).into_iter().take(MAX_TOK).map(|t| t as usize).collect()
 }
 
-fn load(path: &str) -> Vec<Item> {
+fn load_raw(path: &str) -> Vec<RawItem> {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| {
         eprintln!("cannot read {path}: {e}\nRun the ingest tool first.");
         std::process::exit(1);
@@ -96,15 +101,14 @@ fn load(path: &str) -> Vec<Item> {
         if q.is_empty() || ch.len() < 2 || ans >= ch.len() {
             continue;
         }
-        let qt = tokenize(q);
-        let cts: Vec<Vec<usize>> = ch.iter().map(|c| tokenize(c.as_str().unwrap_or(""))).collect();
-        if qt.is_empty() || cts.iter().any(|t| t.is_empty()) {
+        let choices: Vec<String> = ch.iter().map(|c| c.as_str().unwrap_or("").to_string()).collect();
+        if choices.iter().any(|c| c.trim().is_empty()) {
             continue;
         }
-        out.push(Item {
+        out.push(RawItem {
             dataset: v["dataset"].as_str().unwrap_or("?").to_string(),
-            question: qt,
-            choices: cts,
+            question: q.to_string(),
+            choices,
             answer: ans,
         });
     }
@@ -119,14 +123,20 @@ struct McModel<B: Backend> {
 }
 
 impl<B: Backend> McModel<B> {
-    fn new(device: &B::Device) -> Self {
+    fn new(vocab: usize, device: &B::Device) -> Self {
         Self {
-            embed: EmbeddingConfig::new(VOCAB, DIM).init(device),
+            embed: EmbeddingConfig::new(vocab, DIM).init(device),
             attn: BurnMultiHeadAttention::new(
                 &BurnAttentionConfig::new().with_model_dim(DIM).with_num_heads(4).with_head_dim(32),
                 device,
             ),
-            proj: LinearConfig::new(DIM, DIM).init(device),
+            // Scores [attended ; choice ; attended*choice] -> 1.
+            // A plain dot product between the attention output and the choice
+            // set is near-circular: `attended` IS a weighted mix of those same
+            // vectors, so the logits collapse toward a Gram matrix over choices
+            // and the model sits at ln(N) forever. The elementwise product term
+            // is what gives it an actual contrast signal per choice.
+            proj: LinearConfig::new(DIM * 3, 1).init(device),
         }
     }
 
@@ -146,11 +156,15 @@ impl<B: Backend> McModel<B> {
         let n = cs.len();
         let ctx = Tensor::cat(cs.clone(), 0); // [n, DIM]
 
-        // Question attends over the choice set, then scores each choice.
-        let attended = self.proj.forward(self.attn.forward(q, ctx.clone())); // [1, DIM]
-        let scale = (DIM as f32).sqrt();
-        let scores = attended.matmul(ctx.transpose()).div_scalar(scale); // [1, n]
-        scores.reshape([1, n])
+        // Context-aware question representation, then an explicit contrast
+        // against each candidate.
+        let attended = self.attn.forward(q, ctx.clone()); // [1, DIM]
+        let att_n = Tensor::cat(vec![attended; n], 0); // [n, DIM]
+        let feat = Tensor::cat(
+            vec![att_n.clone(), ctx.clone(), att_n * ctx],
+            1,
+        ); // [n, 3*DIM]
+        self.proj.forward(feat).reshape([1, n])
     }
 }
 
@@ -167,33 +181,68 @@ fn cross_entropy(logits: Tensor<B, 2>, target: usize) -> Tensor<B, 1> {
 
 fn main() {
     let device: Dev = Default::default();
+    // Reproducible init: without this the untrained baseline drifted 24.9%-28.5%
+    // between runs, so "beats untrained" was not a stable claim.
+    <NdArray as Backend>::seed(SEED);
+
     let path = "data/mc_corpus.jsonl";
-    let mut items = load(path);
-    if items.is_empty() {
+    let mut raw = load_raw(path);
+    if raw.is_empty() {
         eprintln!("no usable items in {path}");
         std::process::exit(1);
     }
 
-    // Deterministic split. Shuffle by a fixed stride so every dataset is
-    // represented on both sides rather than splitting by file order.
-    let mut idx: Vec<usize> = (0..items.len()).collect();
+    // Deterministic split, hash-shuffled so every dataset lands on both sides
+    // rather than splitting by file order.
+    let mut idx: Vec<usize> = (0..raw.len()).collect();
     idx.sort_by_key(|&i| {
         let mut h = DefaultHasher::new();
         (i as u64).wrapping_mul(0x9E3779B97F4A7C15).hash(&mut h);
         h.finish()
     });
-    items = idx.into_iter().map(|i| items[i].clone()).collect();
-    let split = ((items.len() as f32) * (1.0 - HELD_OUT)) as usize;
+    raw = idx.into_iter().map(|i| raw[i].clone()).collect();
+    let split = ((raw.len() as f32) * (1.0 - HELD_OUT)) as usize;
+
+    // BPE is trained on the TRAIN SPLIT ONLY. Fitting the vocabulary on the
+    // full corpus would leak held-out text into the tokenisation and inflate
+    // the held-out score.
+    let train_text: Vec<String> = raw[..split]
+        .iter()
+        .flat_map(|r| std::iter::once(r.question.clone()).chain(r.choices.iter().cloned()))
+        .collect();
+    let tok = SubwordTokenizer::load_or_train(
+        std::path::Path::new(TOKENIZER_DIR),
+        &train_text,
+        BPE_MERGES,
+        DIM,
+    );
+
+    let items: Vec<Item> = raw
+        .iter()
+        .map(|r| Item {
+            dataset: r.dataset.clone(),
+            question: encode(&tok, &r.question),
+            choices: r.choices.iter().map(|c| encode(&tok, c)).collect(),
+            answer: r.answer,
+        })
+        .filter(|i| !i.question.is_empty() && !i.choices.iter().any(|c| c.is_empty()))
+        .collect();
+    let split = split.min(items.len().saturating_sub(1));
     let (train, test) = items.split_at(split);
 
-    println!("Vortex multiple-choice — trained on REAL benchmark data\n");
+    println!("Vortex multiple-choice — trained on REAL benchmark data
+");
     println!("  corpus      : {} items ({} train / {} held-out)", items.len(), train.len(), test.len());
     let chance: f32 = test.iter().map(|i| 1.0 / i.choices.len() as f32).sum::<f32>() / test.len() as f32;
     println!("  chance      : {:.1}%", chance * 100.0);
-    println!("  vocab/dim   : {VOCAB} / {DIM}");
+    println!("  tokenizer   : BPE, {} merges, vocab {}", BPE_MERGES, tok.vocab_size());
+    println!("  persisted   : {TOKENIZER_DIR}");
+    println!("  seed        : {SEED:#x}");
+    println!("  dim         : {DIM}");
 
-    let mut model = McModel::<B>::new(&device);
-    println!("  parameters  : {}\n", model.num_params());
+    let mut model = McModel::<B>::new(tok.vocab_size(), &device);
+    println!("  parameters  : {}
+", model.num_params());
 
     let eval = |m: &McModel<B>, set: &[Item]| -> (f32, std::collections::BTreeMap<String, (usize, usize)>) {
         let mut hits = 0usize;
@@ -201,7 +250,12 @@ fn main() {
         for it in set {
             let l = m.logits(it, &device).into_data().convert::<f32>();
             let v = l.as_slice::<f32>().unwrap();
-            let pred = v.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).map(|(i, _)| i).unwrap_or(0);
+            let pred = v
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(i, _)| i)
+                .unwrap_or(0);
             let e = per.entry(it.dataset.clone()).or_insert((0, 0));
             e.1 += 1;
             if pred == it.answer {
@@ -209,7 +263,7 @@ fn main() {
                 e.0 += 1;
             }
         }
-        (hits as f32 / set.len() as f32, per)
+        (hits as f32 / set.len().max(1) as f32, per)
     };
 
     let (untrained, _) = eval(&model, test);
