@@ -139,6 +139,57 @@ impl<B: Backend> BurnMultiHeadAttention<B> {
         self.w_o.forward(merged)
     }
 
+    /// Attend from `query` over a **per-item** `context`.
+    ///
+    /// [`Self::forward`] shares one context across the whole batch, which is
+    /// the ring-buffer shape. Batched multiple-choice training needs the
+    /// opposite: every item carries its *own* candidate set, so the context
+    /// must gain a leading batch axis and the padded candidate slots must be
+    /// removed from the softmax.
+    ///
+    /// ```text
+    /// query   [batch, n_q,   model_dim]
+    /// context [batch, n_ctx, model_dim]
+    /// bias    [batch, 1, 1, n_ctx]   (broadcast to [batch, heads, n_q, n_ctx])
+    /// output  [batch, n_q,   model_dim]
+    /// ```
+    ///
+    /// `bias` is *additive*: `0.0` on real context slots and a large negative
+    /// value (`-1e30`) on padded ones, so `softmax` assigns them exactly zero
+    /// weight and no gradient flows into the padding. Use a finite sentinel
+    /// rather than `f32::NEG_INFINITY` — [`softmax`] subtracts a per-row max
+    /// before `exp`, and `-inf - -inf` is `NaN` if a row is ever fully masked.
+    pub fn forward_batched(
+        &self,
+        query: Tensor<B, 3>,
+        context: Tensor<B, 3>,
+        bias: Option<Tensor<B, 4>>,
+    ) -> Tensor<B, 3> {
+        let [batch, n_q, _] = query.dims();
+        let [_, n_ctx, _] = context.dims();
+        let (h, hd) = (self.num_heads, self.head_dim);
+
+        // Linear is rank-generic ([..., d_in] -> [..., d_out]), so the batch
+        // axis rides through the projections untouched.
+        let q = self.w_q.forward(query).reshape([batch, n_q, h, hd]).swap_dims(1, 2);
+        let k = self.w_k.forward(context.clone()).reshape([batch, n_ctx, h, hd]).swap_dims(1, 2);
+        let v = self.w_v.forward(context).reshape([batch, n_ctx, h, hd]).swap_dims(1, 2);
+
+        // [b, h, n_q, hd] @ [b, h, hd, n_ctx] -> [b, h, n_q, n_ctx]
+        let scale = (hd as f32).sqrt();
+        let mut scores = q.matmul(k.clone().swap_dims(2, 3)).div_scalar(scale);
+        if let Some(bias) = bias {
+            scores = scores + bias;
+        }
+        let weights = softmax(scores, 3);
+
+        // [b, h, n_q, n_ctx] @ [b, h, n_ctx, hd] -> [b, h, n_q, hd]
+        let attended = weights.matmul(v);
+
+        let merged = attended.swap_dims(1, 2).reshape([batch, n_q, h * hd]);
+        self.w_o.forward(merged)
+    }
+
     /// Attention weights only, `[num_heads, batch, n_ctx]`.
     ///
     /// Useful for inspecting *what* the heads learned to look at.
@@ -219,6 +270,64 @@ mod tests {
             attn.num_params() > 0,
             "projections must be registered parameters, not opaque buffers"
         );
+    }
+
+    #[test]
+    fn batched_matches_the_shared_context_path() {
+        // With batch = 1 the per-item path must reproduce the shared-context
+        // path exactly; otherwise the two are not the same computation.
+        let device = Default::default();
+        let attn = BurnMultiHeadAttention::<TB>::new(&cfg(), &device);
+        let q = Tensor::<TB, 2>::from_data(
+            TensorData::new((0..24).map(|i| i as f32 * 0.1).collect::<Vec<f32>>(), [3, 8]),
+            &device,
+        );
+        let c = Tensor::<TB, 2>::from_data(
+            TensorData::new((0..40).map(|i| i as f32 * 0.05).collect::<Vec<f32>>(), [5, 8]),
+            &device,
+        );
+
+        let flat = attn.forward(q.clone(), c.clone());
+        let batched: Tensor<TB, 3> =
+            attn.forward_batched(q.unsqueeze_dim(0), c.unsqueeze_dim(0), None);
+        assert_eq!(batched.dims(), [1, 3, 8]);
+
+        let a = flat.into_data().convert::<f32>();
+        let b = batched.reshape([3, 8]).into_data().convert::<f32>();
+        for (x, y) in a.as_slice::<f32>().unwrap().iter().zip(b.as_slice::<f32>().unwrap()) {
+            assert!((x - y).abs() < 1e-5, "batched path diverged: {x} vs {y}");
+        }
+    }
+
+    #[test]
+    fn additive_mask_zeroes_padded_context_slots() {
+        // A padded slot must not influence the output at all: attending over
+        // [real, real, PAD] with the pad masked has to equal attending over
+        // just [real, real].
+        let device = Default::default();
+        let attn = BurnMultiHeadAttention::<TB>::new(&cfg(), &device);
+        let q = Tensor::<TB, 3>::from_data(
+            TensorData::new((0..8).map(|i| i as f32 * 0.1).collect::<Vec<f32>>(), [1, 1, 8]),
+            &device,
+        );
+        let real = TensorData::new((0..16).map(|i| i as f32 * 0.05).collect::<Vec<f32>>(), [1, 2, 8]);
+        let c2 = Tensor::<TB, 3>::from_data(real.clone(), &device);
+        let c3 = Tensor::cat(vec![c2.clone(), Tensor::<TB, 3>::ones([1, 1, 8], &device) * 7.0], 1);
+
+        // bias [batch, 1, 1, n_ctx]: 0 on real slots, -1e30 on the pad.
+        let bias = Tensor::<TB, 4>::from_data(
+            TensorData::new(vec![0.0f32, 0.0, -1.0e30], [1, 1, 1, 3]),
+            &device,
+        );
+
+        let unpadded = attn.forward_batched(q.clone(), c2, None);
+        let padded = attn.forward_batched(q, c3, Some(bias));
+
+        let a = unpadded.into_data().convert::<f32>();
+        let b = padded.into_data().convert::<f32>();
+        for (x, y) in a.as_slice::<f32>().unwrap().iter().zip(b.as_slice::<f32>().unwrap()) {
+            assert!((x - y).abs() < 1e-5, "padding leaked into the output: {x} vs {y}");
+        }
     }
 
     #[test]
