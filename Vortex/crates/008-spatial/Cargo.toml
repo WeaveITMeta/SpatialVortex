@@ -1,0 +1,12 @@
+[package]
+name = "vortex-spatial"
+description = "008 | Vortex Spatial: 2D/3D-with-time reasoning. Collision-free route planning, clearance, assembly placement and kinematics."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+vortex-kernel.workspace = true
+serde.workspace = true

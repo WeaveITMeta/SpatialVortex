@@ -1,0 +1,14 @@
+[package]
+name = "vortex-rsi"
+description = "012 | Vortex RSI: the improvement gate. Self-modification only through significant held-out gains, zero safety regressions, reversibility and an append-only ledger."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+vortex-kernel.workspace = true
+vortex-constitution.workspace = true
+serde.workspace = true
+serde_json.workspace = true

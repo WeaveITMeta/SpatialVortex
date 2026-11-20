@@ -1,0 +1,16 @@
+[package]
+name = "vortex-pipeline"
+description = "005 | Vortex Pipeline (Eustress AI Mode): the seven-discipline learning lifecycle and the per-request inference tick, both constitution-gated and traced."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+vortex-kernel.workspace = true
+vortex-constitution.workspace = true
+vortex-safety.workspace = true
+vortex-tools.workspace = true
+serde.workspace = true
+serde_json.workspace = true

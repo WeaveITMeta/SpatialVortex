@@ -1,0 +1,13 @@
+[package]
+name = "vortex-world"
+description = "010 | Vortex World Model: abstract-state reasoning over the Eustress WorldState loop (OBSERVE, HYPOTHESIZE, SIMULATE, EVALUATE, INTERNALIZE). v1: few-shot ARC grid program induction."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+vortex-kernel.workspace = true
+eustress-vortex-core.workspace = true
+eustress-vortex-grid2d.workspace = true

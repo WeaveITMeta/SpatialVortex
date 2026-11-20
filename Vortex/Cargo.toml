@@ -1,0 +1,57 @@
+# =============================================================================
+# Vortex — pure-Rust general intelligence system, built to live inside
+# Eustress Engine. One crate per numbered subsystem; see SUBSYSTEMS.md.
+#
+# Folder prefixes (000-, 001-, ...) are the subsystem registry numbers that
+# dedicated build sessions are named after ("001 | Vortex Orchestrator").
+# Package names are `vortex-*` and deliberately never plain `vortex`, which is
+# already taken by ../aimodel.
+# =============================================================================
+
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.88"
+authors = ["McKale Olson"]
+repository = "https://github.com/WeaveITMeta/SpatialVortex"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml_edit = "0.22"
+
+vortex-kernel = { path = "crates/000-kernel" }
+vortex-orchestrator = { path = "crates/001-orchestrator" }
+vortex-llm = { path = "crates/002-llm" }
+vortex-constitution = { path = "crates/003-constitution" }
+vortex-safety = { path = "crates/004-safety" }
+vortex-pipeline = { path = "crates/005-pipeline" }
+vortex-tools = { path = "crates/006-tools" }
+vortex-spatial = { path = "crates/008-spatial" }
+vortex-world = { path = "crates/010-world" }
+vortex-rsi = { path = "crates/012-rsi" }
+vortex-harness = { path = "crates/014-harness" }
+vortex-economics = { path = "crates/015-economics" }
+vortex-eustress = { path = "crates/017-eustress" }
+
+# Eustress Engine (submodule at ../eustress/EustressEngine). Path deps, never
+# vendored copies: Vortex tracks the engine's real API.
+eustress-data = { path = "../eustress/EustressEngine/eustress/crates/data" }
+eustress-bridge-client = { path = "../eustress/EustressEngine/eustress/crates/bridge-client" }
+eustress-vortex-core = { path = "../eustress/crates/vortex-core" }
+eustress-vortex-grid2d = { path = "../eustress/crates/vortex-grid2d" }
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 16
+
+# Tests that train the n-gram model are slow unoptimised.
+[profile.test]
+opt-level = 2

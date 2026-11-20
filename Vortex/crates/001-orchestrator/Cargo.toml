@@ -1,0 +1,28 @@
+[package]
+name = "vortex-orchestrator"
+description = "001 | Vortex Orchestrator: routes every task to the subsystem that owns it, runs the AI-mode lifecycle, and ships the `vortex` CLI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "vortex"
+path = "src/bin/vortex.rs"
+
+[dependencies]
+vortex-kernel.workspace = true
+vortex-llm.workspace = true
+vortex-constitution.workspace = true
+vortex-safety.workspace = true
+vortex-pipeline.workspace = true
+vortex-tools.workspace = true
+vortex-spatial.workspace = true
+vortex-world.workspace = true
+vortex-rsi.workspace = true
+vortex-harness.workspace = true
+vortex-economics.workspace = true
+vortex-eustress.workspace = true
+serde.workspace = true
+serde_json.workspace = true
