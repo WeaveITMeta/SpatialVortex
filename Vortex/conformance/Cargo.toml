@@ -15,7 +15,7 @@ name = "vortex-conformance"
 description = "Vortex API cross-checks against independent implementations (TOON spec 4.4 reference decoder)."
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "Apache-2.0"
 publish = false
 
 [dependencies]
