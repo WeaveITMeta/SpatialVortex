@@ -1,0 +1,25 @@
+[package]
+name = "vortex-api"
+description = "Vortex API: the whole in-process Vortex surface as one dependency-light crate any host can embed. Modules behind a named-method door, reachable as Rust calls, JSON, JSON-RPC 2.0 or MCP tools. Pure: no file, process, network or environment I/O."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[lib]
+name = "vortex_api"
+
+[features]
+default = []
+# 010 | World Model: ARC grid program induction on the vortex-core
+# loop. Off by default so the embeddable core stays dependency-light.
+world = ["dep:eustress-vortex-core", "dep:eustress-vortex-grid2d"]
+
+[dependencies]
+vortex-kernel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+eustress-vortex-core = { workspace = true, optional = true }
+eustress-vortex-grid2d = { workspace = true, optional = true }

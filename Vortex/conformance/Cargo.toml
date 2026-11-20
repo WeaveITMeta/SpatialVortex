@@ -1,0 +1,28 @@
+# Out-of-workspace cross-checks. Deliberately NOT a member of the Vortex
+# workspace: the reference TOON implementation enables the `preserve_order`
+# feature of serde_json, and cargo would unify that feature into every
+# workspace test build, so the workspace would be tested under a different
+# serde_json than the release binary ships with. Run it on demand:
+#
+#   cd conformance && cargo test
+#
+# That also runs the vortex-api unit tests under `preserve_order`
+# (insertion-ordered maps), the configuration a host may impose.
+[workspace]
+
+[package]
+name = "vortex-conformance"
+description = "Vortex API cross-checks against independent implementations (TOON spec 4.4 reference decoder)."
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+vortex-api = { path = "../crates/api" }
+serde_json = "1"
+
+[dev-dependencies]
+# Reference implementation from the TOON org; declares toon-spec 4.4.
+# `default-features = false` drops its CLI/TUI stack.
+toon-format = { version = "=0.7.0", default-features = false }

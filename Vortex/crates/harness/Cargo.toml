@@ -1,0 +1,16 @@
+[package]
+name = "vortex-harness"
+description = "014 | Vortex Harness: anti-cheat evaluation across language, math, code, grids, 2D/3D space, safety and tool use, with calibration, confidence intervals and an append-only ledger."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+# Deliberately depends on the kernel only (never vortex-api): graders never
+# share code with the solvers they grade. sha2 checks the sealed-set pins.
+[dependencies]
+vortex-kernel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true

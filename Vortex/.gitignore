@@ -1,1 +1,4 @@
-/target
+target/
+# Rewritten by every `vortex eval`; the ledger is the record.
+/eval/latest_report.json
+/eval/cost_report.json

@@ -2,7 +2,7 @@
 
 Hash: `sha256:cbf5923f25b7a8944ae050d6d60e43e9dfa76a6c9ca7cb0cf8faaf453d5035ae`
 
-Generated from `crates/003-constitution/src/lib.rs`; the code is the source of truth.
+Generated from `crates/api/src/constitution.rs`; the code is the source of truth.
 
 ## A1 Human authority (gate)
 

@@ -1,8 +1,76 @@
 # Vortex
 
-A pure-Rust general intelligence system, built to run inside Eustress Engine. It is organised as numbered subsystems (see [SUBSYSTEMS.md](SUBSYSTEMS.md)), governed by a hash-pinned [constitution](CONSTITUTION.md), and measured by a harness built so it cannot flatter itself ([eval/PROTOCOL.md](eval/PROTOCOL.md)).
+A pure-Rust general intelligence system behind one host-agnostic API. Any host uses it the same way: an engine, an editor, an agent, a script. It is organised as numbered subsystems (see [SUBSYSTEMS.md](SUBSYSTEMS.md)), governed by a hash-pinned [constitution](CONSTITUTION.md), and measured by a harness built so it cannot flatter itself ([eval/PROTOCOL.md](eval/PROTOCOL.md)).
 
 [EVALUATION.md](EVALUATION.md) is the audit of the legacy system this replaces, and records what transfers.
+
+## Layout: four crates
+
+| Crate | What it is | Depends on |
+|---|---|---|
+| [`vortex-kernel`](crates/kernel) | The shared vocabulary: `Task`, `Answer`, `Response`, the `Agent` trait, tool and Guardian types. | `serde`, `serde_json` |
+| [`vortex-api`](crates/api) | **The API.** Everything Vortex does in-process. Pure computation: no file, process, network or environment access (`tests/purity.rs` enforces it). | kernel, `serde`, `serde_json`, `sha2` |
+| [`vortex-harness`](crates/harness) | The graders. Never links `vortex-api`, so a solver bug cannot also corrupt its own grade. | kernel, `serde`, `serde_json`, `sha2` |
+| [`vortex-lab`](crates/lab) | Everything with side effects: the `vortex` CLI, `vortex serve`, the eval run, corpus loading with provenance, shell and filesystem tools, the MCP client, pricing. | the three above, `toml_edit` |
+
+No crate depends on any host. The only code outside `Vortex/` that the workspace touches is the domain-agnostic WorldState core in this repository (`eustress/crates/vortex-core`, `vortex-grid2d`), and only behind the `world` feature. [`conformance/`](conformance) sits outside the workspace and cross-checks the API against independent implementations.
+
+## The API
+
+**Universal.** One surface, four ways to reach it. All four are built on the same two functions, `methods()` and `call()`, so whatever one can do, all can do.
+
+| Way in | For | Example |
+|---|---|---|
+| Typed Rust | a Rust host that links the crate | `vortex.gate(&call, Effect::LocalWrite, &approvals)` |
+| By name, JSON | a host with its own tool registry | `vortex.call("safety.gate", params)` |
+| JSON-RPC 2.0 | any language, any transport | `{"jsonrpc":"2.0","id":1,"method":"safety.gate","params":{...}}` |
+| MCP tools | any Model Context Protocol host | `tools/list`, then `tools/call` with `safety_gate` |
+
+`vortex serve` speaks the last two on stdio. `vortex_api::rpc` is the same handler with no transport attached: one message in, one reply out, for a host that moves the bytes itself.
+
+**Dynamic.** What a handle offers is decided when it is built, not when the crate is compiled. `methods()` returns every method with its JSON Schema at run time. Language models, tools and modules are trait objects the host supplies.
+
+**Modular.** Every capability is a module under its own namespace. A host adds its own, replaces a built-in by registering the same id, or drops one:
+
+```rust
+let vortex = Vortex::new()                 // core, safety, tools, spatial
+    .with_module(Arc::new(MyModule))       // served by all four ways in, no other wiring
+    .without_module("spatial");
+```
+
+| Module | Methods |
+|---|---|
+| `core` | `core.info`, `core.constitution`, `core.respond`, `core.plan` |
+| `safety` | `safety.moderate`, `safety.assess_action`, `safety.gate` |
+| `tools` | `tools.route`, `tools.calc` |
+| `spatial` | `spatial.solve`, `spatial.kinematics` |
+
+Every built-in method decides or computes; none executes. `core.plan` is the one a host that owns execution wants: it moderates a request, rules on it, routes it to tool calls, and gates each call, and hands back the plan.
+
+`call` returns JSON for code. `call_text` returns the text a model should read. [`crates/api/tests/host_seam.rs`](crates/api/tests/host_seam.rs) drives every method through one generic adapter of the shape every tool system shares (definition, execute, read-only flag).
+
+To depend on it:
+
+```toml
+vortex-api = { path = "../Vortex/crates/api" }
+```
+
+A path dependency is the tested form: [`conformance/`](conformance) consumes the crate exactly this way, from outside the workspace. A git dependency on this repository is untested.
+
+### TOON, measured
+
+`vortex_api::toon` is a JSON to TOON encoder for [spec 4.4](https://github.com/toon-format/spec), checked byte-for-byte against the reference encoder and round-tripped through the reference decoder. TOON is not smaller everywhere. Against compact JSON on Vortex's own outputs (o200k tokens, a proxy for the model's tokenizer):
+
+| Result | Shape | TOON tokens vs JSON |
+|---|---|---|
+| Cost report | table | 69% |
+| Method list | table | 85% |
+| Constitution | table | 86% |
+| Eval report | nested | 105% |
+| Plan | nested | 110% |
+| Spatial solution | nested | 122% |
+
+So `call_text` returns whichever encoding is shorter, and says which. Tables are where the saving is; a result worth sending to a model in bulk is worth shaping as a table first.
 
 ## Architecture: one contract, many solvers, two loops
 
@@ -18,8 +86,8 @@ request --> OBSERVE --> CLASSIFY (004 Guardian lane) --> GATE --> PLAN (006 rout
 Task --> 001 Orchestrator --> 002 LLM | 006 Tools | 008 Spatial | 010 World | 004 Safety | ...
                               each answer labelled learned / search / engineered
 
-Eustress AI Mode lifecycle (005, outer loop):
-  Acquisition -> Curation -> Provenance (eustress-data Manifest must verify) -> Training
+Lifecycle (005, outer loop):
+  Acquisition -> Curation -> Provenance (manifest must verify) -> Training
   -> Reinforcement (012 gate, dev split only) -> Evaluation (014, test + sealed) -> Publishing (ledger; outward needs a human)
 ```
 
@@ -32,6 +100,10 @@ How this generalises to every type of problem:
 ## First measured results (2026-10-02, seed 20261002)
 
 The run used a 32 MB slice of the AI2 ARC Corpus: 5.74M tokens, held-out perplexity 448. Its constitution hash is `sha256:cbf5923f...`. The full output is in [eval/first_contact_run.txt](eval/first_contact_run.txt) and the machine record is in [eval/ledger.jsonl](eval/ledger.jsonl).
+
+**Reproduced exactly on 2026-11-19**, before and after the recompose into four crates: a control run on the old tree, then the new tree, same seed. Every row below and every per-suite metric matched; only latency moved. No solver, classifier or grader logic changed.
+
+The same run is also faster. Timings move with machine load, so as ranges over five runs that day: 26 to 47 s before, 11 to 16 s after. The Evaluation stage went from 18 to 32 s down to under 6 s, because the contamination check used to re-read the whole training corpus once per suite and now reads it once. Provenance hashing moved to a native manifest, and the release profile uses one codegen unit with thin LTO. The scores did not move, and held-out perplexity is identical to the last digit.
 
 | Suite | n | Score | 95% CI | Chance | How |
 |---|---|---|---|---|---|
@@ -60,7 +132,7 @@ The **real Astra Spatial Reasoning Lab** Space scored **100/100**, graded by its
 
 ## Cost and price
 
-[`015-economics`](crates/015-economics) prices every workload from *measured* latency. It assumes an AWS c7i.2xlarge (8 vCPU) at $0.357/h, 35% utilisation and 25% infrastructure overhead. Revenue is split as follows:
+[`vortex_lab::economics`](crates/lab/src/economics.rs) (subsystem 015) prices every workload from *measured* latency. It assumes an AWS c7i.2xlarge (8 vCPU) at $0.357/h, 35% utilisation and 25% infrastructure overhead. Revenue is split as follows:
 
 | Share | % of revenue |
 |---|---|
@@ -87,12 +159,20 @@ The goal named for Vortex is consciousness inside Eustress Engine. No accepted t
 - **A self-model that knows what it knows.** Every answer carries a confidence, and the harness scores calibration (Brier). Current calibration is poor; HellaSwag Brier is 0.727.
 - **A persistent identity.** The ledgers and, in future, 009 Memory.
 - **A global workspace.** The orchestrator plus the per-request trace.
-- **A world model it can act in and verify against.** 010 and 017.
+- **A world model it can act in and verify against.** 010.
 
 ## Run it
 
 ```bash
-cargo build --release -p vortex-orchestrator
+cargo build --release -p vortex-lab
+```
+
+```bash
+./target/release/vortex call safety.gate '{"tool":"shell","args":{"command":"git push origin main"}}'
+```
+
+```bash
+./target/release/vortex toon eval/cost_report.json
 ```
 
 ```bash
@@ -100,7 +180,15 @@ cargo build --release -p vortex-orchestrator
 ```
 
 ```bash
-./target/release/vortex astra
+./target/release/vortex serve
+```
+
+```bash
+./target/release/vortex mcp ./target/release/vortex serve
+```
+
+```bash
+./target/release/vortex astra --space "<path to a Spatial Reasoning Lab Space>"
 ```
 
 ```bash
@@ -108,11 +196,13 @@ cargo build --release -p vortex-orchestrator
 ```
 
 ```bash
-./target/release/vortex spaces
-```
-
-```bash
 cargo test --workspace
 ```
 
-`vortex eval` defaults to 500 items per dataset, 200 per procedural suite, 100 ARC-AGI tasks and a 32 MB LM corpus. A full run takes about 45 seconds on this machine.
+```bash
+cd conformance && cargo test
+```
+
+`vortex call` with no method lists the API. `vortex serve` is the API over JSON-RPC 2.0 and MCP on stdio, and the `vortex mcp` line above points Vortex's own MCP client at it to list the tools it serves. The conformance suite is separate on purpose: its reference TOON decoder turns on `serde_json`'s `preserve_order`, and running it apart keeps the workspace tests on the same `serde_json` the release binary uses. It also proves the API under that setting, which a host may impose.
+
+`vortex eval` refuses to score anything if a sealed set does not match `eval/heldout/MANIFEST.sha256`. It defaults to 500 items per dataset, 200 per procedural suite, 100 ARC-AGI tasks and a 32 MB LM corpus. A full run takes about 45 seconds on this machine.

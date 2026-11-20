@@ -1,0 +1,20 @@
+[package]
+name = "vortex-lab"
+description = "Vortex Lab: everything that touches disk, processes or the network. The lifecycle run (001), provenance-gated corpora (002), host tools and the MCP client (006), the RSI ledger (012), economics (015), and the `vortex` CLI with `vortex serve`."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "vortex"
+path = "src/bin/vortex.rs"
+
+[dependencies]
+vortex-kernel.workspace = true
+vortex-api = { workspace = true, features = ["world"] }
+vortex-harness.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml_edit.workspace = true

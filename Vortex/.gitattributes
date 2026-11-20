@@ -1,0 +1,7 @@
+# Byte-exact files. The sealed sets are hash-pinned in
+# eval/heldout/MANIFEST.sha256 and the harness refuses to score them if a
+# single byte differs; the ledgers are append-only records. Git must never
+# convert their line endings, on any platform.
+eval/heldout/** -text
+eval/*.jsonl -text
+eval/first_contact_run.txt -text

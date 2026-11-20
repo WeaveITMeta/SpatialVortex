@@ -42,7 +42,7 @@ There was no pretrained or trained LLM, no working diffusion model, and no real 
 
 - **AI mode exists upstream** as a Studio Mode (`engine/modes/ai.toml`). Its seven disciplines (Acquisition, Curation, Provenance, Training, Reinforcement, Evaluation, Publishing) became Vortex's lifecycle (005).
 - **The Guardian Policy v1.2** became Vortex's safety taxonomy (000, 004).
-- **`eustress-data` provenance** now gates Vortex training (002, through A7).
+- **`eustress-data` provenance** gated Vortex training (002, through A7) until 2026-11-19, when `vortex_api::provenance` replaced it and Vortex stopped depending on engine crates.
 - The engine **Workshop** is an agentic tool loop with per-message cost tracking. The **Soul Kernel** gates Rune rewrites. Vortex's 012 gate plays the same role for Vortex itself.
 - Scripting runs Luau via `mlua` 0.10 and Rune 0.14. The engine exposes both through `execute_luau` and `execute_rune` (MCP and Engine Bridge). Vortex reaches them as tools through 006 and 017. Emitting Rune, Kernel-gated, is 013's job.
 - **forge-orchestration** 0.6 (`E:\Libraries\Forge`) has job, MoE-routing and sim-cell scheduling, but **no cost metering**. 015 supplies that.
